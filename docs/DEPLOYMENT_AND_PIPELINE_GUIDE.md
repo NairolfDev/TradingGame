@@ -13,88 +13,32 @@ Dieses Handbuch führt dich **Schritt für Schritt** durch alle manuellen Schrit
 
 ---
 
-## 1. GitHub Repository & CI/CD Secrets Setup
+## 1. GitHub Repository & CI/CD Setup – ✅ BEREITS ERLEDIGT!
 
-Deine CI/CD-Pipeline in `.github/workflows/ci_cd.yml` ist bereits vollständig programmiert. Sobald du deinen Code auf GitHub pushst, baut GitHub Actions automatisch:
-- Den **Web-Build** und deployt ihn auf Firebase Hosting.
-- Die **Android APK** (zum direkten Installieren am Smartphone).
-- Das **Android App Bundle (.aab)** für die Google Play Console.
-- Die **Windows Desktop Version** (.zip).
-- Und bei jedem Git-Tag (z. B. `v1.0.0`) ein **GitHub Release**, das die Auto-Update-Prüfung im Spiel füttert!
-
-### Schritt 1.1: Repository auf GitHub anlegen & Public schalten
-1. Öffne [github.com/new](https://github.com/new).
-2. Vergib den Repository-Namen: `TradingGame` (oder `trading_game`).
-3. Wähle **Public** (damit GitHub Releases öffentlich heruntergeladen werden können und dein Auto-Update-Check für alle Spieler ohne API-Token funktioniert).
-4. Klicke auf **Create repository** (ohne README / .gitignore anzuhaken, da wir diese schon lokal haben).
-
-### Schritt 1.2: Code von deinem PC auf GitHub hochladen
-Öffne PowerShell im Projektordner `C:\Users\oberh\WenziComp\TradingGame` und führe aus:
-```powershell
-git init
-git add .
-git commit -m "feat: complete trading game with loans, credit rating, real-time hours, luxury shop and multi-platform CI/CD"
-git branch -M main
-git remote add origin https://github.com/<DEIN-GITHUB-USERNAME>/TradingGame.git
-git push -u origin main
-```
-
-### Schritt 1.3: GitHub Actions Secret für Firebase Hosting hinterlegen
-Damit GitHub Actions die Web-Version automatisch auf Firebase veröffentlichen darf:
-1. Gehe in deinem GitHub-Repository auf **Settings** -> **Secrets and variables** -> **Actions**.
-2. Klicke auf **New repository secret**.
-3. **Name**: `FIREBASE_SERVICE_ACCOUNT`
-4. **Secret**: Füge hier den JSON-Schlüssel aus Firebase ein (wie du diesen Schlüssel erstellst, siehst du in Abschnitt 2.3).
-5. Klicke auf **Add secret**.
+- **GitHub Repository**: [github.com/NairolfDev/TradingGame](https://github.com/NairolfDev/TradingGame) ist live und auf **Public** gesetzt.
+- **Branches**: `dev` und `main` sind synchronisiert und aktuell.
+- **GitHub Secret**: Das Secret `FIREBASE_SERVICE_ACCOUNT` wurde bereits vollautomatisch per CLI hinterlegt.
+- **CI/CD Pipeline**: `.github/workflows/ci_cd.yml` baut bei jedem Push auf `main` oder bei neuen Tags:
+  - 🌐 **Web-Build** & automatischer Deploy auf Firebase Hosting
+  - 🤖 **Android APK** (`trading_game.apk`)
+  - 📦 **Android App Bundle** (`trading_game.aab` für den Google Play Store)
+  - 🪟 **Windows Release** (`TradingGame-Windows-x64.zip`)
 
 ---
 
-## 2. Firebase Console Setup (Auth, Firestore & Hosting)
+## 2. Firebase Setup (Was erledigt ist & Was du noch brauchst)
 
-Dein Firebase-Projekt wurde bereits mit der Project-ID **`tradinggame-austria-prod`** erstellt und im Flutter-Code konfiguriert. Du musst nun noch die Authentifizierungsmethoden und die Datenbank in der Web-Konsole aktivieren.
+### Bereits erledigt:
+- ✅ **Firebase Projekt**: `tradinggame-austria-prod` erstellt und konfiguriert.
+- ✅ **Firebase Security Rules (`firestore.rules`)**: Vollständig implementiert und live auf Firebase deployt!
+- ✅ **Firebase Hosting**: Live unter [https://tradinggame-austria-prod.web.app](https://tradinggame-austria-prod.web.app).
 
-### Schritt 2.1: Login-Methoden (Auth) aktivieren
-1. Öffne die [Firebase Console](https://console.firebase.google.com/).
-2. Wähle dein Projekt **`tradinggame-austria-prod`** aus.
-3. Klicke links im Menü auf **Build** -> **Authentication** (bzw. Authentifizierung) -> **Get started**.
-4. Wähle im Reiter **Sign-in method**:
-   - **E-Mail/Passwort**:
-     - Klicke darauf -> Schalter auf **Aktivieren** stellen -> **Speichern**.
-   - **Google**:
-     - Klicke auf **Google** -> Schalter auf **Aktivieren** stellen.
-     - Wähle deine Support-E-Mail aus dem Dropdown.
-     - Klicke auf **Speichern**.
-
-### Schritt 2.2: Cloud Firestore Datenbank aktivieren
-1. Klicke links im Menü auf **Build** -> **Firestore Database** -> **Create database**.
-2. Wähle als Standort **`europe-west3 (Frankfurt)`** oder `europe-west1 (Belgien)`.
-3. Wähle **Start in test mode** (Testmodus) und klicke auf **Enable**.
-4. **Firestore Sicherheitsregeln (Rules)**:
-   Gehe auf den Reiter **Rules** (Regeln) und füge folgendes ein:
-   ```javascript
-   rules_version = '2';
-   service cloud.firestore {
-     match /databases/{database}/documents {
-       // Leaderboard darf jeder lesen, aber nur angemeldete Nutzer aktualisieren
-       match /leaderboard/{docId} {
-         allow read: if true;
-         allow write: if request.auth != null;
-       }
-       // Portfolio & Kredite: Jeder Nutzer darf nur sein eigenes Dokument lesen und schreiben
-       match /portfolios/{userId}/{document=**} {
-         allow read, write: if request.auth != null && request.auth.uid == userId;
-       }
-     }
-   }
-   ```
-5. Klicke auf **Publish** (Veröffentlichen).
-
-### Schritt 2.3: Firebase Service Account Schlüssel für GitHub generieren
-1. Klicke oben links auf das **Zahnrad-Symbol** (Projekteinstellungen).
-2. Gehe auf den Reiter **Dienstkonten** (Service accounts).
-3. Klicke unten auf **Neuen privaten Schlüssel generieren** (Generate new private key).
-4. Eine `.json`-Datei wird heruntergeladen.
-5. Öffne diese `.json`-Datei mit einem Text-Editor, kopiere den **gesamten Inhalt** und füge ihn in GitHub unter `FIREBASE_SERVICE_ACCOUNT` ein (siehe Schritt 1.3).
+### Deine einzigen 2 Klicks in Firebase:
+1. Öffne die [Firebase Authentication Konsole](https://console.firebase.google.com/project/tradinggame-austria-prod/authentication/providers).
+2. Klicke auf **Get Started** (falls noch nicht geschehen).
+3. Unter **Sign-in method**:
+   - **E-Mail/Passwort**: Anklicken -> **Aktivieren** -> **Speichern**.
+   - *(Optional)* **Google**: Anklicken -> **Aktivieren** -> Support-E-Mail wählen -> **Speichern**.
 
 ---
 
