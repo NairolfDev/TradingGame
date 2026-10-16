@@ -17,6 +17,13 @@ class CurrencyFormatter {
     return _euroFormat.format(value);
   }
 
+  static String formatPrice(num value) {
+    if (value < 1) {
+      return '${value.toStringAsFixed(4)} €';
+    }
+    return _euroFormat.format(value);
+  }
+
   static String formatCompact(num value) {
     return _compactEuroFormat.format(value);
   }

@@ -6,13 +6,13 @@ import 'package:trading_game/logic/trading_fee_service.dart';
 
 void main() {
   group('CreditRatingService & Loans Tests', () {
-    test('Start Loan has 50.000 EUR principal and 60 days term', () {
+    test('Start Loan has 25.000 EUR principal and 60 days term', () {
       final startLoan = Loan.createInitialStartLoan();
-      expect(startLoan.principal, 50000.0);
+      expect(startLoan.principal, 25000.0);
       expect(startLoan.durationDays, 60);
       expect(startLoan.interestRate, 0.045);
-      expect(startLoan.remainingDebt, 50000.0);
-      expect(startLoan.totalWithInterest, greaterThan(50000.0));
+      expect(startLoan.remainingDebt, 25000.0);
+      expect(startLoan.totalWithInterest, greaterThan(25000.0));
       expect(startLoan.isPaid, false);
       expect(startLoan.daysRemaining, inInclusiveRange(59, 60));
     });

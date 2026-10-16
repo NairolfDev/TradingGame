@@ -7,7 +7,9 @@ import '../../data/models/market_schedule.dart';
 import '../../logic/portfolio_provider.dart';
 import '../../logic/auth_provider.dart';
 import '../../logic/trading_fee_service.dart';
+import '../../data/models/automation_order.dart';
 import '../widgets/interactive_broker_chart.dart';
+import '../widgets/order_routing_dialog.dart';
 import 'auth_screen.dart';
 
 class TradeDetailScreen extends StatefulWidget {
@@ -110,6 +112,16 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
           ],
         ),
         actions: [
+          IconButton(
+            icon: Icon(
+              liveAsset.isWatchlisted ? Icons.star : Icons.star_border,
+              color: liveAsset.isWatchlisted ? AppColors.accentGold : AppColors.textMuted,
+            ),
+            tooltip: liveAsset.isWatchlisted ? 'Aus Watchlist entfernen' : 'Zu Watchlist hinzufügen',
+            onPressed: () {
+              provider.toggleWatchlist(liveAsset);
+            },
+          ),
           Container(
             margin: const EdgeInsets.only(right: 16),
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -625,8 +637,359 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
               ],
             ),
           ),
+          const SizedBox(height: 16),
+          _buildAutomationBotSection(context, liveAsset, provider),
           const SizedBox(height: 30),
         ],
+      ),
+    );
+  }
+
+  Widget _buildAutomationBotSection(
+    BuildContext context,
+    Asset asset,
+    PortfolioProvider provider,
+  ) {
+    final activeOrdersForAsset = provider.activeAutomationOrders
+        .where((o) => o.assetId == asset.id || o.symbol == asset.symbol)
+        .toList();
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.accentGold.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Row(
+                children: [
+                  Text('🤖', style: TextStyle(fontSize: 18)),
+                  SizedBox(width: 8),
+                  Text(
+                    'Limit-Orders & Bot-Trading',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: AppColors.accentGold.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '${provider.activeAutomationOrders.length} / ${provider.unlockedAutomationSlotsCount} Slots',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.accentGold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Automatisiere deine Ein- und Ausstiege. Kaufe bei Marktrücksetzern (Buy-At) oder sichere Gewinne automatisch (Sell-At).',
+            style: TextStyle(
+              fontSize: 11.5,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Aktive Orders für dieses Asset
+          if (activeOrdersForAsset.isNotEmpty) ...[
+            const Text(
+              'Aktive Bot-Orders für dieses Instrument:',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: AppColors.textMuted,
+              ),
+            ),
+            const SizedBox(height: 6),
+            ...activeOrdersForAsset.map((order) {
+              final isBuy = order.orderType == AutomationOrderType.buyLimit;
+              return Container(
+                margin: const EdgeInsets.only(bottom: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceElevated,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppColors.cardBorder),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          isBuy ? Icons.arrow_downward : Icons.arrow_upward,
+                          size: 14,
+                          color: isBuy ? AppColors.profitGreen : AppColors.lossRed,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          '${order.orderType.displayName}: ${CurrencyFormatter.formatPrice(order.targetPrice)}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          '(${CurrencyFormatter.formatAmount(order.amount)} Stk.)',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                    TextButton(
+                      style: TextButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        foregroundColor: AppColors.lossRed,
+                        padding: EdgeInsets.zero,
+                      ),
+                      onPressed: () {
+                        provider.cancelAutomationOrder(order.id);
+                      },
+                      child: const Text('Stornieren', style: TextStyle(fontSize: 11)),
+                    ),
+                  ],
+                ),
+              );
+            }),
+            const SizedBox(height: 8),
+          ],
+
+          // Buttons: Neue Order & Slot freischalten
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  icon: const Icon(Icons.add, size: 16),
+                  label: const Text('Limit-Order setzen'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.accentGold,
+                    foregroundColor: Colors.black,
+                    textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  onPressed: () => _showCreateLimitOrderDialog(context, asset, provider),
+                ),
+              ),
+              if (provider.nextAutomationSlotCost != null) ...[
+                const SizedBox(width: 8),
+                OutlinedButton.icon(
+                  icon: const Icon(Icons.upgrade, size: 16),
+                  label: Text('+Slot (${CurrencyFormatter.format(provider.nextAutomationSlotCost!)})'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.accentGold,
+                    side: const BorderSide(color: AppColors.accentGold),
+                    textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  onPressed: () async {
+                    final success = await provider.unlockAutomationSlot();
+                    if (!success && context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Nicht genügend Barmittel für diesen Bot-Slot!')),
+                      );
+                    }
+                  },
+                ),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showCreateLimitOrderDialog(
+    BuildContext context,
+    Asset asset,
+    PortfolioProvider provider,
+  ) {
+    if (provider.activeAutomationOrders.length >= provider.unlockedAutomationSlotsCount) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: AppColors.surface,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text('Kein freier Bot-Slot'),
+          content: Text(
+            provider.nextAutomationSlotCost != null
+                ? 'Alle ${provider.unlockedAutomationSlotsCount} Slots sind belegt. Schalte Slot ${provider.unlockedAutomationSlotsCount + 1} für ${CurrencyFormatter.format(provider.nextAutomationSlotCost!)} frei!'
+                : 'Du hast bereits alle 5 Bot-Slots belegt!',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Schließen'),
+            ),
+            if (provider.nextAutomationSlotCost != null)
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.accentGold,
+                  foregroundColor: Colors.black,
+                ),
+                onPressed: () async {
+                  Navigator.pop(ctx);
+                  await provider.unlockAutomationSlot();
+                },
+                child: const Text('Slot freischalten'),
+              ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    AutomationOrderType selectedType = AutomationOrderType.buyLimit;
+    double targetPrice = double.parse((asset.currentPrice * 0.96).toStringAsFixed(asset.currentPrice > 500 ? 2 : 4));
+    double orderAmount = _amount;
+
+    final targetPriceController = TextEditingController(text: targetPrice.toString());
+    final orderAmountController = TextEditingController(text: orderAmount.toString());
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setModalState) {
+          return Padding(
+            padding: EdgeInsets.only(
+              left: 20,
+              right: 20,
+              top: 20,
+              bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Neue Limit-Order (Bot)',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(ctx),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                SegmentedButton<AutomationOrderType>(
+                  segments: const [
+                    ButtonSegment(
+                      value: AutomationOrderType.buyLimit,
+                      label: Text('Buy-At', style: TextStyle(fontSize: 11)),
+                    ),
+                    ButtonSegment(
+                      value: AutomationOrderType.takeProfit,
+                      label: Text('Take-Profit', style: TextStyle(fontSize: 11)),
+                    ),
+                    ButtonSegment(
+                      value: AutomationOrderType.stopLoss,
+                      label: Text('Stop-Loss', style: TextStyle(fontSize: 11)),
+                    ),
+                  ],
+                  selected: {selectedType},
+                  onSelectionChanged: (val) {
+                    setModalState(() {
+                      selectedType = val.first;
+                      if (selectedType == AutomationOrderType.buyLimit) {
+                        targetPrice = double.parse((asset.currentPrice * 0.95).toStringAsFixed(asset.currentPrice > 500 ? 2 : 4));
+                      } else if (selectedType == AutomationOrderType.takeProfit) {
+                        targetPrice = double.parse((asset.currentPrice * 1.08).toStringAsFixed(asset.currentPrice > 500 ? 2 : 4));
+                      } else {
+                        targetPrice = double.parse((asset.currentPrice * 0.92).toStringAsFixed(asset.currentPrice > 500 ? 2 : 4));
+                      }
+                      targetPriceController.text = targetPrice.toString();
+                    });
+                  },
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: targetPriceController,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: InputDecoration(
+                    labelText: 'Zielkurs / Auslösepreis (€)',
+                    suffixText: '€',
+                    helperText: 'Aktueller Marktpreis: ${CurrencyFormatter.formatPrice(asset.currentPrice)}',
+                    filled: true,
+                    fillColor: AppColors.surfaceElevated,
+                  ),
+                  onChanged: (v) {
+                    targetPrice = double.tryParse(v) ?? targetPrice;
+                  },
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: orderAmountController,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(
+                    labelText: 'Menge (Stückzahl)',
+                    filled: true,
+                    fillColor: AppColors.surfaceElevated,
+                  ),
+                  onChanged: (v) {
+                    orderAmount = double.tryParse(v) ?? orderAmount;
+                  },
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.black,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onPressed: () async {
+                      if (targetPrice <= 0 || orderAmount <= 0) return;
+                      Navigator.pop(ctx);
+                      await provider.placeAutomationOrder(
+                        asset: asset,
+                        orderType: selectedType,
+                        targetPrice: targetPrice,
+                        amount: orderAmount,
+                      );
+                    },
+                    child: const Text('Limit-Order scharf stellen', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
@@ -915,11 +1278,19 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
                 onPressed: () async {
                   Navigator.pop(ctx);
                   final nav = Navigator.of(context);
-                  final success = await provider.executeBuy(
-                    asset: asset,
+                  final success = await OrderRoutingDialog.show(
+                    context: context,
+                    symbol: asset.symbol,
+                    assetName: asset.name,
+                    isBuy: true,
                     amount: _amount,
-                    leverage: _leverage,
-                    isShort: _isShort,
+                    price: asset.currentPrice,
+                    onExecute: () => provider.executeBuy(
+                      asset: asset,
+                      amount: _amount,
+                      leverage: _leverage,
+                      isShort: _isShort,
+                    ),
                   );
                   if (success && mounted) {
                     nav.pop();
