@@ -30,6 +30,9 @@ class PendingOrder {
   final int leverage;
   final bool isShort;
   final DateTime createdAt;
+  final DateTime? scheduledExecutionTime;
+  final String? executionReason;
+  final String? brokerVenue;
   PendingOrderStatus status;
   DateTime? executedAt;
   double? executedPrice;
@@ -47,10 +50,19 @@ class PendingOrder {
     this.leverage = 1,
     this.isShort = false,
     DateTime? createdAt,
+    this.scheduledExecutionTime,
+    this.executionReason,
+    this.brokerVenue,
     this.status = PendingOrderStatus.pending,
     this.executedAt,
     this.executedPrice,
   }) : createdAt = createdAt ?? DateTime.now();
+
+  int get minutesRemaining {
+    if (scheduledExecutionTime == null) return 0;
+    final diff = scheduledExecutionTime!.difference(DateTime.now()).inMinutes;
+    return diff < 0 ? 0 : diff;
+  }
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -65,6 +77,9 @@ class PendingOrder {
         'leverage': leverage,
         'isShort': isShort,
         'createdAt': createdAt.toIso8601String(),
+        'scheduledExecutionTime': scheduledExecutionTime?.toIso8601String(),
+        'executionReason': executionReason,
+        'brokerVenue': brokerVenue,
         'status': status.name,
         'executedAt': executedAt?.toIso8601String(),
         'executedPrice': executedPrice,
@@ -83,6 +98,11 @@ class PendingOrder {
         leverage: (json['leverage'] as num?)?.toInt() ?? 1,
         isShort: json['isShort'] as bool? ?? false,
         createdAt: DateTime.parse(json['createdAt'] as String),
+        scheduledExecutionTime: json['scheduledExecutionTime'] != null
+            ? DateTime.parse(json['scheduledExecutionTime'] as String)
+            : null,
+        executionReason: json['executionReason'] as String?,
+        brokerVenue: json['brokerVenue'] as String?,
         status: PendingOrderStatus.values.byName(json['status'] as String),
         executedAt: json['executedAt'] != null
             ? DateTime.parse(json['executedAt'] as String)

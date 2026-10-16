@@ -47,9 +47,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
       }
 
       final adjustedRoi = e.roiPercent * factor;
-      final adjustedNetWorth = e.isPlayer
-          ? provider.netWorth
-          : 50000.0 * (1 + (adjustedRoi / 100));
+      final adjustedNetWorth = e.isPlayer ? provider.netWorth : e.netWorth;
 
       return LeaderboardEntry(
         id: e.id,
@@ -94,26 +92,41 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
       appBar: AppBar(
         title: const Text('Börsenspiel Rangliste'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh, size: 20),
+            tooltip: 'Live aus Cloud aktualisieren',
+            onPressed: () async {
+              await provider.reloadLeaderboard();
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    duration: Duration(seconds: 1),
+                    content: Text('Rangliste live aus Firebase synchronisiert!'),
+                  ),
+                );
+              }
+            },
+          ),
           Container(
-            margin: const EdgeInsets.only(right: 16),
+            margin: const EdgeInsets.only(right: 12),
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.15),
+              color: AppColors.profit.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: AppColors.primary.withValues(alpha: 0.4),
+                color: AppColors.profit.withValues(alpha: 0.4),
               ),
             ),
             child: const Row(
               children: [
-                Icon(Icons.cloud_done, size: 14, color: AppColors.primary),
+                Icon(Icons.wifi, size: 13, color: AppColors.profit),
                 SizedBox(width: 4),
                 Text(
-                  'Firebase Cloud',
+                  'Cloud Live',
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
-                    color: AppColors.primary,
+                    color: AppColors.profit,
                   ),
                 ),
               ],
