@@ -753,7 +753,125 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
             }),
           ],
 
-          const SizedBox(height: 20),
+          if (provider.isUnderCreditLockout) ...[
+            Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: AppColors.loss.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: AppColors.loss, width: 2),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(Icons.gavel, color: AppColors.loss, size: 24),
+                      SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          '🚨 5-TAGE-KREDITSPERRE AKTIV (PRIVATINSOLVENZ)',
+                          style: TextStyle(
+                            color: AppColors.loss,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    'Verbleibende Sperre: ${provider.creditLockoutTimeRemaining.inDays} Tage, ${provider.creditLockoutTimeRemaining.inHours % 24} Std, ${provider.creditLockoutTimeRemaining.inMinutes % 60} Min',
+                    style: const TextStyle(
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'Du hast Insolvenz angemeldet oder bist zahlungsunfähig. Bis zum Ablauf der 5 Tage sind alle Kredite gesperrt. Nach Ablauf kannst du einen Sanierungs-Notkredit (Rating D) aufnehmen.',
+                    style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+          ] else if (provider.cash <= 0 && provider.netWorth <= -10000) ...[
+            Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: AppColors.loss.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: AppColors.loss, width: 2),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(Icons.warning, color: AppColors.loss, size: 24),
+                      SizedBox(width: 10),
+                      Text(
+                        'AKUTE ZAHLUNGSUNFÄHIGKEIT (PLEITE)',
+                        style: TextStyle(
+                          color: AppColors.loss,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Dein Bargeld ist aufgebraucht und deine Schulden übersteigen dein Vermögen. Melde jetzt Privatinsolvenz an. Nach einer 5-tägigen Kreditsperre kannst du dich mit einem Sanierungskredit wieder hocharbeiten.',
+                    style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                  ),
+                  const SizedBox(height: 14),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        showDialog(
+                          context: context,
+                          builder: (ctx) => AlertDialog(
+                            backgroundColor: AppColors.surface,
+                            title: const Text('Privatinsolvenz wirklich anmelden?'),
+                            content: const Text(
+                              'Achtung: Dies startet eine reale 5-Tage-Kreditsperre (120 Stunden). Alle offenen Positionen werden zur Schuldendeckung verwertet.',
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(ctx),
+                                child: const Text('Abbrechen'),
+                              ),
+                              ElevatedButton(
+                                style: ElevatedButton.styleFrom(backgroundColor: AppColors.loss),
+                                onPressed: () {
+                                  Navigator.pop(ctx);
+                                  provider.declareInsolvency();
+                                },
+                                child: const Text('Ja, Insolvenz anmelden', style: TextStyle(color: Colors.white)),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.loss,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      icon: const Icon(Icons.gavel, size: 18),
+                      label: const Text('Privatinsolvenz einleiten (5 Tage Sperre)', style: TextStyle(fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+          ],
 
           // 3. NEUEN KREDIT AUFNEHMEN (INTERACTIVE LOAN CALCULATOR)
           Container(
@@ -901,18 +1019,24 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: () => _confirmTakeLoan(context, provider, auth),
+                    onPressed: provider.canTakeLoan ? () => _confirmTakeLoan(context, provider, auth) : null,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.accent,
-                      foregroundColor: Colors.black,
+                      backgroundColor: provider.canTakeLoan ? AppColors.accent : AppColors.surfaceElevated,
+                      foregroundColor: provider.canTakeLoan ? Colors.black : AppColors.textMuted,
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
                     child: Text(
-                      'Kredit über ${CurrencyFormatter.format(_requestedAmount)} jetzt beantragen',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                      provider.isUnderCreditLockout
+                          ? '🔒 5-Tage Kreditsperre aktiv (${provider.creditLockoutTimeRemaining.inDays}T ${provider.creditLockoutTimeRemaining.inHours % 24}h)'
+                          : (provider.isLoanOnCooldown
+                              ? '⏳ Abkühlphase: 24h Sperre (noch ${provider.loanCooldownRemaining.inHours}h)'
+                              : (!provider.canTakeLoan
+                                  ? '⚠️ Bereits 1 Bankkredit aktiv'
+                                  : 'Kredit über ${CurrencyFormatter.format(_requestedAmount)} jetzt beantragen')),
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                     ),
                   ),
                 ),

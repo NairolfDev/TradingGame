@@ -31,5 +31,12 @@ abstract class TradingRepository {
   Future<List<Loan>> getLoans();
   Future<void> saveLoans(List<Loan> loans);
 
+  Future<Map<String, dynamic>> getInsolvencyStatus();
+  Future<void> saveInsolvencyStatus({
+    required bool isInsolvent,
+    DateTime? lockoutUntil,
+    DateTime? lastLoanTakenAt,
+  });
+
   Future<void> resetGameToInitial();
 }

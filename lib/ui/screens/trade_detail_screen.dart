@@ -1,4 +1,3 @@
-import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
@@ -8,6 +7,7 @@ import '../../data/models/market_schedule.dart';
 import '../../logic/portfolio_provider.dart';
 import '../../logic/auth_provider.dart';
 import '../../logic/trading_fee_service.dart';
+import '../widgets/interactive_broker_chart.dart';
 import 'auth_screen.dart';
 
 class TradeDetailScreen extends StatefulWidget {
@@ -192,16 +192,18 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
 
           const SizedBox(height: 16),
 
-          // Interaktiver Kurschart mit fl_chart
+          // Interaktiver Profi-Broker Chart (1D, 1W, 1M, 1Y, ALL, Kerzen & Indikatoren)
           Container(
-            height: 220,
-            padding: const EdgeInsets.fromLTRB(10, 16, 16, 10),
+            height: 310,
             decoration: BoxDecoration(
               color: AppColors.surface,
               borderRadius: BorderRadius.circular(20),
               border: Border.all(color: AppColors.cardBorder),
             ),
-            child: _buildInteractiveChart(liveAsset, isPos),
+            child: InteractiveBrokerChart(
+              asset: liveAsset,
+              isPositive: isPos,
+            ),
           ),
 
           const SizedBox(height: 16),
@@ -624,76 +626,6 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
             ),
           ),
           const SizedBox(height: 30),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInteractiveChart(Asset asset, bool isPos) {
-    final history = asset.priceHistory;
-    final minVal = history.reduce((a, b) => a < b ? a : b);
-    final maxVal = history.reduce((a, b) => a > b ? a : b);
-    final diff = maxVal - minVal;
-
-    final spots = <FlSpot>[];
-    for (int i = 0; i < history.length; i++) {
-      spots.add(FlSpot(i.toDouble(), history[i]));
-    }
-
-    final color = isPos ? AppColors.profit : AppColors.loss;
-
-    return LineChart(
-      LineChartData(
-        gridData: FlGridData(
-          show: true,
-          drawVerticalLine: false,
-          horizontalInterval: diff > 0 ? diff / 3 : 1,
-          getDrawingHorizontalLine: (value) => const FlLine(
-            color: AppColors.cardBorder,
-            strokeWidth: 0.8,
-          ),
-        ),
-        titlesData: FlTitlesData(
-          leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          rightTitles: AxisTitles(
-            sideTitles: SideTitles(
-              showTitles: true,
-              reservedSize: 55,
-              getTitlesWidget: (value, meta) {
-                return Text(
-                  CurrencyFormatter.formatCompact(value),
-                  style:
-                      const TextStyle(color: AppColors.textMuted, fontSize: 10),
-                );
-              },
-            ),
-          ),
-          bottomTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-        ),
-        borderData: FlBorderData(show: false),
-        minY: minVal - (diff * 0.1),
-        maxY: maxVal + (diff * 0.1),
-        lineBarsData: [
-          LineChartBarData(
-            spots: spots,
-            isCurved: true,
-            curveSmoothness: 0.25,
-            color: color,
-            barWidth: 2.5,
-            dotData: const FlDotData(show: false),
-            belowBarData: BarAreaData(
-              show: true,
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  color.withValues(alpha: 0.3),
-                  color.withValues(alpha: 0.0),
-                ],
-              ),
-            ),
-          ),
         ],
       ),
     );

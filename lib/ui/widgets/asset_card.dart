@@ -28,6 +28,8 @@ class AssetCard extends StatelessWidget {
         return AppColors.cfd;
       case AssetType.bond:
         return AppColors.bond;
+      case AssetType.commodity:
+        return AppColors.gold;
     }
   }
 

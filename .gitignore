@@ -41,3 +41,15 @@ app.*.map.json
 
 # Firebase cache
 .firebase/
+
+# Node / Functions
+**/node_modules/
+npm-debug.log*
+
+# Secrets & Credentials (Never commit to repo)
+*.key
+*.pem
+*service-account*.json
+*.env
+*.env.*
+temp_*.json

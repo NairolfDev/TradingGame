@@ -22,7 +22,7 @@ class AppUpdateInfo {
 }
 
 class AppUpdateService {
-  static const String githubRepoOwner = 'oberh';
+  static const String githubRepoOwner = 'NairolfDev';
   static const String githubRepoName = 'TradingGame';
   static const String defaultReleaseUrl =
       'https://github.com/$githubRepoOwner/$githubRepoName/releases/latest';

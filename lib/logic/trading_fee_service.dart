@@ -56,6 +56,12 @@ class TradingFeeService {
         fee = 4.90;
         description = 'CFD Kommission & Kontraktspesen: 4,90 €';
         break;
+
+      case AssetType.commodity:
+        // Edelmetall- & Rohstoffspesen
+        fee = 14.90;
+        description = 'Edelmetall- & Rohstoffspesen (Tresorverwahrung): 14,90 €';
+        break;
     }
 
     return OrderFeeBreakdown(
@@ -78,6 +84,8 @@ class TradingFeeService {
         return (proceeds * 0.012).clamp(1.50, 150.0);
       case AssetType.cfd:
         return 4.90;
+      case AssetType.commodity:
+        return 14.90;
     }
   }
 }

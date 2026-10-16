@@ -80,6 +80,7 @@ class _MarketsScreenState extends State<MarketsScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   children: [
                     _buildCategoryChip('Alle', null),
+                    _buildCategoryChip('🥇 Rohstoffe & Metalle', AssetType.commodity),
                     _buildCategoryChip('🪙 Krypto 24/7', AssetType.crypto),
                     _buildCategoryChip('📈 Aktien', AssetType.stock),
                     _buildCategoryChip('🌐 ETFs', AssetType.etf),

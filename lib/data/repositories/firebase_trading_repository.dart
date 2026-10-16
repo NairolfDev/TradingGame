@@ -262,6 +262,58 @@ class FirebaseTradingRepository implements TradingRepository {
   }
 
   @override
+  Future<Map<String, dynamic>> getInsolvencyStatus() async {
+    if (!_isFirebaseConfigured) return _fallbackLocal.getInsolvencyStatus();
+
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('portfolios')
+          .doc(_currentUserId)
+          .get();
+
+      if (doc.exists && doc.data()?['insolvency'] != null) {
+        final data = doc.data()!['insolvency'] as Map<String, dynamic>;
+        await _fallbackLocal.saveInsolvencyStatus(
+          isInsolvent: data['isInsolvent'] as bool? ?? false,
+          lockoutUntil: data['lockoutUntil'] != null ? DateTime.parse(data['lockoutUntil'] as String) : null,
+          lastLoanTakenAt: data['lastLoanTakenAt'] != null ? DateTime.parse(data['lastLoanTakenAt'] as String) : null,
+        );
+        return data;
+      }
+    } catch (_) {}
+
+    return _fallbackLocal.getInsolvencyStatus();
+  }
+
+  @override
+  Future<void> saveInsolvencyStatus({
+    required bool isInsolvent,
+    DateTime? lockoutUntil,
+    DateTime? lastLoanTakenAt,
+  }) async {
+    await _fallbackLocal.saveInsolvencyStatus(
+      isInsolvent: isInsolvent,
+      lockoutUntil: lockoutUntil,
+      lastLoanTakenAt: lastLoanTakenAt,
+    );
+
+    if (_isFirebaseConfigured) {
+      try {
+        await FirebaseFirestore.instance
+            .collection('portfolios')
+            .doc(_currentUserId)
+            .set({
+          'insolvency': {
+            'isInsolvent': isInsolvent,
+            'lockoutUntil': lockoutUntil?.toIso8601String(),
+            'lastLoanTakenAt': lastLoanTakenAt?.toIso8601String(),
+          }
+        }, SetOptions(merge: true));
+      } catch (_) {}
+    }
+  }
+
+  @override
   Future<void> resetGameToInitial() async {
     await _fallbackLocal.resetGameToInitial();
 

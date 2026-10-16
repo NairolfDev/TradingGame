@@ -3,7 +3,8 @@ enum AssetType {
   crypto,
   etf,
   cfd,
-  bond;
+  bond,
+  commodity;
 
   String get displayName {
     switch (this) {
@@ -17,6 +18,8 @@ enum AssetType {
         return 'CFD / Hebel';
       case AssetType.bond:
         return 'Anleihen';
+      case AssetType.commodity:
+        return 'Edelmetalle & Rohstoffe';
     }
   }
 }

@@ -141,8 +141,20 @@ jobs:
       - name: Build Windows
         run: flutter build windows --release
 
-      - name: Compress Windows Build
+      - name: Build Windows Installer (Inno Setup)
+        shell: pwsh
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" windows\installer.iss
+          Move-Item windows\TradingGame-Setup.exe TradingGame-Setup.exe
+
+      - name: Compress Windows Portable ZIP
         run: Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath TradingGame-Windows-x64.zip
+
+      - name: Upload Windows Installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: TradingGame-Setup.exe
 
       - name: Upload Windows ZIP
         uses: actions/upload-artifact@v4
@@ -168,6 +180,11 @@ jobs:
         with:
           name: android-aab
 
+      - name: Download Windows Installer
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-installer
+
       - name: Download Windows ZIP
         uses: actions/download-artifact@v4
         with:
@@ -179,24 +196,27 @@ jobs:
           tag_name: ${{ github.ref_name }}
           name: 'Trading Game Release ${{ github.ref_name }}'
           body: |
-            ## 🚀 Trading Game – Börsenspiel Österreich (${{ github.ref_name }})
+            ## 🚀 Trading Game – Offizielles Release (${{ github.ref_name }})
             
             ### 📥 Downloads:
+            - 💻 **Windows Installer Setup** (Empfohlen: Ein-Klick-Installation mit Startmenü & Desktop-Icon): `TradingGame-Setup.exe`
+            - 🪟 **Windows Portable ZIP** (Ohne Installation direkt starten): `TradingGame-Windows-x64.zip`
             - 🤖 **Android APK** (Direkte Installation auf dem Smartphone): `trading_game.apk`
             - 📦 **Android App Bundle** (Für Google Play Console Upload): `trading_game.aab`
-            - 🪟 **Windows Portable ZIP** (Entpacken und `trading_game.exe` starten): `TradingGame-Windows-x64.zip`
-            - 🌐 **Web-Version**: Live auf Firebase Hosting
+            - 🌐 **Web-Version**: Live unter [https://tradinggame-live.web.app](https://tradinggame-live.web.app)
             
-            ### 🌟 Features:
-            - 50.000 € Startguthaben
-            - Aktien, Krypto 24/7, ETFs, CFDs bis 50x Hebel, Anleihen mit Zinskupons
-            - Echte Börsenöffnungszeiten & automatische Vorab-Orders
-            - Prestige-Shop mit Luxusuhren, Sportwagen, Penthouses & Yachten
-            - Endlos-Leaderboard
-            - Automatischer In-App Update Checker
+            ### 🌟 Features & Patch Notes:
+            - 📈 **Gigantisches Asset-Universum**: DAX, ATX, US Wall Street, Asien (Tokio/Hongkong), Krypto 24/7, ETFs, CFDs bis 50x Hebel, Staatsanleihen (AT, DE, US, CH, UK) & **Edelmetalle/Rohstoffe (Gold, Silber, Platin, Öl, Kupfer, Lithium)**
+            - 📊 **Profi-Broker Charting**: Umschalten zwischen 1D, 1W, 1M, 1Y, ALL, Kerzenchart (Candlesticks) & Linienchart mit gleitendem Durchschnitt (SMA) und Live-Touch-Inspektion
+            - ⚖️ **Privatinsolvenz & Kreditsperre**: Reale 5-Tage-Kreditsperre (120h) bei Zahlungsunfähigkeit, gefolgt von Sanierungs-Notkrediten zu Subprime-Konditionen
+            - ⏳ **Kredit-Abkühlphase**: 24h Sperre nach Kreditaufnahme verhindert unkontrolliertes Überschulden
+            - 🏆 **Prestige & Status-Shop**: Luxusuhren, Sportwagen, Penthouses & Superyachten
+            - 🌐 **Server-Backend & REST-API**: Integrierte Firebase Cloud Functions unter `/api/...`
+            - 🔄 **In-App Auto-Update System**: Erkennt neue Releases und aktualisiert nahtlos
           files: |
+            TradingGame-Setup.exe
+            TradingGame-Windows-x64.zip
             trading_game.apk
             trading_game.aab
-            TradingGame-Windows-x64.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

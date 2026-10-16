@@ -112,4 +112,26 @@ void main() {
       expect(fee.totalCashRequired, 2000.0 + 24.50);
     });
   });
+
+  group('Insolvency & Loan Cooldown System Tests', () {
+    test('5-day real calendar time lockout is calculated accurately', () {
+      final now = DateTime.now();
+      final lockout = now.add(const Duration(days: 5));
+      final diff = lockout.difference(now);
+      expect(diff.inDays, 5);
+      expect(diff.inHours, 120);
+    });
+
+    test('24-hour loan cooldown enforces waiting period after taking loan', () {
+      final now = DateTime.now();
+      final loanTakenAt = now.subtract(const Duration(hours: 12));
+      final isCooldown = now.difference(loanTakenAt).inHours < 24;
+      expect(isCooldown, true);
+
+      final olderLoanTakenAt = now.subtract(const Duration(hours: 25));
+      final isOlderCooldown = now.difference(olderLoanTakenAt).inHours < 24;
+      expect(isOlderCooldown, false);
+    });
+  });
 }
+

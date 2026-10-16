@@ -31,6 +31,10 @@ class PortfolioProvider extends ChangeNotifier {
   List<Loan> _loans = [];
   final List<NewsEvent> _newsEvents = [];
 
+  bool _isInsolvent = false;
+  DateTime? _insolvencyLockoutUntil;
+  DateTime? _lastLoanTakenAt;
+
   bool _isLoading = true;
   String? _lastAlertMessage;
 
@@ -53,6 +57,43 @@ class PortfolioProvider extends ChangeNotifier {
   List<NewsEvent> get newsEvents => _newsEvents;
   bool get isLoading => _isLoading;
   String? get lastAlertMessage => _lastAlertMessage;
+
+  // Insolvenz & Kreditsperre (5 echte Kalendertage = 120h)
+  bool get isInsolvent => _isInsolvent || (_cash <= 0 && netWorth <= -10000);
+  DateTime? get insolvencyLockoutUntil => _insolvencyLockoutUntil;
+  DateTime? get lastLoanTakenAt => _lastLoanTakenAt;
+
+  bool get isUnderCreditLockout {
+    if (_insolvencyLockoutUntil == null) return false;
+    return DateTime.now().isBefore(_insolvencyLockoutUntil!);
+  }
+
+  Duration get creditLockoutTimeRemaining {
+    if (!isUnderCreditLockout || _insolvencyLockoutUntil == null) return Duration.zero;
+    return _insolvencyLockoutUntil!.difference(DateTime.now());
+  }
+
+  // Kredit-Abkühlphase: Nach jedem Kredit mind. 24h Sperre
+  bool get isLoanOnCooldown {
+    if (_lastLoanTakenAt == null) return false;
+    return DateTime.now().difference(_lastLoanTakenAt!).inHours < 24;
+  }
+
+  Duration get loanCooldownRemaining {
+    if (!isLoanOnCooldown || _lastLoanTakenAt == null) return Duration.zero;
+    final end = _lastLoanTakenAt!.add(const Duration(hours: 24));
+    final diff = end.difference(DateTime.now());
+    return diff.isNegative ? Duration.zero : diff;
+  }
+
+  bool get canTakeLoan {
+    if (isUnderCreditLockout) return false;
+    if (isLoanOnCooldown) return false;
+    // Maximal 1 aktiver Bankkredit neben dem Startkredit
+    final bankLoans = activeLoans.where((l) => l.id != 'initial_start_loan_50k').length;
+    if (bankLoans >= 1) return false;
+    return true;
+  }
 
   void clearAlert() {
     _lastAlertMessage = null;
@@ -163,6 +204,15 @@ class PortfolioProvider extends ChangeNotifier {
       final startLoan = Loan.createInitialStartLoan();
       _loans = [startLoan];
       await repository.saveLoans(_loans);
+    }
+
+    final insolvencyData = await repository.getInsolvencyStatus();
+    _isInsolvent = insolvencyData['isInsolvent'] as bool? ?? false;
+    if (insolvencyData['lockoutUntil'] != null) {
+      _insolvencyLockoutUntil = DateTime.tryParse(insolvencyData['lockoutUntil'] as String);
+    }
+    if (insolvencyData['lastLoanTakenAt'] != null) {
+      _lastLoanTakenAt = DateTime.tryParse(insolvencyData['lastLoanTakenAt'] as String);
     }
 
     // Starte Market Engine
@@ -638,10 +688,72 @@ class PortfolioProvider extends ChangeNotifier {
   }
 
   // --- KREDIT & SCHULDEN SYSTEM ---
+  Future<void> declareInsolvency() async {
+    _isInsolvent = true;
+    _insolvencyLockoutUntil = DateTime.now().add(const Duration(days: 5)); // 5 echte Tage = 120h
+    
+    // Notverkauf aller Positionen
+    for (final pos in List<Position>.from(_positions)) {
+      final recoveryCash = pos.currentValue * 0.8;
+      _cash += recoveryCash;
+    }
+    _positions.clear();
+    await repository.savePositions(_positions);
+
+    if (_cash < 0) {
+      _cash = 0;
+    }
+
+    await repository.saveCashBalance(_cash);
+    await repository.saveInsolvencyStatus(
+      isInsolvent: _isInsolvent,
+      lockoutUntil: _insolvencyLockoutUntil,
+      lastLoanTakenAt: _lastLoanTakenAt,
+    );
+
+    final record = TransactionRecord(
+      id: _uuid.v4(),
+      symbol: '🚨',
+      name: 'Privatinsolvenz angemeldet',
+      type: TransactionType.liquidation,
+      amount: 1,
+      price: 0,
+      totalAmount: 0,
+      timestamp: DateTime.now(),
+      note: '5 Tage Kreditsperre verhängt. Sanierungsverfahren eingeleitet.',
+    );
+    _transactions.insert(0, record);
+    await repository.saveTransaction(record);
+
+    _lastAlertMessage = '🚨 PRIVATINSOLVENZ ANGEMELDET! 5 Tage Kreditsperre aktiv.';
+    _updateLeaderboard();
+    notifyListeners();
+  }
+
   Future<bool> takeLoan({
     required double principal,
     required int durationDays,
   }) async {
+    if (isUnderCreditLockout) {
+      final rem = creditLockoutTimeRemaining;
+      _lastAlertMessage =
+          '🚨 Kreditsperre aktiv! Du musst noch ${rem.inDays} Tage und ${rem.inHours % 24} Stunden warten.';
+      notifyListeners();
+      return false;
+    }
+
+    if (!canTakeLoan) {
+      if (isLoanOnCooldown) {
+        final rem = loanCooldownRemaining;
+        _lastAlertMessage =
+            '⏳ Kredit-Abkühlphase: Nach jedem Kredit gilt eine 24-Stunden-Sperre (noch ${rem.inHours}h ${rem.inMinutes % 60}m)!';
+      } else {
+        _lastAlertMessage = '⚠️ Du hast bereits einen aktiven Bankkredit! Tilge diesen zuerst ab.';
+      }
+      notifyListeners();
+      return false;
+    }
+
     final rating = creditRating;
     final interest = CreditRatingService.calculateLoanInterest(
       principal: principal,
@@ -664,9 +776,16 @@ class PortfolioProvider extends ChangeNotifier {
 
     _cash += principal;
     _loans.insert(0, loan);
+    _lastLoanTakenAt = now;
+    _isInsolvent = false; // Wieder aktiv im Spiel
 
     await repository.saveCashBalance(_cash);
     await repository.saveLoans(_loans);
+    await repository.saveInsolvencyStatus(
+      isInsolvent: _isInsolvent,
+      lockoutUntil: _insolvencyLockoutUntil,
+      lastLoanTakenAt: _lastLoanTakenAt,
+    );
 
     final record = TransactionRecord(
       id: _uuid.v4(),

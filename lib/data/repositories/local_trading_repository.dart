@@ -209,6 +209,45 @@ class LocalTradingRepository implements TradingRepository {
     await prefs.setString(_keyLoans, raw);
   }
 
+  static const String _keyInsolvency = 'tg_insolvency_status';
+
+  @override
+  Future<Map<String, dynamic>> getInsolvencyStatus() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_keyInsolvency);
+    if (raw == null) {
+      return {
+        'isInsolvent': false,
+        'lockoutUntil': null,
+        'lastLoanTakenAt': null,
+      };
+    }
+    try {
+      return jsonDecode(raw) as Map<String, dynamic>;
+    } catch (_) {
+      return {
+        'isInsolvent': false,
+        'lockoutUntil': null,
+        'lastLoanTakenAt': null,
+      };
+    }
+  }
+
+  @override
+  Future<void> saveInsolvencyStatus({
+    required bool isInsolvent,
+    DateTime? lockoutUntil,
+    DateTime? lastLoanTakenAt,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final data = {
+      'isInsolvent': isInsolvent,
+      'lockoutUntil': lockoutUntil?.toIso8601String(),
+      'lastLoanTakenAt': lastLoanTakenAt?.toIso8601String(),
+    };
+    await prefs.setString(_keyInsolvency, jsonEncode(data));
+  }
+
   @override
   Future<void> resetGameToInitial() async {
     final prefs = await SharedPreferences.getInstance();
@@ -220,5 +259,6 @@ class LocalTradingRepository implements TradingRepository {
     await prefs.remove(_keyLuxury);
     await prefs.remove(_keyLeaderboard);
     await prefs.remove(_keyLoans);
+    await prefs.remove(_keyInsolvency);
   }
 }
