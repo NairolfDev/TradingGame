@@ -189,7 +189,33 @@ class LiveMarketDataService {
           return result;
         }
       }
-    } catch (_) {}
+    } catch (_) {
+      try {
+        final uri = Uri.parse('$_cloudApiBase/quote?symbol=$yahooSymbol');
+        final response = await http.get(uri).timeout(const Duration(seconds: 4));
+        if (response.statusCode == 200) {
+          final json = jsonDecode(response.body) as Map<String, dynamic>;
+          final double price = (json['currentPrice'] as num?)?.toDouble() ?? 0.0;
+          final double prevClose = (json['previousClose'] as num?)?.toDouble() ?? price;
+          final double? high = (json['high'] as num?)?.toDouble();
+          final double? low = (json['low'] as num?)?.toDouble();
+          final seriesRaw = json['series'] as List<dynamic>?;
+          final series = seriesRaw?.where((v) => v != null).map((v) => (v as num).toDouble()).toList();
+
+          if (price > 0) {
+            final result = LiveQuoteResult(
+              currentPrice: price,
+              previousClose: prevClose,
+              high: high,
+              low: low,
+              series: series,
+            );
+            _quoteCache[yahooSymbol] = result;
+            return result;
+          }
+        }
+      } catch (_) {}
+    }
 
     return null;
   }
@@ -269,7 +295,19 @@ class LiveMarketDataService {
           if (filtered.isNotEmpty) return filtered;
         }
       }
-    } catch (_) {}
+    } catch (_) {
+      try {
+        final uri = Uri.parse('$_cloudApiBase/history?symbol=$yahooSymbol&timeframe=$timeframe');
+        final response = await http.get(uri).timeout(const Duration(seconds: 4));
+        if (response.statusCode == 200) {
+          final json = jsonDecode(response.body) as Map<String, dynamic>;
+          final seriesRaw = json['series'] as List<dynamic>?;
+          if (seriesRaw != null && seriesRaw.isNotEmpty) {
+            return seriesRaw.map((v) => (v as num).toDouble()).toList();
+          }
+        }
+      } catch (_) {}
+    }
 
     return null;
   }

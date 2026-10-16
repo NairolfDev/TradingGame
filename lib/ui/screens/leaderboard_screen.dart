@@ -369,70 +369,74 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
 
   Widget _buildPodiumColumn(
       LeaderboardEntry entry, int place, Color medalColor, double podiumHeight) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(entry.avatarEmoji, style: const TextStyle(fontSize: 28)),
-        const SizedBox(height: 4),
-        Text(
-          entry.name,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: entry.isPlayer ? FontWeight.w900 : FontWeight.bold,
-            color: entry.isPlayer ? AppColors.primary : AppColors.textPrimary,
+    return SizedBox(
+      width: 90,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(entry.avatarEmoji, style: const TextStyle(fontSize: 28)),
+          const SizedBox(height: 4),
+          Text(
+            entry.name,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: entry.isPlayer ? FontWeight.w900 : FontWeight.bold,
+              color: entry.isPlayer ? AppColors.primary : AppColors.textPrimary,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
           ),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        Text(
-          CurrencyFormatter.formatCompact(entry.netWorth),
-          style: const TextStyle(
-            fontSize: 11,
-            color: AppColors.textSecondary,
-            fontWeight: FontWeight.w600,
+          Text(
+            CurrencyFormatter.formatCompact(entry.netWorth),
+            style: const TextStyle(
+              fontSize: 11,
+              color: AppColors.textSecondary,
+              fontWeight: FontWeight.w600,
+            ),
           ),
-        ),
-        const SizedBox(height: 8),
-        Container(
-          width: 85,
-          height: podiumHeight,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                medalColor.withValues(alpha: 0.35),
-                AppColors.surfaceElevated,
+          const SizedBox(height: 8),
+          Container(
+            width: 85,
+            height: podiumHeight,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  medalColor.withValues(alpha: 0.35),
+                  AppColors.surfaceElevated,
+                ],
+              ),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+              border: Border.all(color: medalColor.withValues(alpha: 0.6)),
+            ),
+            alignment: Alignment.center,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  place == 1 ? '🥇 1.' : (place == 2 ? '🥈 2.' : '🥉 3.'),
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                    color: medalColor,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '${entry.roiPercent >= 0 ? "+" : ""}${entry.roiPercent.toStringAsFixed(1)}%',
+                  style: const TextStyle(
+                    fontSize: 10,
+                    color: AppColors.profit,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ],
             ),
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-            border: Border.all(color: medalColor.withValues(alpha: 0.6)),
           ),
-          alignment: Alignment.center,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                place == 1 ? '🥇 1.' : (place == 2 ? '🥈 2.' : '🥉 3.'),
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w900,
-                  color: medalColor,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                '${entry.roiPercent >= 0 ? "+" : ""}${entry.roiPercent.toStringAsFixed(1)}%',
-                style: const TextStyle(
-                  fontSize: 10,
-                  color: AppColors.profit,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 

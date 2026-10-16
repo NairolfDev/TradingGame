@@ -133,6 +133,8 @@ class Position {
     double? amount,
     double? averageBuyPrice,
     double? currentPrice,
+    double? collateral,
+    double? liquidationPrice,
   }) {
     return Position(
       id: id,
@@ -145,8 +147,8 @@ class Position {
       currentPrice: currentPrice ?? this.currentPrice,
       leverage: leverage,
       isShort: isShort,
-      collateral: collateral,
-      liquidationPrice: liquidationPrice,
+      collateral: collateral ?? this.collateral,
+      liquidationPrice: liquidationPrice ?? this.liquidationPrice,
       openedAt: openedAt,
     );
   }

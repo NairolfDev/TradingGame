@@ -991,12 +991,12 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                 Builder(
                   builder: (context) {
                     final hasTakenLoan = provider.transactions.any((t) => t.type == TransactionType.loanPayout);
-                    final double maxLimit = hasTakenLoan ? rating.maxBorrowLimit : 25000.0;
-                    if (_requestedAmount > maxLimit) {
-                      _requestedAmount = maxLimit;
-                    }
+                    final double maxLimit = hasTakenLoan
+                        ? rating.maxBorrowLimit
+                        : (rating.maxBorrowLimit < 25000.0 ? rating.maxBorrowLimit : 25000.0);
+                    final double effectiveAmount = _requestedAmount.clamp(5000.0, maxLimit);
                     return Slider(
-                      value: _requestedAmount.clamp(5000.0, maxLimit),
+                      value: effectiveAmount,
                       min: 5000.0,
                       max: maxLimit > 5000.0 ? maxLimit : 5000.0,
                       divisions: maxLimit > 5000.0 ? ((maxLimit - 5000.0) / 5000.0).round().clamp(1, 50) : 1,

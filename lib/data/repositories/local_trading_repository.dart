@@ -13,14 +13,20 @@ import '../mock_data/initial_leaderboard.dart';
 import 'trading_repository.dart';
 
 class LocalTradingRepository implements TradingRepository {
-  static const String _keyCash = 'tg_cash_balance';
+  final String userId;
+  LocalTradingRepository([this.userId = 'local']);
+
+  String _k(String base) => (userId == 'local' || userId.isEmpty) ? 'tg_$base' : 'tg_${userId}_$base';
+
+  String get _keyCash => _k('cash_balance');
   static const String _keyAssets = 'tg_assets';
-  static const String _keyPositions = 'tg_positions';
-  static const String _keyTransactions = 'tg_transactions';
-  static const String _keyLuxury = 'tg_luxury_items';
-  static const String _keyPendingOrders = 'tg_pending_orders';
+  String get _keyPositions => _k('positions');
+  String get _keyTransactions => _k('transactions');
+  String get _keyLuxury => _k('luxury_items');
+  String get _keyPendingOrders => _k('pending_orders');
   static const String _keyLeaderboard = 'tg_leaderboard';
-  static const String _keyLoans = 'tg_loans';
+  String get _keyLoans => _k('loans');
+  String get _keyInsolvency => _k('insolvency_status');
 
   static const double initialStartingCash = 50000.0; // 50.000 € Startguthaben
 
@@ -111,6 +117,12 @@ class LocalTradingRepository implements TradingRepository {
     await prefs.setString(_keyTransactions, raw);
   }
 
+  Future<void> saveAllTransactions(List<TransactionRecord> transactions) async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = jsonEncode(transactions.map((t) => t.toJson()).toList());
+    await prefs.setString(_keyTransactions, raw);
+  }
+
   @override
   Future<List<LuxuryItem>> getLuxuryItems() async {
     final prefs = await SharedPreferences.getInstance();
@@ -179,7 +191,7 @@ class LocalTradingRepository implements TradingRepository {
   }
 
   @override
-  Future<void> saveLeaderboard(List<LeaderboardEntry> entries) async {
+  Future<void> saveLeaderboard(List<LeaderboardEntry> entries, {bool forceCloud = false}) async {
     final prefs = await SharedPreferences.getInstance();
     final raw = jsonEncode(entries.map((e) => e.toJson()).toList());
     await prefs.setString(_keyLeaderboard, raw);
@@ -211,8 +223,6 @@ class LocalTradingRepository implements TradingRepository {
     final raw = jsonEncode(loans.map((l) => l.toJson()).toList());
     await prefs.setString(_keyLoans, raw);
   }
-
-  static const String _keyInsolvency = 'tg_insolvency_status';
 
   @override
   Future<Map<String, dynamic>> getInsolvencyStatus() async {
@@ -258,10 +268,12 @@ class LocalTradingRepository implements TradingRepository {
     await prefs.remove(_keyPositions);
     await prefs.remove(_keyTransactions);
     await prefs.remove(_keyPendingOrders);
-    await prefs.remove(_keyAssets);
     await prefs.remove(_keyLuxury);
-    await prefs.remove(_keyLeaderboard);
     await prefs.remove(_keyLoans);
     await prefs.remove(_keyInsolvency);
+    if (userId == 'local') {
+      await prefs.remove(_keyAssets);
+      await prefs.remove(_keyLeaderboard);
+    }
   }
 }

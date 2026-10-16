@@ -11,7 +11,7 @@ import 'trading_repository.dart';
 import 'local_trading_repository.dart';
 
 class FirebaseTradingRepository implements TradingRepository {
-  final LocalTradingRepository _fallbackLocal = LocalTradingRepository();
+  LocalTradingRepository get _fallbackLocal => LocalTradingRepository(_currentUserId);
 
   bool get _isFirebaseConfigured {
     try {
@@ -93,14 +93,12 @@ class FirebaseTradingRepository implements TradingRepository {
           .collection('positions')
           .get();
 
-      if (snap.docs.isNotEmpty) {
-        final positions = snap.docs
-            .map((d) => Position.fromJson(d.data()))
-            .where((p) => p.amount > 0)
-            .toList();
-        await _fallbackLocal.savePositions(positions);
-        return positions;
-      }
+      final positions = snap.docs
+          .map((d) => Position.fromJson(d.data()))
+          .where((p) => p.amount > 0)
+          .toList();
+      await _fallbackLocal.savePositions(positions);
+      return positions;
     } catch (_) {}
 
     return _fallbackLocal.getPositions();
@@ -112,17 +110,24 @@ class FirebaseTradingRepository implements TradingRepository {
 
     if (_isFirebaseConfigured) {
       try {
-        final batch = FirebaseFirestore.instance.batch();
         final col = FirebaseFirestore.instance
             .collection('portfolios')
             .doc(_currentUserId)
             .collection('positions');
 
+        final activeIds = positions.where((p) => p.amount > 0).map((p) => p.id).toSet();
+        final existingSnap = await col.get();
+        final batch = FirebaseFirestore.instance.batch();
+
+        for (final doc in existingSnap.docs) {
+          if (!activeIds.contains(doc.id)) {
+            batch.delete(doc.reference);
+          }
+        }
+
         for (final pos in positions) {
           if (pos.amount > 0) {
             batch.set(col.doc(pos.id), pos.toJson(), SetOptions(merge: true));
-          } else {
-            batch.delete(col.doc(pos.id));
           }
         }
         await batch.commit();
@@ -144,12 +149,11 @@ class FirebaseTradingRepository implements TradingRepository {
           .limit(100)
           .get();
 
-      if (snap.docs.isNotEmpty) {
-        final list = snap.docs
-            .map((d) => TransactionRecord.fromJson(d.data()))
-            .toList();
-        return list;
-      }
+      final list = snap.docs
+          .map((d) => TransactionRecord.fromJson(d.data()))
+          .toList();
+      await _fallbackLocal.saveAllTransactions(list);
+      return list;
     } catch (_) {}
 
     return _fallbackLocal.getTransactions();
@@ -227,13 +231,11 @@ class FirebaseTradingRepository implements TradingRepository {
           .collection('pendingOrders')
           .get();
 
-      if (snap.docs.isNotEmpty) {
-        final orders = snap.docs
-            .map((d) => PendingOrder.fromJson(d.data()))
-            .toList();
-        await _fallbackLocal.savePendingOrders(orders);
-        return orders;
-      }
+      final orders = snap.docs
+          .map((d) => PendingOrder.fromJson(d.data()))
+          .toList();
+      await _fallbackLocal.savePendingOrders(orders);
+      return orders;
     } catch (_) {}
 
     return _fallbackLocal.getPendingOrders();
@@ -245,11 +247,20 @@ class FirebaseTradingRepository implements TradingRepository {
 
     if (_isFirebaseConfigured) {
       try {
-        final batch = FirebaseFirestore.instance.batch();
         final col = FirebaseFirestore.instance
             .collection('portfolios')
             .doc(_currentUserId)
             .collection('pendingOrders');
+
+        final activeIds = orders.map((o) => o.id).toSet();
+        final existingSnap = await col.get();
+        final batch = FirebaseFirestore.instance.batch();
+
+        for (final doc in existingSnap.docs) {
+          if (!activeIds.contains(doc.id)) {
+            batch.delete(doc.reference);
+          }
+        }
 
         // Overwrite active orders
         for (final order in orders) {
@@ -352,11 +363,21 @@ class FirebaseTradingRepository implements TradingRepository {
     }
   }
 
+  DateTime? _lastLeaderboardCloudSave;
+
   @override
-  Future<void> saveLeaderboard(List<LeaderboardEntry> entries) async {
+  Future<void> saveLeaderboard(List<LeaderboardEntry> entries, {bool forceCloud = false}) async {
     await _fallbackLocal.saveLeaderboard(entries);
 
     if (_isFirebaseConfigured) {
+      final now = DateTime.now();
+      if (!forceCloud &&
+          _lastLeaderboardCloudSave != null &&
+          now.difference(_lastLeaderboardCloudSave!).inSeconds < 30) {
+        return;
+      }
+      _lastLeaderboardCloudSave = now;
+
       try {
         final myUid = _currentUserId;
         final player = entries.firstWhere(
@@ -455,11 +476,9 @@ class FirebaseTradingRepository implements TradingRepository {
           .collection('loans')
           .get();
 
-      if (snap.docs.isNotEmpty) {
-        final loans = snap.docs.map((d) => Loan.fromJson(d.data())).toList();
-        await _fallbackLocal.saveLoans(loans);
-        return loans;
-      }
+      final loans = snap.docs.map((d) => Loan.fromJson(d.data())).toList();
+      await _fallbackLocal.saveLoans(loans);
+      return loans;
     } catch (_) {}
 
     return _fallbackLocal.getLoans();
@@ -549,14 +568,27 @@ class FirebaseTradingRepository implements TradingRepository {
 
     if (_isFirebaseConfigured) {
       try {
-        await FirebaseFirestore.instance
+        final portfolioDoc = FirebaseFirestore.instance
             .collection('portfolios')
-            .doc(_currentUserId)
-            .delete();
-        await FirebaseFirestore.instance
-            .collection('leaderboard')
-            .doc(_currentUserId)
-            .delete();
+            .doc(_currentUserId);
+
+        final positionsSnap = await portfolioDoc.collection('positions').get();
+        final ordersSnap = await portfolioDoc.collection('pendingOrders').get();
+        final loansSnap = await portfolioDoc.collection('loans').get();
+
+        final batch = FirebaseFirestore.instance.batch();
+        for (final d in positionsSnap.docs) {
+          batch.delete(d.reference);
+        }
+        for (final d in ordersSnap.docs) {
+          batch.delete(d.reference);
+        }
+        for (final d in loansSnap.docs) {
+          batch.delete(d.reference);
+        }
+        batch.delete(portfolioDoc);
+        batch.delete(FirebaseFirestore.instance.collection('leaderboard').doc(_currentUserId));
+        await batch.commit();
       } catch (_) {}
     }
   }

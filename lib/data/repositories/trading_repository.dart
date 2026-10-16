@@ -26,7 +26,7 @@ abstract class TradingRepository {
   Future<void> savePendingOrders(List<PendingOrder> orders);
 
   Future<List<LeaderboardEntry>> getLeaderboard();
-  Future<void> saveLeaderboard(List<LeaderboardEntry> entries);
+  Future<void> saveLeaderboard(List<LeaderboardEntry> entries, {bool forceCloud = false});
   Stream<List<LeaderboardEntry>>? streamLeaderboard() => null;
 
   Future<List<Loan>> getLoans();

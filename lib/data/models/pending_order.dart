@@ -29,6 +29,8 @@ class PendingOrder {
   final double totalEstimatedCost;
   final int leverage;
   final bool isShort;
+  final double? collateral;
+  final double? averageBuyPrice;
   final DateTime createdAt;
   final DateTime? scheduledExecutionTime;
   final String? executionReason;
@@ -49,6 +51,8 @@ class PendingOrder {
     required this.totalEstimatedCost,
     this.leverage = 1,
     this.isShort = false,
+    this.collateral,
+    this.averageBuyPrice,
     DateTime? createdAt,
     this.scheduledExecutionTime,
     this.executionReason,
@@ -76,6 +80,8 @@ class PendingOrder {
         'totalEstimatedCost': totalEstimatedCost,
         'leverage': leverage,
         'isShort': isShort,
+        'collateral': collateral,
+        'averageBuyPrice': averageBuyPrice,
         'createdAt': createdAt.toIso8601String(),
         'scheduledExecutionTime': scheduledExecutionTime?.toIso8601String(),
         'executionReason': executionReason,
@@ -97,6 +103,8 @@ class PendingOrder {
         totalEstimatedCost: (json['totalEstimatedCost'] as num).toDouble(),
         leverage: (json['leverage'] as num?)?.toInt() ?? 1,
         isShort: json['isShort'] as bool? ?? false,
+        collateral: (json['collateral'] as num?)?.toDouble(),
+        averageBuyPrice: (json['averageBuyPrice'] as num?)?.toDouble(),
         createdAt: DateTime.parse(json['createdAt'] as String),
         scheduledExecutionTime: json['scheduledExecutionTime'] != null
             ? DateTime.parse(json['scheduledExecutionTime'] as String)

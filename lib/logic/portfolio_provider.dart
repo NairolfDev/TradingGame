@@ -749,6 +749,7 @@ class PortfolioProvider extends ChangeNotifier {
       totalPositionsCount: _positions.length,
     );
 
+    _updateLeaderboard(forceCloud: true);
     _lastAlertMessage = 'Erfolgreich gekauft: ${amount.toStringAsFixed(2)}x ${asset.symbol}';
     notifyListeners();
     return true;
@@ -808,6 +809,7 @@ class PortfolioProvider extends ChangeNotifier {
       }
       await repository.savePositions(_positions);
 
+      final ratio = sellAmount / position.amount;
       final pendingOrder = PendingOrder(
         id: _uuid.v4(),
         assetId: asset.id,
@@ -820,6 +822,8 @@ class PortfolioProvider extends ChangeNotifier {
         totalEstimatedCost: sellAmount * asset.currentPrice,
         leverage: position.leverage,
         isShort: position.isShort,
+        collateral: position.isLeveraged ? (position.collateral * ratio) : null,
+        averageBuyPrice: position.averageBuyPrice,
         scheduledExecutionTime: scheduledTime,
         executionReason: 'Im Orderbuch',
         brokerVenue: venue,
@@ -892,6 +896,7 @@ class PortfolioProvider extends ChangeNotifier {
       totalPositionsCount: _positions.length,
     );
 
+    _updateLeaderboard(forceCloud: true);
     _lastAlertMessage =
         'Verkauft: ${sellAmount.toStringAsFixed(2)}x ${position.symbol} (Rendite: ${realizedPnL >= 0 ? "+" : ""}${realizedPnL.toStringAsFixed(2)} €)';
     notifyListeners();
@@ -994,7 +999,22 @@ class PortfolioProvider extends ChangeNotifier {
             '✅ KAUF AUSGEFÜHRT: ${order.amount.toStringAsFixed(2)}x ${matchingAsset.symbol} @ ${matchingAsset.currentPrice.toStringAsFixed(2)} € eingebucht!';
       } else {
         // Verkaufs-Order abwickeln
-        final cashReturn = order.amount * matchingAsset.currentPrice;
+        double cashReturn = 0.0;
+        double realizedPnL = 0.0;
+
+        if (order.leverage > 1) {
+          final portionCollateral = order.collateral ??
+              ((order.amount * (order.averageBuyPrice ?? order.estimatedPrice)) / order.leverage);
+          final currentVal = order.amount * matchingAsset.currentPrice;
+          final entryVal = order.amount * (order.averageBuyPrice ?? order.estimatedPrice);
+          final portionPnL = order.isShort ? (entryVal - currentVal) : (currentVal - entryVal);
+          cashReturn = (portionCollateral + portionPnL).clamp(0.0, double.infinity);
+          realizedPnL = portionPnL;
+        } else {
+          cashReturn = order.amount * matchingAsset.currentPrice;
+          realizedPnL = (matchingAsset.currentPrice - (order.averageBuyPrice ?? order.estimatedPrice)) * order.amount;
+        }
+
         _cash += cashReturn;
         repository.saveCashBalance(_cash);
 
@@ -1006,11 +1026,20 @@ class PortfolioProvider extends ChangeNotifier {
           amount: order.amount,
           price: matchingAsset.currentPrice,
           totalAmount: cashReturn,
+          realizedPnL: realizedPnL,
           timestamp: now,
           note: 'Börsen-Verkauf ausgeführt (${order.brokerVenue ?? "Orderbuch"})',
         );
         _transactions.insert(0, record);
         repository.saveTransaction(record);
+
+        questService.recordTrade(
+          tradeAmount: cashReturn,
+          isCommodity: matchingAsset.type == AssetType.commodity,
+          leverage: order.leverage,
+          profit: realizedPnL,
+          totalPositionsCount: _positions.length,
+        );
 
         _lastAlertMessage =
             '✅ VERKAUF AUSGEFÜHRT: ${order.amount.toStringAsFixed(2)}x ${matchingAsset.symbol} für ${cashReturn.toStringAsFixed(2)} € abgerechnet!';
@@ -1021,6 +1050,7 @@ class PortfolioProvider extends ChangeNotifier {
       repository.savePendingOrders(_pendingOrders);
       repository.savePositions(_positions);
       _checkAllAchievements();
+      _updateLeaderboard(forceCloud: true);
       notifyListeners();
     }
 
@@ -1104,7 +1134,10 @@ class PortfolioProvider extends ChangeNotifier {
       // Verkaufsmenge zurück in Depotposition einbuchen
       final idx = _positions.indexWhere((p) => p.assetId == order.assetId || p.symbol == order.symbol);
       if (idx != -1) {
-        _positions[idx] = _positions[idx].copyWith(amount: _positions[idx].amount + order.amount);
+        _positions[idx] = _positions[idx].copyWith(
+          amount: _positions[idx].amount + order.amount,
+          collateral: order.collateral != null ? (_positions[idx].collateral + order.collateral!) : _positions[idx].collateral,
+        );
       } else {
         _positions.add(
           Position(
@@ -1114,16 +1147,18 @@ class PortfolioProvider extends ChangeNotifier {
             name: order.name,
             type: order.assetType,
             amount: order.amount,
-            averageBuyPrice: order.estimatedPrice,
+            averageBuyPrice: order.averageBuyPrice ?? order.estimatedPrice,
             currentPrice: order.estimatedPrice,
             leverage: order.leverage,
             isShort: order.isShort,
+            collateral: order.collateral ?? 0.0,
           ),
         );
       }
       await repository.savePositions(_positions);
     }
     await repository.savePendingOrders(_pendingOrders);
+    _updateLeaderboard(forceCloud: true);
 
     _lastAlertMessage = 'Order für ${order.symbol} storniert.';
     notifyListeners();
@@ -1242,7 +1277,7 @@ class PortfolioProvider extends ChangeNotifier {
     await repository.saveTransaction(record);
 
     _lastAlertMessage = '🎉 Glückwunsch! Du hast ${item.name} erworben. Dein Prestige steigt!';
-    _updateLeaderboard();
+    _updateLeaderboard(forceCloud: true);
     notifyListeners();
     return true;
   }
@@ -1286,7 +1321,7 @@ class PortfolioProvider extends ChangeNotifier {
     await repository.saveTransaction(record);
 
     _lastAlertMessage = '🚨 PRIVATINSOLVENZ ANGEMELDET! 5 Tage Kreditsperre aktiv.';
-    _updateLeaderboard();
+    _updateLeaderboard(forceCloud: true);
     notifyListeners();
   }
 
@@ -1372,7 +1407,7 @@ class PortfolioProvider extends ChangeNotifier {
 
     _lastAlertMessage =
         '💳 Kredit über ${principal.toStringAsFixed(0)} € ausgezahlt! Zinssatz: ${(rating.baseInterestRate * 100).toStringAsFixed(1)}% p.a.';
-    _updateLeaderboard();
+    _updateLeaderboard(forceCloud: true);
     _checkAllAchievements();
     notifyListeners();
     return true;
@@ -1412,7 +1447,7 @@ class PortfolioProvider extends ChangeNotifier {
 
     _lastAlertMessage =
         '🤝 Rettungsschirm aktiviert! Die Bank gewährt dir einen 10.000 € Sanierungskredit zum Weiterspielen!';
-    _updateLeaderboard();
+    _updateLeaderboard(forceCloud: true);
     _checkAllAchievements();
     notifyListeners();
     return true;
@@ -1458,13 +1493,13 @@ class PortfolioProvider extends ChangeNotifier {
     _lastAlertMessage = loan.isPaid
         ? '🎉 Bravo! Kredit "${loan.title}" vollständig zurückgezahlt!'
         : 'Kreditrate über ${actualRepay.toStringAsFixed(2)} € erfolgreich geleistet.';
-    _updateLeaderboard();
+    _updateLeaderboard(forceCloud: true);
     notifyListeners();
     return true;
   }
 
   // --- LEADERBOARD SYNCHRONISATION ---
-  void _updateLeaderboard() {
+  void _updateLeaderboard({bool forceCloud = false}) {
     final luxuryCount = _luxuryItems.fold<int>(0, (sum, i) => sum + i.ownedCount);
 
     String myUid = 'player_user';
@@ -1512,12 +1547,12 @@ class PortfolioProvider extends ChangeNotifier {
       _leaderboard[i].rank = i + 1;
     }
 
-    repository.saveLeaderboard(_leaderboard);
+    repository.saveLeaderboard(_leaderboard, forceCloud: forceCloud);
   }
 
   Future<void> reloadLeaderboard() async {
     _leaderboard = await repository.getLeaderboard();
-    _updateLeaderboard();
+    _updateLeaderboard(forceCloud: true);
     notifyListeners();
   }
 
@@ -1527,7 +1562,7 @@ class PortfolioProvider extends ChangeNotifier {
       _cash += cashReward;
       repository.saveCashBalance(_cash);
       _lastAlertMessage = '🎁 Belohnung abgeholt: +${cashReward.toStringAsFixed(0)} € & +$prestigeReward Prestige!';
-      _updateLeaderboard();
+      _updateLeaderboard(forceCloud: true);
       notifyListeners();
     });
   }
@@ -1593,7 +1628,7 @@ class PortfolioProvider extends ChangeNotifier {
     await repository.savePositions(_positions);
     await repository.saveTransaction(record);
     _lastAlertMessage = '🤝 Du kopierst jetzt ${trader.name} mit ${allocatedAmount.toStringAsFixed(0)} €!';
-    _updateLeaderboard();
+    _updateLeaderboard(forceCloud: true);
     notifyListeners();
     return true;
   }
@@ -1621,7 +1656,7 @@ class PortfolioProvider extends ChangeNotifier {
     _transactions.insert(0, record);
     repository.saveTransaction(record);
     _lastAlertMessage = '💵 Dividenden gutgeschrieben: +${payout.toStringAsFixed(2)} €!';
-    _updateLeaderboard();
+    _updateLeaderboard(forceCloud: true);
     notifyListeners();
   }
 
