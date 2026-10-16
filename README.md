@@ -3,7 +3,7 @@
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 [![Flutter](https://img.shields.io/badge/Flutter-3.41.0-02569B?logo=flutter)](https://flutter.dev)
 [![Firebase](https://img.shields.io/badge/Firebase-Hosting%20%7C%20Functions-FFCA28?logo=firebase)](https://tradinggame-live.web.app)
-[![Platforms](https://img.shields.io/badge/Platforms-Android%20%7C%20Windows%20%7C%20Web-brightgreen)](#)
+[![Platforms](https://img.shields.io/badge/Platforms-Android%20%7C%20Windows%20%7C%20Linux%20%7C%20macOS%20%7C%20Web-brightgreen)](#)
 [![Release Pipeline](https://img.shields.io/badge/CI%2FCD-GitHub%20Actions-2088FF?logo=github-actions)](.github/workflows/ci_cd.yml)
 
 Ein realistisches, persistentes, kompetitives und plattformübergreifendes Finanz- & Börsenspiel entwickelt mit **Flutter**, **Firebase** und **Inno Setup**.
@@ -11,8 +11,10 @@ Ein realistisches, persistentes, kompetitives und plattformübergreifendes Finan
 Tritt an weltweiten Märkten an, meistere Hebelzertifikate bis 50x, manage Kredite und Bonitätsratings, überlebe drohende Insolvenzen und steige im ewigen **Endlos-Leaderboard** an die Spitze auf!
 
 🌐 **Live Web-App spielen:** [https://tradinggame-live.web.app](https://tradinggame-live.web.app)  
-💻 **Windows Desktop Installer:** Verfügbar unter [GitHub Releases](../../releases) (`TradingGame-Setup.exe`)  
-📱 **Android App Bundle & APK:** Verfügbar in den Release-Artefakten (`app-release.aab` / `app-release.apk`)
+💻 **Windows Desktop Installer:** Verfügbar unter [GitHub Releases](../../releases) (`TradingGame-Setup.exe` / `.zip`)  
+🐧 **Linux Desktop:** Verfügbar unter [GitHub Releases](../../releases) (`TradingGame-Linux-x64.tar.gz`)  
+🍎 **macOS Desktop:** Verfügbar unter [GitHub Releases](../../releases) (`TradingGame-macOS.zip`)  
+📱 **Android App Bundle & APK:** Verfügbar in der Google Play Console und den [GitHub Releases](../../releases) (`trading_game.aab` / `trading_game.apk`)
 
 ---
 
