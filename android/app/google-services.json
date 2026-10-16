@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "974968386258",
+    "project_id": "tradinggame-austria-prod",
+    "storage_bucket": "tradinggame-austria-prod.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:974968386258:android:7adfd1d5894f875f67f30b",
+        "android_client_info": {
+          "package_name": "com.tradinggame.trading_game"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDaTaYKZdRu1oO5LxCxe_9VLQQ_uQerMxM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

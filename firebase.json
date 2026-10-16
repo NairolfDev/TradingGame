@@ -1,0 +1,41 @@
+{
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "hosting": {
+    "public": "build/web",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
+  },
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "tradinggame-austria-prod",
+          "appId": "1:974968386258:android:7adfd1d5894f875f67f30b",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "tradinggame-austria-prod",
+          "configurations": {
+            "android": "1:974968386258:android:7adfd1d5894f875f67f30b",
+            "web": "1:974968386258:web:526752f83901959567f30b",
+            "windows": "1:974968386258:web:43c904a297205c0167f30b"
+          }
+        }
+      }
+    }
+  }
+}

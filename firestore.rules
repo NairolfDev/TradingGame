@@ -1,0 +1,30 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 1. Leaderboard: Öffentliche Einsicht für alle (auch unregistrierte Gäste / Read-Only).
+    // Schreiben dürfen alle angemeldeten Spieler für ihr Ranking.
+    match /leaderboard/{docId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    // 2. Portfolios: Privates Depot jedes Nutzers.
+    // Jeder Spieler hat nur Zugriff auf sein eigenes Dokument und Unterkollektionen.
+    match /portfolios/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+
+      match /positions/{posId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+
+      match /transactions/{txId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+
+      match /loans/{loanId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+    }
+  }
+}
