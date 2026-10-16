@@ -160,14 +160,18 @@ class Asset {
   }
 
   Asset copyWithPrice(double newPrice) {
-    final updatedHistory = List<double>.from(priceHistory)..add(newPrice);
+    double sanitizedPrice = newPrice;
+    if (sanitizedPrice.isNaN || sanitizedPrice.isInfinite || sanitizedPrice <= 0) {
+      sanitizedPrice = 0.0001;
+    }
+    final updatedHistory = List<double>.from(priceHistory)..add(sanitizedPrice);
     if (updatedHistory.length > 50) {
       updatedHistory.removeAt(0);
     }
     return copyWith(
-      currentPrice: newPrice,
-      dailyHigh: newPrice > dailyHigh ? newPrice : dailyHigh,
-      dailyLow: newPrice < dailyLow ? newPrice : dailyLow,
+      currentPrice: sanitizedPrice,
+      dailyHigh: sanitizedPrice > dailyHigh ? sanitizedPrice : dailyHigh,
+      dailyLow: sanitizedPrice < dailyLow ? sanitizedPrice : dailyLow,
       priceHistory: updatedHistory,
     );
   }

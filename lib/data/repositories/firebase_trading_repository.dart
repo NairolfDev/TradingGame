@@ -7,6 +7,7 @@ import '../models/luxury_item.dart';
 import '../models/pending_order.dart';
 import '../models/leaderboard_entry.dart';
 import '../models/loan_model.dart';
+import '../mock_data/initial_luxury_items.dart';
 import 'trading_repository.dart';
 import 'local_trading_repository.dart';
 
@@ -188,11 +189,20 @@ class FirebaseTradingRepository implements TradingRepository {
           .get();
 
       if (snap.docs.isNotEmpty) {
-        final items = snap.docs
+        final catalog = InitialLuxuryItems.getItems();
+        final cloudItems = snap.docs
             .map((d) => LuxuryItem.fromJson(d.data()))
             .toList();
-        await _fallbackLocal.saveLuxuryItems(items);
-        return items;
+        final cloudMap = {for (final item in cloudItems) item.id: item};
+        final merged = catalog.map((catItem) {
+          if (cloudMap.containsKey(catItem.id)) {
+            return catItem.copyWith(ownedCount: cloudMap[catItem.id]!.ownedCount);
+          }
+          return catItem;
+        }).toList();
+
+        await _fallbackLocal.saveLuxuryItems(merged);
+        return merged;
       }
     } catch (_) {}
 

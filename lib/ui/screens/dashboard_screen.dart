@@ -42,7 +42,10 @@ class DashboardScreen extends StatelessWidget {
     return Scaffold(
       body: SafeArea(
         child: RefreshIndicator(
-          onRefresh: () async {},
+          onRefresh: () async {
+            await provider.fetchLiveMarketQuotes();
+            await provider.reloadLeaderboard();
+          },
           color: AppColors.primary,
           child: ListView(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),

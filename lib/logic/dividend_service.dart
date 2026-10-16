@@ -24,22 +24,11 @@ class DividendService {
   ) {
     double total = 0.0;
     for (final pos in positions) {
-      final asset = assets.firstWhere(
-        (a) => a.symbol == pos.symbol,
-        orElse: () => Asset(
-          id: '',
-          symbol: '',
-          name: '',
-          type: AssetType.stock,
-          currentPrice: 0,
-          previousClose: 0,
-          dailyHigh: 0,
-          dailyLow: 0,
-          priceHistory: [],
-          volatility: 0,
-          description: '',
-        ),
-      );
+      if (pos.isShort || pos.isLeveraged) continue;
+
+      final matching = assets.where((a) => a.symbol == pos.symbol);
+      if (matching.isEmpty) continue;
+      final asset = matching.first;
 
       if (asset.dividendYield != null && asset.dividendYield! > 0) {
         final positionValue = pos.amount * asset.currentPrice;
@@ -65,22 +54,11 @@ class DividendService {
 
     for (int i = 0; i < positions.length; i++) {
       final pos = positions[i];
-      final asset = assets.firstWhere(
-        (a) => a.symbol == pos.symbol,
-        orElse: () => Asset(
-          id: '',
-          symbol: '',
-          name: '',
-          type: AssetType.stock,
-          currentPrice: 0,
-          previousClose: 0,
-          dailyHigh: 0,
-          dailyLow: 0,
-          priceHistory: [],
-          volatility: 0,
-          description: '',
-        ),
-      );
+      if (pos.isShort || pos.isLeveraged) continue;
+
+      final matching = assets.where((a) => a.symbol == pos.symbol);
+      if (matching.isEmpty) continue;
+      final asset = matching.first;
 
       if (asset.dividendYield != null && asset.dividendYield! > 0) {
         final positionValue = pos.amount * asset.currentPrice;

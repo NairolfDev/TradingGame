@@ -1325,6 +1325,21 @@ class PortfolioProvider extends ChangeNotifier {
     _positions.clear();
     await repository.savePositions(_positions);
 
+    // Storniere offene Pending Orders & Trading-Bot Orders
+    for (final order in _pendingOrders) {
+      if (order.status == PendingOrderStatus.pending) {
+        order.status = PendingOrderStatus.cancelled;
+        if (order.isBuy) {
+          _cash += order.totalEstimatedCost;
+        }
+      }
+    }
+    await repository.savePendingOrders(_pendingOrders);
+
+    for (final botOrder in List.from(automationService.activeOrders)) {
+      await automationService.cancelOrder(botOrder.id);
+    }
+
     if (_cash < 0) {
       _cash = 0;
     }
@@ -1484,14 +1499,15 @@ class PortfolioProvider extends ChangeNotifier {
   }
 
   Future<bool> repayLoan(Loan loan, double amount) async {
-    if (amount <= 0) return false;
-    if (_cash < amount) {
+    if (amount <= 0 || loan.isPaid) return false;
+    final actualRepay = amount > loan.remainingDebt ? loan.remainingDebt : amount;
+    if (actualRepay <= 0) return false;
+
+    if (_cash < actualRepay) {
       _lastAlertMessage = 'Nicht genügend Barmittel für diese Kredittilgung!';
       notifyListeners();
       return false;
     }
-
-    final actualRepay = amount > loan.remainingDebt ? loan.remainingDebt : amount;
 
     _cash -= actualRepay;
     loan.remainingDebt -= actualRepay;

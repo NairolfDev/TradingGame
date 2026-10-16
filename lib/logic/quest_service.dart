@@ -58,10 +58,8 @@ class QuestService {
   }
 
   bool claimQuest(String questId, void Function(double cash, int prestige) onReward) {
-    final quest = _quests.firstWhere(
-      (q) => q.id == questId,
-      orElse: () => throw Exception('Quest not found'),
-    );
+    final quest = _quests.where((q) => q.id == questId).firstOrNull;
+    if (quest == null) return false;
 
     if (quest.isCompleted && !quest.isClaimed) {
       quest.isClaimed = true;

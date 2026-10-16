@@ -67,4 +67,26 @@ class LuxuryItem {
         prestigePoints: (json['prestigePoints'] as num).toInt(),
         ownedCount: (json['ownedCount'] as num?)?.toInt() ?? 0,
       );
+
+  LuxuryItem copyWith({
+    String? id,
+    String? name,
+    LuxuryCategory? category,
+    double? price,
+    String? icon,
+    String? description,
+    int? prestigePoints,
+    int? ownedCount,
+  }) {
+    return LuxuryItem(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      category: category ?? this.category,
+      price: price ?? this.price,
+      icon: icon ?? this.icon,
+      description: description ?? this.description,
+      prestigePoints: prestigePoints ?? this.prestigePoints,
+      ownedCount: ownedCount ?? this.ownedCount,
+    );
+  }
 }

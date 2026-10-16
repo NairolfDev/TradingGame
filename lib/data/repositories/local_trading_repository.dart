@@ -127,18 +127,28 @@ class LocalTradingRepository implements TradingRepository {
   Future<List<LuxuryItem>> getLuxuryItems() async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_keyLuxury);
+    final catalog = InitialLuxuryItems.getItems();
     if (raw == null) {
-      final initial = InitialLuxuryItems.getItems();
-      await saveLuxuryItems(initial);
-      return initial;
+      await saveLuxuryItems(catalog);
+      return catalog;
     }
     try {
       final list = jsonDecode(raw) as List<dynamic>;
-      return list
+      final savedItems = list
           .map((e) => LuxuryItem.fromJson(e as Map<String, dynamic>))
           .toList();
+      final savedMap = {for (final item in savedItems) item.id: item};
+
+      final merged = catalog.map((catItem) {
+        if (savedMap.containsKey(catItem.id)) {
+          return catItem.copyWith(ownedCount: savedMap[catItem.id]!.ownedCount);
+        }
+        return catItem;
+      }).toList();
+
+      return merged;
     } catch (_) {
-      return InitialLuxuryItems.getItems();
+      return catalog;
     }
   }
 

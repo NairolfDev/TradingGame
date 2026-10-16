@@ -119,10 +119,11 @@ class AutomationService {
     bool changes = false;
 
     for (final order in activeOrders) {
-      final matching = assets.firstWhere(
+      final matchingAssets = assets.where(
         (a) => a.id == order.assetId || a.symbol == order.symbol,
-        orElse: () => assets.first,
       );
+      if (matchingAssets.isEmpty) continue;
+      final matching = matchingAssets.first;
 
       bool triggered = false;
 

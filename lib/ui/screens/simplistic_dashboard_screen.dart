@@ -173,9 +173,15 @@ class _SimplisticDashboardScreenState extends State<SimplisticDashboardScreen> {
           ),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-        children: [
+      body: RefreshIndicator(
+        onRefresh: () async {
+          await provider.fetchLiveMarketQuotes();
+          await provider.reloadLeaderboard();
+        },
+        color: AppColors.primary,
+        child: ListView(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          children: [
           // 1. MINIMALIST BALANCE CARD
           Container(
             padding: const EdgeInsets.all(18),
@@ -434,6 +440,7 @@ class _SimplisticDashboardScreenState extends State<SimplisticDashboardScreen> {
               );
             }),
         ],
+        ),
       ),
     );
   }

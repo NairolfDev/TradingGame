@@ -94,48 +94,57 @@ class _MarketsScreenState extends State<MarketsScreen> {
           ),
         ),
       ),
-      body: filteredAssets.isEmpty
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+      body: RefreshIndicator(
+        onRefresh: () => provider.fetchLiveMarketQuotes(),
+        color: AppColors.primary,
+        child: filteredAssets.isEmpty
+            ? ListView(
                 children: [
-                  const Icon(Icons.search_off, size: 48, color: AppColors.textMuted),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'Keine Finanzinstrumente gefunden',
-                    style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
-                  ),
-                  if (_searchQuery.isNotEmpty)
-                    TextButton(
-                      onPressed: () {
-                        setState(() {
-                          _searchQuery = '';
-                          _selectedCategory = null;
-                        });
-                      },
-                      child: const Text('Filter zurücksetzen'),
+                  SizedBox(height: MediaQuery.of(context).size.height * 0.2),
+                  Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.search_off, size: 48, color: AppColors.textMuted),
+                        const SizedBox(height: 12),
+                        const Text(
+                          'Keine Finanzinstrumente gefunden',
+                          style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
+                        ),
+                        if (_searchQuery.isNotEmpty)
+                          TextButton(
+                            onPressed: () {
+                              setState(() {
+                                _searchQuery = '';
+                                _selectedCategory = null;
+                              });
+                            },
+                            child: const Text('Filter zurücksetzen'),
+                          ),
+                      ],
                     ),
+                  ),
                 ],
+              )
+            : ListView.builder(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                itemCount: filteredAssets.length,
+                itemBuilder: (context, index) {
+                  final asset = filteredAssets[index];
+                  return AssetCard(
+                    asset: asset,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => TradeDetailScreen(asset: asset),
+                        ),
+                      );
+                    },
+                  );
+                },
               ),
-            )
-          : ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              itemCount: filteredAssets.length,
-              itemBuilder: (context, index) {
-                final asset = filteredAssets[index];
-                return AssetCard(
-                  asset: asset,
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => TradeDetailScreen(asset: asset),
-                      ),
-                    );
-                  },
-                );
-              },
-            ),
+      ),
     );
   }
 
