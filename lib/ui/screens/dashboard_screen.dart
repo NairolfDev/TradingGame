@@ -8,7 +8,8 @@ import '../widgets/rank_badge.dart';
 import '../widgets/position_tile.dart';
 import '../widgets/pending_order_card.dart';
 import '../widgets/breaking_news_ticker.dart';
-import 'turbo_options_screen.dart';
+import '../widgets/order_routing_dialog.dart';
+import 'achievements_screen.dart';
 import 'quests_screen.dart';
 import 'social_trading_screen.dart';
 import 'dividends_screen.dart';
@@ -543,17 +544,17 @@ class DashboardScreen extends StatelessWidget {
                   Expanded(
                     child: _buildFeatureCard(
                       context: context,
-                      title: '60s Turbo',
-                      subtitle: 'Blitz-Optionen',
-                      detail: '+85% Payout',
-                      icon: Icons.bolt,
-                      color: AppColors.primary,
-                      badge: provider.activeTurboOptions.isNotEmpty
-                          ? '${provider.activeTurboOptions.length} aktiv'
+                      title: 'Trophäen & Erfolge',
+                      subtitle: 'Prestige & Badges',
+                      detail: '${provider.achievementService.unlockedCount} / ${provider.achievementService.totalCount} frei',
+                      icon: Icons.military_tech,
+                      color: AppColors.accentGold,
+                      badge: provider.achievementService.unlockedCount > 0
+                          ? '🏆 ${provider.achievementService.unlockedCount}'
                           : null,
                       onTap: () => Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (_) => const TurboOptionsScreen()),
+                        MaterialPageRoute(builder: (_) => const AchievementsScreen()),
                       ),
                     ),
                   ),
@@ -855,9 +856,17 @@ class DashboardScreen extends StatelessWidget {
                     child: ElevatedButton(
                       onPressed: () async {
                         Navigator.pop(ctx);
-                        await provider.executeSell(
-                          position: position,
-                          sellAmount: amountToSell,
+                        await OrderRoutingDialog.show(
+                          context: context,
+                          symbol: position.symbol,
+                          assetName: position.name,
+                          isBuy: false,
+                          amount: amountToSell,
+                          price: position.currentPrice,
+                          onExecute: () => provider.executeSell(
+                            position: position,
+                            sellAmount: amountToSell,
+                          ),
                         );
                       },
                       style: ElevatedButton.styleFrom(

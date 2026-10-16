@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../data/models/asset.dart';
+import '../../logic/live_market_data_service.dart';
 
 enum ChartMode { line, candle }
 
@@ -42,12 +43,28 @@ class InteractiveBrokerChart extends StatefulWidget {
 }
 
 class _InteractiveBrokerChartState extends State<InteractiveBrokerChart> {
-  String _timeframe = '1D'; // 1D, 1W, 1M, 1Y, ALL
+  String _timeframe = '1D'; // 1D, 1W, 1M, 1Y, 3Y, ALL
   ChartMode _chartMode = ChartMode.line;
   bool _showSMA = true;
   double? _touchedPrice;
+  List<double>? _liveFetchedSeries;
 
-  final List<String> _timeframes = ['1D', '1W', '1M', '1Y', 'ALL'];
+  final List<String> _timeframes = ['1D', '1W', '1M', '1Y', '3Y', 'ALL'];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLiveSeries();
+  }
+
+  Future<void> _loadLiveSeries() async {
+    final series = await LiveMarketDataService().fetchHistoricalSeries(widget.asset, _timeframe);
+    if (mounted && series != null && series.length >= 4) {
+      setState(() {
+        _liveFetchedSeries = series;
+      });
+    }
+  }
 
   List<double> _generateSeriesForTimeframe() {
     final basePrice = widget.asset.currentPrice;
@@ -64,8 +81,10 @@ class _InteractiveBrokerChartState extends State<InteractiveBrokerChart> {
         return _simulatePath(basePrice * 0.94, 30, vol * 0.9);
       case '1Y':
         return _simulatePath(basePrice * 0.82, 40, vol * 1.4);
+      case '3Y':
+        return _simulatePath(basePrice * 0.70, 48, vol * 1.6);
       case 'ALL':
-        return _simulatePath(basePrice * 0.65, 50, vol * 1.8);
+        return _simulatePath(basePrice * 0.55, 60, vol * 2.0);
       default:
         return history;
     }
@@ -127,7 +146,7 @@ class _InteractiveBrokerChartState extends State<InteractiveBrokerChart> {
 
   @override
   Widget build(BuildContext context) {
-    final series = _generateSeriesForTimeframe();
+    final series = _liveFetchedSeries ?? _generateSeriesForTimeframe();
     final candles = _generateCandles(series);
     final minVal = series.reduce(min);
     final maxVal = series.reduce(max);
@@ -245,8 +264,10 @@ class _InteractiveBrokerChartState extends State<InteractiveBrokerChart> {
                   setState(() {
                     _timeframe = tf;
                     _touchedPrice = null;
+                    _liveFetchedSeries = null;
                   });
                   widget.onScrubPrice?.call(null);
+                  _loadLiveSeries();
                 },
                 borderRadius: BorderRadius.circular(6),
                 child: Container(

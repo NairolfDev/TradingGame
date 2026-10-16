@@ -17,19 +17,24 @@ import 'trading_fee_service.dart';
 import 'credit_rating_service.dart';
 import 'news_service.dart';
 import 'quest_service.dart';
-import 'turbo_options_service.dart';
 import 'dividend_service.dart';
-import '../data/models/turbo_option.dart';
 import '../data/models/copy_trader.dart';
 import '../data/models/daily_quest.dart';
+import '../data/models/automation_order.dart';
+import '../data/models/achievement.dart';
 import '../data/mock_data/initial_copy_traders.dart';
+import 'automation_service.dart';
+import 'achievement_service.dart';
+import 'live_market_data_service.dart';
 
 class PortfolioProvider extends ChangeNotifier {
   final TradingRepository repository;
   final MarketEngine marketEngine = MarketEngine();
   final NewsService newsService = NewsService();
   final QuestService questService = QuestService();
-  final TurboOptionsService turboService = TurboOptionsService();
+  final AutomationService automationService = AutomationService();
+  final AchievementService achievementService = AchievementService();
+  final LiveMarketDataService liveDataService = LiveMarketDataService();
   final Uuid _uuid = const Uuid();
 
   double _cash = 50000.0;
@@ -58,6 +63,13 @@ class PortfolioProvider extends ChangeNotifier {
   List<Asset> get assets => _assets;
   List<Position> get positions => _positions;
   List<TransactionRecord> get transactions => _transactions;
+  List<AutomationOrder> get activeAutomationOrders => automationService.activeOrders;
+  List<AutomationOrder> get allAutomationOrders => automationService.allOrders;
+  int get unlockedAutomationSlotsCount => automationService.unlockedSlotsCount;
+  double? get nextAutomationSlotCost => automationService.nextSlotCost;
+  List<Achievement> get achievements => achievementService.achievements;
+  int get unlockedAchievementsCount => achievementService.unlockedCount;
+  List<Asset> get watchlistAssets => _assets.where((a) => a.isWatchlisted).toList();
   List<LuxuryItem> get luxuryItems => _luxuryItems;
   List<PendingOrder> get pendingOrders =>
       _pendingOrders.where((o) => o.status == PendingOrderStatus.pending).toList();
@@ -69,8 +81,6 @@ class PortfolioProvider extends ChangeNotifier {
   NewsEvent? get latestBreakingNews => newsService.latestNews ?? (_newsEvents.isNotEmpty ? _newsEvents.first : null);
   List<DailyQuest> get dailyQuests => questService.quests;
   int get loginStreakDays => questService.loginStreakDays;
-  List<TurboOption> get activeTurboOptions => turboService.activeOptions;
-  List<TurboOption> get settledTurboOptions => turboService.settledOptions;
   List<CopyTrader> get copyTraders => InitialCopyTraders.getTraders();
   double get totalAnnualDividends => DividendService.calculateAnnualDividendRunRate(_positions, _assets);
   double get monthlyPassiveIncome => DividendService.calculateMonthlyPassiveIncome(_positions, _assets);
@@ -259,46 +269,23 @@ class PortfolioProvider extends ChangeNotifier {
       totalPositionsCount: _positions.length,
     );
 
-    // Initialisiere Turbo Options Ticker
-    turboService.startTicker((symbol) {
-      final matching = _assets.firstWhere(
-        (a) => a.symbol == symbol,
-        orElse: () => _assets.first,
-      );
-      return matching.currentPrice;
-    });
+    // Initialisiere Automation Service (Limit-Orders & Bot-Trading)
+    await automationService.initialize();
 
-    turboService.onOptionSettled = (option) {
-      final record = TransactionRecord(
-        id: _uuid.v4(),
-        symbol: option.assetSymbol,
-        name: option.assetName,
-        type: TransactionType.sell,
-        amount: 1,
-        price: option.finalPrice ?? option.entryPrice,
-        totalAmount: option.isWon ? option.potentialPayout : 0.0,
-        realizedPnL: option.profit,
-        timestamp: DateTime.now(),
-        note: option.isWon
-            ? '⚡ 60s Turbo-Option (${option.direction == TurboDirection.call ? 'Call' : 'Put'}) GEWONNEN!'
-            : '⚡ 60s Turbo-Option (${option.direction == TurboDirection.call ? 'Call' : 'Put'}) VERLOREN',
-      );
-
-      if (option.isWon) {
-        _cash += option.potentialPayout;
-        _lastAlertMessage = '🎉 Turbo-Option gewonnen! +${option.potentialPayout.toStringAsFixed(2)} €!';
-      } else {
-        _lastAlertMessage = '❌ Turbo-Option verloren (-${option.stake.toStringAsFixed(2)} €).';
-      }
-      _transactions.insert(0, record);
+    // Initialisiere Gamification Achievements
+    await achievementService.initialize();
+    achievementService.onAchievementUnlocked = (ach) {
+      _cash += ach.cashReward;
       repository.saveCashBalance(_cash);
-      repository.saveTransaction(record);
+      _lastAlertMessage =
+          '🏆 Trophäe freigeschaltet: "${ach.title}"! +${ach.cashReward.toStringAsFixed(0)} € & +${ach.prestigeReward} Prestige!';
       notifyListeners();
     };
 
-    // Initiales Update der Positionspreise & Leaderboard
+    // Initiales Update der Positionspreise, Leaderboard & Achievements
     _updatePositionsWithCurrentAssetPrices();
     _updateLeaderboard();
+    _checkAllAchievements();
 
     _isLoading = false;
     notifyListeners();
@@ -321,8 +308,10 @@ class PortfolioProvider extends ChangeNotifier {
 
     _updatePositionsWithCurrentAssetPrices();
     _checkAndExecutePendingOrders();
+    _checkAndExecuteAutomationOrders();
     _checkBondsCouponPayout();
     _updateLeaderboard();
+    _checkAllAchievements();
 
     // Gelegentlich im Hintergrund speichern
     repository.saveAssets(_assets);
@@ -839,6 +828,14 @@ class PortfolioProvider extends ChangeNotifier {
     required double principal,
     required int durationDays,
   }) async {
+    // Erste Kreditaufnahme ist bankenseitig auf maximal 25.000 € gedeckelt
+    final previousBankLoans = _transactions.where((t) => t.type == TransactionType.loanPayout);
+    if (previousBankLoans.isEmpty && principal > 25000.0) {
+      _lastAlertMessage = '⚠️ Der erste Bankkredit ist bankenseitig auf maximal 25.000 € begrenzt!';
+      notifyListeners();
+      return false;
+    }
+
     if (isUnderCreditLockout) {
       final rem = creditLockoutTimeRemaining;
       _lastAlertMessage =
@@ -910,6 +907,47 @@ class PortfolioProvider extends ChangeNotifier {
     _lastAlertMessage =
         '💳 Kredit über ${principal.toStringAsFixed(0)} € ausgezahlt! Zinssatz: ${(rating.baseInterestRate * 100).toStringAsFixed(1)}% p.a.';
     _updateLeaderboard();
+    _checkAllAchievements();
+    notifyListeners();
+    return true;
+  }
+
+  /// Notfall-Sanierungskredit der Bank: Nach Insolvenz hilft die Bank immer mit 10.000 € Rettungsgeld
+  Future<bool> takeSanierungsKredit() async {
+    final loan = Loan.createSanierungsLoan();
+    _cash += loan.principal;
+    _loans.insert(0, loan);
+    _isInsolvent = false;
+    _insolvencyLockoutUntil = null; // Kreditsperre sofort aufheben!
+    _lastLoanTakenAt = DateTime.now();
+
+    await repository.saveCashBalance(_cash);
+    await repository.saveLoans(_loans);
+    await repository.saveInsolvencyStatus(
+      isInsolvent: false,
+      lockoutUntil: null,
+      lastLoanTakenAt: _lastLoanTakenAt,
+    );
+
+    final record = TransactionRecord(
+      id: _uuid.v4(),
+      symbol: '🤝',
+      name: 'Bank Notfall-Sanierungskredit erhalten',
+      type: TransactionType.loanPayout,
+      amount: 1,
+      price: loan.principal,
+      totalAmount: loan.principal,
+      timestamp: DateTime.now(),
+      note: '10.000 € Sanierungskredit (12% p.a., 90 Tage) – Sofortiger Neustart nach Insolvenz!',
+    );
+
+    _transactions.insert(0, record);
+    await repository.saveTransaction(record);
+
+    _lastAlertMessage =
+        '🤝 Rettungsschirm aktiviert! Die Bank gewährt dir einen 10.000 € Sanierungskredit zum Weiterspielen!';
+    _updateLeaderboard();
+    _checkAllAchievements();
     notifyListeners();
     return true;
   }
@@ -1006,47 +1044,7 @@ class PortfolioProvider extends ChangeNotifier {
     });
   }
 
-  // --- 2. 60-SEKUNDEN TURBO-BLITZOPTIONEN ---
-  bool placeTurboOption({
-    required String assetSymbol,
-    required String assetName,
-    required double entryPrice,
-    required TurboDirection direction,
-    required double stake,
-    required int durationSeconds,
-  }) {
-    if (_cash < stake || stake <= 0) return false;
-
-    _cash -= stake;
-    repository.saveCashBalance(_cash);
-
-    turboService.placeOption(
-      assetSymbol: assetSymbol,
-      assetName: assetName,
-      entryPrice: entryPrice,
-      direction: direction,
-      stake: stake,
-      durationSeconds: durationSeconds,
-    );
-
-    final record = TransactionRecord(
-      id: _uuid.v4(),
-      symbol: assetSymbol,
-      name: 'Turbo-Option (${direction == TurboDirection.call ? 'Call' : 'Put'})',
-      type: TransactionType.buy,
-      amount: 1,
-      price: stake,
-      totalAmount: stake,
-      timestamp: DateTime.now(),
-      note: 'Einsatz $durationSeconds Sekunden Blitz-Option',
-    );
-    _transactions.insert(0, record);
-    repository.saveTransaction(record);
-    notifyListeners();
-    return true;
-  }
-
-  // --- 3. SOCIAL TRADING & COPY-TRADING ---
+  // --- 2. SOCIAL TRADING & COPY-TRADING ---
   Future<bool> copyTrader(CopyTrader trader, double allocatedAmount) async {
     if (_cash < allocatedAmount || allocatedAmount < 500) return false;
 
@@ -1139,6 +1137,153 @@ class PortfolioProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  // --- 5. WATCHLIST MANAGEMENT ---
+  void toggleWatchlist(Asset asset) {
+    asset.isWatchlisted = !asset.isWatchlisted;
+    repository.saveAssets(_assets);
+    notifyListeners();
+  }
+
+  // --- 6. LIMIT-ORDER & BOT-AUTOMATISIERUNG ---
+  Future<bool> unlockAutomationSlot() async {
+    final success = await automationService.unlockNextSlot(_cash, (cost) {
+      _cash -= cost;
+      repository.saveCashBalance(_cash);
+
+      final record = TransactionRecord(
+        id: _uuid.v4(),
+        symbol: 'BOT',
+        name: 'Trading-Bot Slot freigeschaltet',
+        type: TransactionType.luxuryPurchase,
+        amount: 1,
+        price: cost,
+        totalAmount: cost,
+        timestamp: DateTime.now(),
+        note: 'Freischaltung Slot ${automationService.unlockedSlotsCount}',
+      );
+      _transactions.insert(0, record);
+      repository.saveTransaction(record);
+    });
+
+    if (success) {
+      _lastAlertMessage = '🤖 Neuer Trading-Bot Slot freigeschaltet! Mehr Automatisierung aktiv.';
+      _checkAllAchievements();
+      notifyListeners();
+    }
+    return success;
+  }
+
+  Future<AutomationOrder?> placeAutomationOrder({
+    required Asset asset,
+    required AutomationOrderType orderType,
+    required double targetPrice,
+    required double amount,
+  }) async {
+    final order = await automationService.placeOrder(
+      assetId: asset.id,
+      symbol: asset.symbol,
+      name: asset.name,
+      orderType: orderType,
+      targetPrice: targetPrice,
+      amount: amount,
+    );
+
+    if (order != null) {
+      _lastAlertMessage =
+          '🤖 Limit-Order vorgemerkt: ${orderType.displayName} für ${asset.symbol} @ ${targetPrice.toStringAsFixed(2)} €';
+    } else {
+      _lastAlertMessage = '⚠️ Kein freier Bot-Slot verfügbar! Schalte weitere Slots frei.';
+    }
+
+    notifyListeners();
+    return order;
+  }
+
+  Future<bool> cancelAutomationOrder(String orderId) async {
+    final success = await automationService.cancelOrder(orderId);
+    if (success) {
+      _lastAlertMessage = 'Limit-Order storniert.';
+      notifyListeners();
+    }
+    return success;
+  }
+
+  Future<void> _checkAndExecuteAutomationOrders() async {
+    await automationService.checkAndExecuteOrders(
+      assets: _assets,
+      onExecute: (order, asset) async {
+        if (order.orderType == AutomationOrderType.buyLimit) {
+          final success = await executeBuy(asset: asset, amount: order.amount);
+          if (success) {
+            _lastAlertMessage =
+                '🤖 Bot Limit-Kauf ausgeführt: ${order.amount}x ${order.symbol} @ ${asset.currentPrice.toStringAsFixed(2)} €';
+          }
+        } else {
+          // Take-Profit oder Stop-Loss
+          final pos = _positions.firstWhere(
+            (p) => p.assetId == asset.id || p.symbol == asset.symbol,
+            orElse: () => _positions.first,
+          );
+          if (_positions.contains(pos)) {
+            final sellAmt = order.amount > pos.amount ? pos.amount : order.amount;
+            final success = await executeSell(position: pos, sellAmount: sellAmt);
+            if (success) {
+              _lastAlertMessage =
+                  '🤖 Bot Limit-Verkauf (${order.orderType == AutomationOrderType.takeProfit ? "Take-Profit" : "Stop-Loss"}) ausgeführt: ${sellAmt}x ${order.symbol} @ ${asset.currentPrice.toStringAsFixed(2)} €';
+            }
+          }
+        }
+        _checkAllAchievements();
+        notifyListeners();
+      },
+    );
+  }
+
+  // --- 7. GAMIFICATION & ACHIEVEMENTS EVALUATION ---
+  void _checkAllAchievements() {
+    final playerEntry = _leaderboard.firstWhere((e) => e.isPlayer, orElse: () => _leaderboard.first);
+    final totalTrades = _transactions.where((t) => t.type == TransactionType.buy || t.type == TransactionType.sell).length;
+    final winningStreak = _calculateWinningStreak();
+    final hasWonLeveraged = _transactions.any((t) => (t.note?.contains('Hebel') == true || t.note?.contains('CFD') == true) && (t.realizedPnL ?? 0) > 0);
+    final hasSanierungSettled = _loans.any((l) => l.id.startsWith('sanierung_loan_') && l.isPaid);
+    final hasBotTriggered = automationService.allOrders.any((o) => o.isTriggered);
+    final hasOffMarketCrypto = _transactions.any((t) =>
+        (t.symbol.contains('BTC') || t.symbol.contains('ETH') || t.symbol.contains('SOL')) &&
+        (t.timestamp.hour < 9 || t.timestamp.hour >= 17 || t.timestamp.weekday >= 6));
+
+    achievementService.checkAchievements(
+      netWorth: netWorth,
+      totalTradesCount: totalTrades,
+      winningStreakCount: winningStreak,
+      totalPrestigePoints: totalPrestigePoints,
+      monthlyPassiveIncome: monthlyPassiveIncome,
+      hasDebt: totalDebt > 0,
+      ownedLuxuryCount: _luxuryItems.fold(0, (sum, i) => sum + i.ownedCount),
+      hasCopyTrade: _transactions.any((t) => t.note?.contains('Kopiert Portfolio') == true),
+      hasBotOrderTriggered: hasBotTriggered,
+      hasWonHighLeverage: hasWonLeveraged,
+      leaderboardRank: playerEntry.rank,
+      hasSettledSanierungskredit: hasSanierungSettled,
+      hasTradedOffMarketCrypto: hasOffMarketCrypto,
+      uniqueAssetTypesCount: _positions.map((p) => p.type).toSet().length,
+    );
+  }
+
+  int _calculateWinningStreak() {
+    int streak = 0;
+    int maxStreak = 0;
+    final sells = _transactions.where((t) => t.type == TransactionType.sell && t.realizedPnL != null).toList().reversed;
+    for (final t in sells) {
+      if (t.realizedPnL! > 0) {
+        streak++;
+        if (streak > maxStreak) maxStreak = streak;
+      } else {
+        streak = 0;
+      }
+    }
+    return maxStreak;
+  }
+
   // Spiel zurücksetzen (falls vom Nutzer gewünscht)
   Future<void> resetGame() async {
     await repository.resetGameToInitial();
@@ -1149,7 +1294,6 @@ class PortfolioProvider extends ChangeNotifier {
   void dispose() {
     marketEngine.stop();
     newsService.dispose();
-    turboService.dispose();
     super.dispose();
   }
 }

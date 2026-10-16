@@ -3,12 +3,14 @@ class CreditRating {
   final String grade; // AAA, A, BBB, BB, CCC, D
   final String description;
   final double baseInterestRate; // p.a.
+  final double maxBorrowLimit; // Maximaler Kreditrahmen
 
   const CreditRating({
     required this.score,
     required this.grade,
     required this.description,
     required this.baseInterestRate,
+    required this.maxBorrowLimit,
   });
 }
 
@@ -36,7 +38,7 @@ class CreditRatingService {
     // Hebel-Liquidationsabzug (Zocken mit 50x CFDs zerstört die Bonität!)
     score -= (liquidationsCount * 15);
 
-    // Schuldenlast: Belastung über den 50k Startkredit hinaus
+    // Schuldenlast: Belastung über den Startkredit hinaus
     if (totalDebt > 120000) {
       score -= 30;
     } else if (totalDebt > 75000) {
@@ -61,6 +63,7 @@ class CreditRatingService {
         grade: 'AAA Prime',
         description: 'Exzellente Bonität. Beste Zinsen am Markt.',
         baseInterestRate: 0.038, // 3,8% p.a.
+        maxBorrowLimit: 150000.0,
       );
     } else if (score >= 75) {
       return CreditRating(
@@ -68,6 +71,7 @@ class CreditRatingService {
         grade: 'AA Solid',
         description: 'Sehr solide Bonität der österreichischen Großbanken.',
         baseInterestRate: 0.055, // 5,5% p.a.
+        maxBorrowLimit: 75000.0,
       );
     } else if (score >= 60) {
       return CreditRating(
@@ -75,6 +79,7 @@ class CreditRatingService {
         grade: 'BBB Standard',
         description: 'Durchschnittliche Kreditwürdigkeit mit moderatem Risikoaufschlag.',
         baseInterestRate: 0.089, // 8,9% p.a.
+        maxBorrowLimit: 50000.0,
       );
     } else if (score >= 40) {
       return CreditRating(
@@ -82,6 +87,7 @@ class CreditRatingService {
         grade: 'BB Risikobehaftet',
         description: 'Erhöhte Verluste oder Hebel-Liquidationsspuren. Hohe Zinsen.',
         baseInterestRate: 0.145, // 14,5% p.a.
+        maxBorrowLimit: 25000.0,
       );
     } else if (score >= 25) {
       return CreditRating(
@@ -89,6 +95,7 @@ class CreditRatingService {
         grade: 'CCC Hochrisiko',
         description: 'Schwere finanzielle Schieflage. Banken verlangen Notfallzuschlag.',
         baseInterestRate: 0.225, // 22,5% p.a.
+        maxBorrowLimit: 15000.0,
       );
     } else {
       return CreditRating(
@@ -96,6 +103,7 @@ class CreditRatingService {
         grade: 'D Kredithai-Sektor',
         description: 'Faktisch pleite. Kredite werden nur noch zu Wucherzinsen vergeben!',
         baseInterestRate: 0.360, // 36,0% p.a.
+        maxBorrowLimit: 10000.0,
       );
     }
   }

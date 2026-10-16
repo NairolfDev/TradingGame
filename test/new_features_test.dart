@@ -1,12 +1,10 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:trading_game/data/models/asset.dart';
 import 'package:trading_game/data/models/position.dart';
-import 'package:trading_game/data/models/turbo_option.dart';
 import 'package:trading_game/data/models/daily_quest.dart';
 import 'package:trading_game/data/mock_data/initial_copy_traders.dart';
 import 'package:trading_game/logic/dividend_service.dart';
 import 'package:trading_game/logic/quest_service.dart';
-import 'package:trading_game/logic/turbo_options_service.dart';
 import 'package:trading_game/logic/news_service.dart';
 
 void main() {
@@ -161,66 +159,4 @@ void main() {
     });
   });
 
-  group('Feature 5: 60s Turbo-Options Engine Tests', () {
-    test('TurboOption evaluates Call and Put win/loss conditions accurately', () {
-      final callOption = TurboOption(
-        id: 'opt_1',
-        assetSymbol: 'BTC',
-        assetName: 'Bitcoin',
-        entryPrice: 50000.0,
-        direction: TurboDirection.call,
-        stake: 100.0,
-        durationSeconds: 60,
-        payoutMultiplier: 1.85,
-        startedAt: DateTime.now().subtract(const Duration(seconds: 65)),
-        endsAt: DateTime.now().subtract(const Duration(seconds: 5)),
-        finalPrice: 50100.0,
-        isSettled: true,
-        isWon: true,
-      );
-
-      expect(callOption.isWon, isTrue);
-      expect(callOption.potentialPayout, 185.0);
-      expect(callOption.profit, 85.0);
-
-      final putOption = TurboOption(
-        id: 'opt_2',
-        assetSymbol: 'BTC',
-        assetName: 'Bitcoin',
-        entryPrice: 50000.0,
-        direction: TurboDirection.put,
-        stake: 100.0,
-        durationSeconds: 60,
-        payoutMultiplier: 1.85,
-        startedAt: DateTime.now().subtract(const Duration(seconds: 65)),
-        endsAt: DateTime.now().subtract(const Duration(seconds: 5)),
-        finalPrice: 50500.0, // Stieg an -> Put verloren
-        isSettled: true,
-        isWon: false,
-      );
-
-      expect(putOption.isWon, isFalse);
-      expect(putOption.profit, -100.0);
-    });
-
-    test('TurboOptionsService places and tracks active options', () {
-      final turboService = TurboOptionsService();
-      turboService.startTicker((symbol) => 50000.0);
-
-      final option = turboService.placeOption(
-        assetSymbol: 'BTC',
-        assetName: 'Bitcoin',
-        entryPrice: 50000.0,
-        direction: TurboDirection.call,
-        stake: 250.0,
-        durationSeconds: 60,
-      );
-
-      expect(turboService.activeOptions.length, 1);
-      expect(turboService.activeOptions.first.id, option.id);
-      expect(turboService.activeOptions.first.stake, 250.0);
-
-      turboService.dispose();
-    });
-  });
 }

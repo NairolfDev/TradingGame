@@ -3,6 +3,62 @@ import '../models/luxury_item.dart';
 class InitialLuxuryItems {
   static List<LuxuryItem> getItems() {
     return [
+      // --- EINSTIEG & LIFESTYLE (Erschwinglich) ---
+      LuxuryItem(
+        id: 'life_espresso',
+        name: 'Italienische Barista Espressomaschine',
+        category: LuxuryCategory.lifestyle,
+        price: 180.0,
+        icon: '☕',
+        description: 'Frischer Siebträger-Espresso für durchgezockte Börsen-Nächte.',
+        prestigePoints: 3,
+      ),
+      LuxuryItem(
+        id: 'life_shirt',
+        name: 'Maßgeschneidertes Designer-Hemd',
+        category: LuxuryCategory.lifestyle,
+        price: 350.0,
+        icon: '👔',
+        description: 'Italienische Baumwolle mit deinen Initialen am Ärmel.',
+        prestigePoints: 6,
+      ),
+      LuxuryItem(
+        id: 'life_pen',
+        name: 'Montblanc Meisterstück Füllfederhalter',
+        category: LuxuryCategory.lifestyle,
+        price: 750.0,
+        icon: '✒️',
+        description: 'Damit werden Millionenverträge und Börsen-Übernahmen unterzeichnet.',
+        prestigePoints: 14,
+      ),
+      LuxuryItem(
+        id: 'life_gold_iphone',
+        name: 'Custom 24k Gold iPhone Edition',
+        category: LuxuryCategory.lifestyle,
+        price: 2400.0,
+        icon: '📱',
+        description: 'Massiver Goldrahmen mit graviertem Bullen-Emblem.',
+        prestigePoints: 40,
+      ),
+      LuxuryItem(
+        id: 'life_wine',
+        name: 'Château Lafite Rothschild 1996',
+        category: LuxuryCategory.lifestyle,
+        price: 4500.0,
+        icon: '🍷',
+        description: 'Ein legendärer Bordeaux-Jahrgang für deine ersten Aktiengewinne.',
+        prestigePoints: 75,
+      ),
+      LuxuryItem(
+        id: 'life_golf_club',
+        name: 'VIP Golf-Club Jahresmitgliedschaft',
+        category: LuxuryCategory.lifestyle,
+        price: 8900.0,
+        icon: '🏌️',
+        description: 'Networking mit den Top-CEOs und Investmentbankern auf dem Green.',
+        prestigePoints: 140,
+      ),
+
       // --- UHREN ---
       LuxuryItem(
         id: 'watch_rolex_sub',

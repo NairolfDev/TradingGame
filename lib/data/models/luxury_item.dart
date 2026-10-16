@@ -1,4 +1,5 @@
 enum LuxuryCategory {
+  lifestyle,
   watch,
   vehicle,
   realEstate,
@@ -6,6 +7,8 @@ enum LuxuryCategory {
 
   String get displayName {
     switch (this) {
+      case LuxuryCategory.lifestyle:
+        return 'Einstieg & Lifestyle';
       case LuxuryCategory.watch:
         return 'Luxusuhren';
       case LuxuryCategory.vehicle:

@@ -4,6 +4,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../data/models/loan_model.dart';
+import '../../data/models/transaction.dart';
 import '../../logic/portfolio_provider.dart';
 import '../../logic/auth_provider.dart';
 import '../../logic/credit_rating_service.dart';
@@ -791,8 +792,57 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                   ),
                   const SizedBox(height: 6),
                   const Text(
-                    'Du hast Insolvenz angemeldet oder bist zahlungsunfähig. Bis zum Ablauf der 5 Tage sind alle Kredite gesperrt. Nach Ablauf kannst du einen Sanierungs-Notkredit (Rating D) aufnehmen.',
+                    'Du hast Insolvenz angemeldet oder bist überschuldet. Reguläre Kredite sind gesperrt.',
                     style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                  ),
+                  const SizedBox(height: 12),
+                  const Divider(color: AppColors.cardBorder),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      const Text('🤝', style: TextStyle(fontSize: 18)),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Rettungsanker der Bank (Zweite Chance):',
+                        style: TextStyle(
+                          color: AppColors.accentGold,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'Die Bank lässt dich nicht im Stich! Aktiviere sofort einen Sanierungs-Notkredit über 10.000 € (12% p.a.), um die Sperre sofort zu beenden und weiterzuspielen.',
+                    style: TextStyle(color: AppColors.textSecondary, fontSize: 11.5),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 44,
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.accentGold,
+                        foregroundColor: Colors.black,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      icon: const Icon(Icons.handshake, size: 18),
+                      label: const Text(
+                        'Sanierungskredit (10.000 €) sofort aktivieren',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
+                      onPressed: () async {
+                        final success = await provider.takeSanierungsKredit();
+                        if (success && context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('🎉 10.000 € Sanierungskredit ausgezahlt! Du bist wieder voll im Spiel!'),
+                            ),
+                          );
+                        }
+                      },
+                    ),
                   ),
                 ],
               ),
@@ -825,47 +875,46 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                   ),
                   const SizedBox(height: 8),
                   const Text(
-                    'Dein Bargeld ist aufgebraucht und deine Schulden übersteigen dein Vermögen. Melde jetzt Privatinsolvenz an. Nach einer 5-tägigen Kreditsperre kannst du dich mit einem Sanierungskredit wieder hocharbeiten.',
+                    'Dein Bargeld ist aufgebraucht. Du kannst entweder den Sanierungs-Notkredit der Bank über 10.000 € abrufen, oder Privatinsolvenz anmelden.',
                     style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
                   ),
                   const SizedBox(height: 14),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        showDialog(
-                          context: context,
-                          builder: (ctx) => AlertDialog(
-                            backgroundColor: AppColors.surface,
-                            title: const Text('Privatinsolvenz wirklich anmelden?'),
-                            content: const Text(
-                              'Achtung: Dies startet eine reale 5-Tage-Kreditsperre (120 Stunden). Alle offenen Positionen werden zur Schuldendeckung verwertet.',
-                            ),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.pop(ctx),
-                                child: const Text('Abbrechen'),
-                              ),
-                              ElevatedButton(
-                                style: ElevatedButton.styleFrom(backgroundColor: AppColors.loss),
-                                onPressed: () {
-                                  Navigator.pop(ctx);
-                                  provider.declareInsolvency();
-                                },
-                                child: const Text('Ja, Insolvenz anmelden', style: TextStyle(color: Colors.white)),
-                              ),
-                            ],
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () async {
+                            final success = await provider.takeSanierungsKredit();
+                            if (success && context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('🎉 10.000 € Sanierungskredit erhalten! Weiter gehts!'),
+                                ),
+                              );
+                            }
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.accentGold,
+                            foregroundColor: Colors.black,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
                           ),
-                        );
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.loss,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
+                          icon: const Icon(Icons.handshake, size: 18),
+                          label: const Text('Sanierungs-Notkredit (10k €)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                        ),
                       ),
-                      icon: const Icon(Icons.gavel, size: 18),
-                      label: const Text('Privatinsolvenz einleiten (5 Tage Sperre)', style: TextStyle(fontWeight: FontWeight.bold)),
-                    ),
+                      const SizedBox(width: 10),
+                      OutlinedButton(
+                        onPressed: () {
+                          provider.declareInsolvency();
+                        },
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.loss,
+                          side: const BorderSide(color: AppColors.loss),
+                          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
+                        ),
+                        child: const Text('Insolvenz', style: TextStyle(fontSize: 12)),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -884,18 +933,36 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Row(
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Icon(Icons.add_card, color: AppColors.accent, size: 20),
-                    SizedBox(width: 8),
-                    Text(
-                      'Neuen Kredit aufnehmen (Kredit-Rechner)',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.textPrimary,
-                      ),
+                    const Row(
+                      children: [
+                        Icon(Icons.add_card, color: AppColors.accent, size: 20),
+                        SizedBox(width: 8),
+                        Text(
+                          'Neuen Kredit aufnehmen',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                      ],
                     ),
+                    if (provider.transactions.where((t) => t.type == TransactionType.loanPayout).isEmpty)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: AppColors.accentGold.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: AppColors.accentGold.withValues(alpha: 0.5)),
+                        ),
+                        child: const Text(
+                          '1. Kredit: Max. 25.000 €',
+                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.gold),
+                        ),
+                      ),
                   ],
                 ),
                 const SizedBox(height: 6),
@@ -921,17 +988,26 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                     ),
                   ],
                 ),
-                Slider(
-                  value: _requestedAmount,
-                  min: 5000.0,
-                  max: 250000.0,
-                  divisions: 49, // 5.000 € steps
-                  activeColor: AppColors.accent,
-                  inactiveColor: AppColors.cardBorder,
-                  onChanged: (val) {
-                    setState(() {
-                      _requestedAmount = val;
-                    });
+                Builder(
+                  builder: (context) {
+                    final hasTakenLoan = provider.transactions.any((t) => t.type == TransactionType.loanPayout);
+                    final double maxLimit = hasTakenLoan ? rating.maxBorrowLimit : 25000.0;
+                    if (_requestedAmount > maxLimit) {
+                      _requestedAmount = maxLimit;
+                    }
+                    return Slider(
+                      value: _requestedAmount.clamp(5000.0, maxLimit),
+                      min: 5000.0,
+                      max: maxLimit > 5000.0 ? maxLimit : 5000.0,
+                      divisions: maxLimit > 5000.0 ? ((maxLimit - 5000.0) / 5000.0).round().clamp(1, 50) : 1,
+                      activeColor: AppColors.accent,
+                      inactiveColor: AppColors.cardBorder,
+                      onChanged: (val) {
+                        setState(() {
+                          _requestedAmount = val;
+                        });
+                      },
+                    );
                   },
                 ),
 

@@ -13,10 +13,12 @@ import 'prestige_shop_screen.dart';
 import 'leaderboard_screen.dart';
 import 'history_news_screen.dart';
 import 'auth_screen.dart';
-import 'turbo_options_screen.dart';
 import 'quests_screen.dart';
+
 import 'social_trading_screen.dart';
 import 'dividends_screen.dart';
+import 'achievements_screen.dart';
+import '../widgets/watchlist_marquee_ticker.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -326,11 +328,11 @@ class _MainScreenState extends State<MainScreen> {
                               ),
                             ),
                             _buildActionTile(
-                              Icons.bolt,
-                              '60s Turbo-Optionen',
-                              AppColors.primary,
-                              () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TurboOptionsScreen())),
-                              badgeText: provider.activeTurboOptions.isNotEmpty ? '${provider.activeTurboOptions.length}' : null,
+                              Icons.military_tech,
+                              'Trophäen & Erfolge',
+                              AppColors.accentGold,
+                              () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AchievementsScreen())),
+                              badgeText: '${provider.achievementService.unlockedCount}/${provider.achievementService.totalCount}',
                             ),
                             _buildActionTile(
                               Icons.emoji_events,
@@ -350,6 +352,13 @@ class _MainScreenState extends State<MainScreen> {
                               'Dividenden',
                               Colors.greenAccent,
                               () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DividendsScreen())),
+                            ),
+                            _buildActionTile(
+                              Icons.military_tech,
+                              'Erfolge & Trophäen',
+                              Colors.orangeAccent,
+                              () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AchievementsScreen())),
+                              badgeText: '${provider.unlockedAchievementsCount}',
                             ),
                           ],
                         ),
@@ -393,9 +402,14 @@ class _MainScreenState extends State<MainScreen> {
                     ],
                   ),
                 ),
-                // Main Content
+                // Main Content mit unterem Bloomberg-Laufband
                 Expanded(
-                  child: screens[_currentIndex],
+                  child: Column(
+                    children: [
+                      Expanded(child: screens[_currentIndex]),
+                      const WatchlistMarqueeTicker(),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -417,6 +431,14 @@ class _MainScreenState extends State<MainScreen> {
             ),
             actions: [
               IconButton(
+                icon: const Icon(Icons.military_tech, size: 22, color: Colors.amber),
+                tooltip: 'Erfolge & Trophäen',
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const AchievementsScreen()),
+                ),
+              ),
+              IconButton(
                 icon: const Icon(Icons.system_update_alt, size: 20),
                 tooltip: 'Updates prüfen',
                 onPressed: () => _checkVersionUpdate(isManual: true),
@@ -429,9 +451,16 @@ class _MainScreenState extends State<MainScreen> {
               const SizedBox(width: 8),
             ],
           ),
-          body: IndexedStack(
-            index: _currentIndex,
-            children: screens,
+          body: Column(
+            children: [
+              Expanded(
+                child: IndexedStack(
+                  index: _currentIndex,
+                  children: screens,
+                ),
+              ),
+              const WatchlistMarqueeTicker(),
+            ],
           ),
           bottomNavigationBar: BottomNavigationBar(
             type: BottomNavigationBarType.fixed,

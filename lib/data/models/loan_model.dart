@@ -73,16 +73,31 @@ class Loan {
 
   static Loan createInitialStartLoan() {
     final now = DateTime.now();
-    // 50.000 € Startkredit mit 60 Tagen (2 Monate) Frist zu 4,5% p.a.
+    // 25.000 € Startkredit mit 60 Tagen Frist zu 4,5% p.a.
     return Loan(
-      id: 'initial_start_loan_50k',
+      id: 'initial_start_loan_25k',
       title: 'Börsenspiel Startkredit (Bank Austria / Erste Group)',
-      principal: 50000.0,
+      principal: 25000.0,
       interestRate: 0.045, // 4,5% p.a.
-      remainingDebt: 50000.0,
+      remainingDebt: 25000.0,
       takenAt: now,
       dueDate: now.add(const Duration(days: 60)),
       durationDays: 60,
+    );
+  }
+
+  static Loan createSanierungsLoan() {
+    final now = DateTime.now();
+    // 10.000 € Notfall-Sanierungskredit nach Insolvenz zu 12% p.a.
+    return Loan(
+      id: 'sanierung_loan_${now.millisecondsSinceEpoch}',
+      title: 'Bank Notfall-Sanierungskredit (Zweite Chance)',
+      principal: 10000.0,
+      interestRate: 0.12, // 12% p.a.
+      remainingDebt: 10000.0 * (1 + 0.12 * (90 / 365)),
+      takenAt: now,
+      dueDate: now.add(const Duration(days: 90)),
+      durationDays: 90,
     );
   }
 }
