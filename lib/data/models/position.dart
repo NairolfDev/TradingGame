@@ -29,7 +29,10 @@ class Position {
     double? collateral,
     double? liquidationPrice,
     DateTime? openedAt,
-  })  : collateral = collateral ?? (amount * averageBuyPrice),
+  })  : collateral = collateral ??
+            ((leverage > 1 || isShort)
+                ? (amount * averageBuyPrice) / (leverage > 0 ? leverage : 1)
+                : (amount * averageBuyPrice)),
         liquidationPrice = liquidationPrice ??
             _calculateLiquidationPrice(
               buyPrice: averageBuyPrice,
@@ -43,9 +46,10 @@ class Position {
     required int leverage,
     required bool isShort,
   }) {
-    if (leverage <= 1) return 0.0;
+    if (leverage <= 1 && !isShort) return 0.0;
     // Bei 90% Verlust des Collaterals erfolgt die Liquidation
-    final maxLossFactor = 0.90 / leverage;
+    final effLeverage = leverage < 1 ? 1 : leverage;
+    final maxLossFactor = 0.90 / effLeverage;
     if (isShort) {
       return buyPrice * (1 + maxLossFactor);
     } else {
@@ -53,9 +57,10 @@ class Position {
     }
   }
 
-  bool get isLeveraged => leverage > 1;
+  bool get isLeveraged => leverage > 1 || isShort;
 
   double get unrealizedPnL {
+    if (averageBuyPrice <= 0) return 0.0;
     if (!isLeveraged) {
       return (currentPrice - averageBuyPrice) * amount;
     } else {

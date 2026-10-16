@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:trading_game/data/models/asset.dart';
 import 'package:trading_game/data/models/pending_order.dart';
+import 'package:trading_game/data/models/position.dart';
 import 'package:trading_game/data/models/savings_plan.dart';
 import 'package:trading_game/logic/savings_plan_service.dart';
 
@@ -82,6 +83,41 @@ void main() {
       // Delete plan
       await service.deletePlan(plan.id);
       expect(service.plans.isEmpty, isTrue);
+    });
+
+    test('Short position is treated as leveraged margin contract and calculates PnL correctly', () {
+      final short1x = Position(
+        id: 'short_1',
+        assetId: 'btc',
+        symbol: 'BTC',
+        name: 'Bitcoin',
+        type: AssetType.crypto,
+        amount: 1.0,
+        averageBuyPrice: 100.0,
+        currentPrice: 90.0,
+        leverage: 1,
+        isShort: true,
+      );
+
+      expect(short1x.isLeveraged, isTrue);
+      expect(short1x.collateral, 100.0);
+      expect(short1x.liquidationPrice, closeTo(190.0, 0.01));
+      // Price dropped from 100 to 90 -> profit of +10 EUR
+      expect(short1x.unrealizedPnL, closeTo(10.0, 0.01));
+      expect(short1x.currentValue, closeTo(110.0, 0.01));
+
+      // Price rose from 100 to 110 -> loss of -10 EUR
+      final shortLoss = short1x.copyWith(currentPrice: 110.0);
+      expect(shortLoss.unrealizedPnL, closeTo(-10.0, 0.01));
+      expect(shortLoss.currentValue, closeTo(90.0, 0.01));
+
+      // Partial sell scaling: 50% sold, remaining collateral is scaled
+      final remainingPos = short1x.copyWith(
+        amount: 0.5,
+        collateral: short1x.collateral * 0.5,
+      );
+      expect(remainingPos.amount, 0.5);
+      expect(remainingPos.collateral, 50.0);
     });
   });
 }

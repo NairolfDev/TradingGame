@@ -4,6 +4,8 @@ import '../../core/constants/app_colors.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../logic/portfolio_provider.dart';
 import '../widgets/pending_order_card.dart';
+import '../widgets/order_routing_dialog.dart';
+import '../../data/models/position.dart';
 import 'trade_detail_screen.dart';
 
 class SimplisticDashboardScreen extends StatefulWidget {
@@ -18,6 +20,114 @@ class SimplisticDashboardScreen extends StatefulWidget {
 class _SimplisticDashboardScreenState extends State<SimplisticDashboardScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+
+  void _showSellDialog(
+      BuildContext context, Position position, PortfolioProvider provider) {
+    double amountToSell = position.amount;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF161F2E),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            final portionPnL = (amountToSell / position.amount) * position.unrealizedPnL;
+            final isPnLPos = portionPnL >= 0;
+
+            return Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Position Schließen: ${position.symbol}',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close, color: Color(0xFF8B9CB2)),
+                        onPressed: () => Navigator.pop(ctx),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Aktueller PnL: ${isPnLPos ? "+" : ""}${CurrencyFormatter.format(portionPnL)}',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: isPnLPos ? AppColors.bullish : AppColors.bearish,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Menge: ${CurrencyFormatter.formatAmount(amountToSell)} / ${CurrencyFormatter.formatAmount(position.amount)}',
+                    style: const TextStyle(fontSize: 13, color: Color(0xFF8B9CB2)),
+                  ),
+                  Slider(
+                    value: amountToSell,
+                    min: 0.0001,
+                    max: position.amount,
+                    divisions: 100,
+                    activeColor: AppColors.loss,
+                    inactiveColor: const Color(0xFF243247),
+                    onChanged: (val) {
+                      setModalState(() {
+                        amountToSell = val;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton(
+                      onPressed: () async {
+                        Navigator.pop(ctx);
+                        await OrderRoutingDialog.show(
+                          context: context,
+                          symbol: position.symbol,
+                          assetName: position.name,
+                          isBuy: false,
+                          amount: amountToSell,
+                          price: position.currentPrice,
+                          onExecute: () => provider.executeSell(
+                            position: position,
+                            sellAmount: amountToSell,
+                          ),
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.loss,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text(
+                        'Verkauf Bestätigen',
+                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
 
   @override
   void dispose() {
@@ -104,7 +214,7 @@ class _SimplisticDashboardScreenState extends State<SimplisticDashboardScreen> {
                       size: 20,
                     ),
                     Text(
-                      '${isProfit ? "+" : ""}${CurrencyFormatter.format(totalPnL)} (${provider.unrealizedPnLPercent.toStringAsFixed(2)}%)',
+                      '${isProfit ? "+" : ""}${CurrencyFormatter.format(totalPnL)} (${CurrencyFormatter.formatPercent(provider.unrealizedPnLPercent)})',
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
@@ -239,74 +349,87 @@ class _SimplisticDashboardScreenState extends State<SimplisticDashboardScreen> {
               final posPnL = pos.unrealizedPnL;
               final posProfit = posPnL >= 0;
 
-              return Container(
-                margin: const EdgeInsets.symmetric(vertical: 4),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF161F2E),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0xFF243247)),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      flex: 4,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            pos.symbol,
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white),
-                          ),
-                          Text(
-                            pos.name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontSize: 11, color: Color(0xFF8B9CB2)),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            '${CurrencyFormatter.formatAmount(pos.amount)} Stk. @ ${CurrencyFormatter.formatPrice(pos.averageBuyPrice)}',
-                            style: const TextStyle(fontSize: 11, color: Color(0xFF56677F)),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Expanded(
-                      flex: 4,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Text(
-                            CurrencyFormatter.format(pos.currentValue),
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white),
-                          ),
-                          Text(
-                            '${posProfit ? "+" : ""}${CurrencyFormatter.format(posPnL)} (${pos.unrealizedPnLPercent.toStringAsFixed(2)}%)',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              color: posProfit ? AppColors.bullish : AppColors.bearish,
+              return InkWell(
+                onTap: () {
+                  final asset = provider.assets.firstWhere(
+                    (a) => a.id == pos.assetId || a.symbol == pos.symbol,
+                    orElse: () => provider.assets.first,
+                  );
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => TradeDetailScreen(asset: asset)),
+                  );
+                },
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  margin: const EdgeInsets.symmetric(vertical: 4),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF161F2E),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFF243247)),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        flex: 4,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              pos.symbol,
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white),
                             ),
-                          ),
-                        ],
+                            Text(
+                              pos.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 11, color: Color(0xFF8B9CB2)),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              '${CurrencyFormatter.formatAmount(pos.amount)} Stk. @ ${CurrencyFormatter.formatPrice(pos.averageBuyPrice)}',
+                              style: const TextStyle(fontSize: 11, color: Color(0xFF56677F)),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    IconButton(
-                      icon: const Icon(Icons.trending_up, size: 20, color: AppColors.primary),
-                      onPressed: () {
-                        final asset = provider.assets.firstWhere(
-                          (a) => a.id == pos.assetId || a.symbol == pos.symbol,
-                          orElse: () => provider.assets.first,
-                        );
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => TradeDetailScreen(asset: asset)),
-                        );
-                      },
-                    ),
-                  ],
+                      Expanded(
+                        flex: 4,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text(
+                              CurrencyFormatter.format(pos.currentValue),
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white),
+                            ),
+                            Text(
+                              '${posProfit ? "+" : ""}${CurrencyFormatter.format(posPnL)} (${CurrencyFormatter.formatPercent(pos.unrealizedPnLPercent)})',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: posProfit ? AppColors.bullish : AppColors.bearish,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      ElevatedButton(
+                        onPressed: () => _showSellDialog(context, pos, provider),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.loss.withValues(alpha: 0.18),
+                          foregroundColor: AppColors.loss,
+                          side: const BorderSide(color: AppColors.loss, width: 1),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        child: const Text('Verkaufen', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                      ),
+                    ],
+                  ),
                 ),
               );
             }),

@@ -8,6 +8,7 @@ import '../../logic/portfolio_provider.dart';
 import '../../logic/auth_provider.dart';
 import '../../logic/trading_fee_service.dart';
 import '../../data/models/automation_order.dart';
+import '../../data/models/position.dart';
 import '../widgets/interactive_broker_chart.dart';
 import '../widgets/order_routing_dialog.dart';
 import '../widgets/order_book_widget.dart';
@@ -47,6 +48,113 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
   void dispose() {
     _amountController.dispose();
     super.dispose();
+  }
+
+  void _showSellDialog(
+      BuildContext context, Position position, PortfolioProvider provider) {
+    double amountToSell = position.amount;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            final portionPnL = (amountToSell / position.amount) * position.unrealizedPnL;
+            final isPnLPos = portionPnL >= 0;
+
+            return Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Position Schließen: ${position.symbol}',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.pop(ctx),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Aktueller PnL: ${isPnLPos ? "+" : ""}${CurrencyFormatter.format(portionPnL)}',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: isPnLPos ? AppColors.profit : AppColors.loss,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Menge: ${CurrencyFormatter.formatAmount(amountToSell)} / ${CurrencyFormatter.formatAmount(position.amount)}',
+                    style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                  ),
+                  Slider(
+                    value: amountToSell,
+                    min: 0.0001,
+                    max: position.amount,
+                    divisions: 100,
+                    activeColor: AppColors.loss,
+                    onChanged: (val) {
+                      setModalState(() {
+                        amountToSell = val;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton(
+                      onPressed: () async {
+                        Navigator.pop(ctx);
+                        await OrderRoutingDialog.show(
+                          context: context,
+                          symbol: position.symbol,
+                          assetName: position.name,
+                          isBuy: false,
+                          amount: amountToSell,
+                          price: position.currentPrice,
+                          onExecute: () => provider.executeSell(
+                            position: position,
+                            sellAmount: amountToSell,
+                          ),
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.loss,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text(
+                        'Verkauf Bestätigen',
+                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   void _setPercentageOfCash(double fraction, PortfolioProvider provider) {
@@ -291,6 +399,111 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
 
           const SizedBox(height: 20),
 
+          // Falls bereits Positionen gehalten werden: Depotbestand-Widget
+          Builder(
+            builder: (context) {
+              final existingPositions = provider.positions
+                  .where((p) => p.assetId == liveAsset.id || p.symbol == liveAsset.symbol)
+                  .toList();
+              if (existingPositions.isEmpty) return const SizedBox.shrink();
+
+              return Column(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: AppColors.primary.withValues(alpha: 0.4)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.pie_chart, size: 16, color: AppColors.primary),
+                            const SizedBox(width: 8),
+                            Text(
+                              'DEIN DEPOTBESTAND (${existingPositions.length})',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 1.1,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        ...existingPositions.map((p) {
+                          final isP = p.unrealizedPnL >= 0;
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: AppColors.surfaceElevated,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: AppColors.cardBorder),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      '${CurrencyFormatter.formatAmount(p.amount)} Stk.${p.isLeveraged ? " (${p.leverage}x ${p.isShort ? "Short" : "Long"})" : ""}',
+                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textPrimary),
+                                    ),
+                                    Text(
+                                      'Ø Kauf: ${CurrencyFormatter.formatPrice(p.averageBuyPrice)}',
+                                      style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
+                                    ),
+                                  ],
+                                ),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    Text(
+                                      CurrencyFormatter.format(p.currentValue),
+                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textPrimary),
+                                    ),
+                                    Text(
+                                      '${isP ? "+" : ""}${CurrencyFormatter.format(p.unrealizedPnL)} (${CurrencyFormatter.formatPercent(p.unrealizedPnLPercent)})',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: isP ? AppColors.profit : AppColors.loss,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                ElevatedButton(
+                                  onPressed: () => _showSellDialog(context, p, provider),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppColors.loss.withValues(alpha: 0.18),
+                                    foregroundColor: AppColors.loss,
+                                    side: const BorderSide(color: AppColors.loss),
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                    minimumSize: Size.zero,
+                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                  ),
+                                  child: const Text('Verkaufen', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                ),
+                              ],
+                            ),
+                          );
+                        }),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+              );
+            },
+          ),
+
           // --- ORDER TERMINAL ---
           Container(
             padding: const EdgeInsets.all(18),
@@ -481,11 +694,9 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
                   ),
                   onChanged: (val) {
                     final parsed = double.tryParse(val.replaceAll(',', '.'));
-                    if (parsed != null && parsed > 0) {
-                      setState(() {
-                        _amount = parsed;
-                      });
-                    }
+                    setState(() {
+                      _amount = (parsed != null && parsed > 0) ? parsed : 0.0;
+                    });
                   },
                 ),
 

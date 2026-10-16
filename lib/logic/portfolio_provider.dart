@@ -562,6 +562,9 @@ class PortfolioProvider extends ChangeNotifier {
 
     _transactions.insert(0, record);
     repository.saveTransaction(record);
+
+    _updateLeaderboard(forceCloud: true);
+    _checkAllAchievements();
   }
 
   // --- TRADING LOGIK (KAUFEN / VERKAUFEN / VORAB-ORDER) ---
@@ -606,6 +609,8 @@ class PortfolioProvider extends ChangeNotifier {
         totalEstimatedCost: totalCost,
         leverage: leverage,
         isShort: isShort,
+        collateral: breakdown.assetCost,
+        averageBuyPrice: asset.currentPrice,
         executionReason: 'Wartet auf Börsenöffnung',
       );
 
@@ -652,6 +657,8 @@ class PortfolioProvider extends ChangeNotifier {
         totalEstimatedCost: totalCost,
         leverage: leverage,
         isShort: isShort,
+        collateral: breakdown.assetCost,
+        averageBuyPrice: asset.currentPrice,
         scheduledExecutionTime: scheduledTime,
         executionReason: 'Im Orderbuch',
         brokerVenue: venue,
@@ -760,9 +767,15 @@ class PortfolioProvider extends ChangeNotifier {
     required Position position,
     required double sellAmount,
   }) async {
-    final asset = _assets.firstWhere(
+    final matchingAssets = _assets.where(
       (a) => a.id == position.assetId || a.symbol == position.symbol,
     );
+    if (matchingAssets.isEmpty) {
+      _lastAlertMessage = 'Asset ${position.symbol} nicht im Marktverzeichnis gefunden!';
+      notifyListeners();
+      return false;
+    }
+    final asset = matchingAssets.first;
 
     final isOpen = isAssetMarketOpen(asset);
 
@@ -804,7 +817,12 @@ class PortfolioProvider extends ChangeNotifier {
       } else {
         final posIdx = _positions.indexWhere((p) => p.id == position.id);
         if (posIdx != -1) {
-          _positions[posIdx] = position.copyWith(amount: position.amount - sellAmount);
+          final remainingAmount = position.amount - sellAmount;
+          final remainingRatio = remainingAmount / position.amount;
+          _positions[posIdx] = position.copyWith(
+            amount: remainingAmount,
+            collateral: position.isLeveraged ? (position.collateral * remainingRatio) : null,
+          );
         }
       }
       await repository.savePositions(_positions);
@@ -861,11 +879,13 @@ class PortfolioProvider extends ChangeNotifier {
       _positions.removeWhere((p) => p.id == position.id);
     } else {
       final remainingAmount = position.amount - sellAmount;
+      final remainingRatio = remainingAmount / position.amount;
       final index = _positions.indexWhere((p) => p.id == position.id);
       if (index != -1) {
         _positions[index] = position.copyWith(
           amount: remainingAmount,
           currentPrice: asset.currentPrice,
+          collateral: position.isLeveraged ? (position.collateral * remainingRatio) : null,
         );
       }
     }
@@ -911,10 +931,11 @@ class PortfolioProvider extends ChangeNotifier {
     for (final order in _pendingOrders) {
       if (order.status != PendingOrderStatus.pending) continue;
 
-      final matchingAsset = _assets.firstWhere(
+      final matchingAssets = _assets.where(
         (a) => a.id == order.assetId || a.symbol == order.symbol,
-        orElse: () => _assets.first,
       );
+      if (matchingAssets.isEmpty) continue;
+      final matchingAsset = matchingAssets.first;
 
       // Börsenöffnungszeiten prüfen
       if (!isAssetMarketOpen(matchingAsset)) continue;
@@ -932,6 +953,7 @@ class PortfolioProvider extends ChangeNotifier {
 
       if (order.isBuy) {
         // Kauf-Order abwickeln
+        final buyPrice = order.averageBuyPrice ?? order.estimatedPrice;
         if (order.leverage == 1 && !order.isShort) {
           final existingIndex = _positions.indexWhere(
             (p) => p.assetId == matchingAsset.id && !p.isLeveraged && !p.isShort,
@@ -940,7 +962,7 @@ class PortfolioProvider extends ChangeNotifier {
             final existing = _positions[existingIndex];
             final newTotalAmount = existing.amount + order.amount;
             final newAvgPrice = ((existing.amount * existing.averageBuyPrice) +
-                    (order.amount * matchingAsset.currentPrice)) /
+                    (order.amount * buyPrice)) /
                 newTotalAmount;
             _positions[existingIndex] = existing.copyWith(
               amount: newTotalAmount,
@@ -956,7 +978,7 @@ class PortfolioProvider extends ChangeNotifier {
                 name: matchingAsset.name,
                 type: matchingAsset.type,
                 amount: order.amount,
-                averageBuyPrice: matchingAsset.currentPrice,
+                averageBuyPrice: buyPrice,
                 currentPrice: matchingAsset.currentPrice,
                 leverage: 1,
                 isShort: false,
@@ -964,6 +986,7 @@ class PortfolioProvider extends ChangeNotifier {
             );
           }
         } else {
+          final effectiveCollateral = order.collateral ?? ((order.amount * buyPrice) / order.leverage);
           _positions.add(
             Position(
               id: _uuid.v4(),
@@ -972,11 +995,11 @@ class PortfolioProvider extends ChangeNotifier {
               name: matchingAsset.name,
               type: matchingAsset.type,
               amount: order.amount,
-              averageBuyPrice: matchingAsset.currentPrice,
+              averageBuyPrice: buyPrice,
               currentPrice: matchingAsset.currentPrice,
               leverage: order.leverage,
               isShort: order.isShort,
-              collateral: (order.amount * matchingAsset.currentPrice) / order.leverage,
+              collateral: effectiveCollateral,
             ),
           );
         }
@@ -1002,9 +1025,10 @@ class PortfolioProvider extends ChangeNotifier {
         double cashReturn = 0.0;
         double realizedPnL = 0.0;
 
-        if (order.leverage > 1) {
+        if (order.leverage > 1 || order.isShort) {
+          final effLeverage = order.leverage > 1 ? order.leverage : 1;
           final portionCollateral = order.collateral ??
-              ((order.amount * (order.averageBuyPrice ?? order.estimatedPrice)) / order.leverage);
+              ((order.amount * (order.averageBuyPrice ?? order.estimatedPrice)) / effLeverage);
           final currentVal = order.amount * matchingAsset.currentPrice;
           final entryVal = order.amount * (order.averageBuyPrice ?? order.estimatedPrice);
           final portionPnL = order.isShort ? (entryVal - currentVal) : (currentVal - entryVal);
@@ -1061,10 +1085,11 @@ class PortfolioProvider extends ChangeNotifier {
   Future<void> _checkSavingsPlans() async {
     final due = savingsPlanService.getDuePlans();
     for (final plan in due) {
-      final asset = _assets.firstWhere(
+      final matchingAssets = _assets.where(
         (a) => a.symbol == plan.assetSymbol,
-        orElse: () => _assets.first,
       );
+      if (matchingAssets.isEmpty) continue;
+      final asset = matchingAssets.first;
       if (_cash >= plan.amountEur && asset.currentPrice > 0) {
         final shares = plan.amountEur / asset.currentPrice;
         _cash -= plan.amountEur;
@@ -1132,7 +1157,10 @@ class PortfolioProvider extends ChangeNotifier {
       await repository.saveCashBalance(_cash);
     } else {
       // Verkaufsmenge zurück in Depotposition einbuchen
-      final idx = _positions.indexWhere((p) => p.assetId == order.assetId || p.symbol == order.symbol);
+      final idx = _positions.indexWhere((p) =>
+          (p.assetId == order.assetId || p.symbol == order.symbol) &&
+          p.leverage == order.leverage &&
+          p.isShort == order.isShort);
       if (idx != -1) {
         _positions[idx] = _positions[idx].copyWith(
           amount: _positions[idx].amount + order.amount,
@@ -1216,7 +1244,9 @@ class PortfolioProvider extends ChangeNotifier {
     double totalCouponPaid = 0.0;
     for (final pos in _positions) {
       if (pos.type == AssetType.bond) {
-        final asset = _assets.firstWhere((a) => a.id == pos.assetId);
+        final matchingAssets = _assets.where((a) => a.id == pos.assetId || a.symbol == pos.symbol);
+        if (matchingAssets.isEmpty) continue;
+        final asset = matchingAssets.first;
         final rate = asset.couponRate ?? 0.035;
         // Simulierte anteilige Ausschüttung
         final payout = (pos.amount * pos.currentPrice) * (rate / 365 * 10);
@@ -1579,10 +1609,11 @@ class PortfolioProvider extends ChangeNotifier {
       final weight = entry.value;
       final sliceAmount = allocatedAmount * weight;
 
-      final asset = _assets.firstWhere(
+      final matchingAssets = _assets.where(
         (a) => a.symbol == symbol,
-        orElse: () => _assets.first,
       );
+      if (matchingAssets.isEmpty) continue;
+      final asset = matchingAssets.first;
 
       final shares = sliceAmount / asset.currentPrice;
 
@@ -1743,11 +1774,11 @@ class PortfolioProvider extends ChangeNotifier {
           }
         } else {
           // Take-Profit oder Stop-Loss
-          final pos = _positions.firstWhere(
+          final matchingPositions = _positions.where(
             (p) => p.assetId == asset.id || p.symbol == asset.symbol,
-            orElse: () => _positions.first,
           );
-          if (_positions.contains(pos)) {
+          if (matchingPositions.isNotEmpty) {
+            final pos = matchingPositions.first;
             final sellAmt = order.amount > pos.amount ? pos.amount : order.amount;
             final success = await executeSell(position: pos, sellAmount: sellAmt);
             if (success) {
@@ -1764,7 +1795,8 @@ class PortfolioProvider extends ChangeNotifier {
 
   // --- 7. GAMIFICATION & ACHIEVEMENTS EVALUATION ---
   void _checkAllAchievements() {
-    final playerEntry = _leaderboard.firstWhere((e) => e.isPlayer, orElse: () => _leaderboard.first);
+    final playerEntry = _leaderboard.where((e) => e.isPlayer).firstOrNull;
+    final playerRank = playerEntry?.rank ?? (_leaderboard.isNotEmpty ? _leaderboard.first.rank : 1);
     final totalTrades = _transactions.where((t) => t.type == TransactionType.buy || t.type == TransactionType.sell).length;
     final winningStreak = _calculateWinningStreak();
     final hasWonLeveraged = _transactions.any((t) => (t.note?.contains('Hebel') == true || t.note?.contains('CFD') == true) && (t.realizedPnL ?? 0) > 0);
@@ -1785,7 +1817,7 @@ class PortfolioProvider extends ChangeNotifier {
       hasCopyTrade: _transactions.any((t) => t.note?.contains('Kopiert Portfolio') == true),
       hasBotOrderTriggered: hasBotTriggered,
       hasWonHighLeverage: hasWonLeveraged,
-      leaderboardRank: playerEntry.rank,
+      leaderboardRank: playerRank,
       hasSettledSanierungskredit: hasSanierungSettled,
       hasTradedOffMarketCrypto: hasOffMarketCrypto,
       uniqueAssetTypesCount: _positions.map((p) => p.type).toSet().length,
