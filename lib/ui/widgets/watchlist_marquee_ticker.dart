@@ -29,7 +29,10 @@ class _WatchlistMarqueeTickerState extends State<WatchlistMarqueeTicker> {
   void _startContinuousScroll() {
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(milliseconds: 35), (timer) {
-      if (!_scrollController.hasClients || _isHoveredOrTouching) return;
+      if (!mounted || MediaQuery.of(context).disableAnimations ||
+          !_scrollController.hasClients || _isHoveredOrTouching) {
+        return;
+      }
 
       final maxScroll = _scrollController.position.maxScrollExtent;
       final current = _scrollController.offset;
@@ -112,7 +115,7 @@ class _WatchlistMarqueeTickerState extends State<WatchlistMarqueeTicker> {
                 ),
                 const SizedBox(width: 6),
                 Text(
-                  watchlisted.isNotEmpty ? 'WATCHLIST' : 'LIVE TICKER',
+                  watchlisted.isNotEmpty ? 'WATCHLIST' : 'KURSE',
                   style: const TextStyle(
                     color: AppColors.accentGold,
                     fontSize: 10,
@@ -133,7 +136,7 @@ class _WatchlistMarqueeTickerState extends State<WatchlistMarqueeTicker> {
               child: ListView.builder(
                 controller: _scrollController,
                 scrollDirection: Axis.horizontal,
-                physics: const NeverScrollableScrollPhysics(),
+                physics: const BouncingScrollPhysics(),
                 itemCount: marqueeList.length,
                 itemBuilder: (context, index) {
                   final asset = marqueeList[index];

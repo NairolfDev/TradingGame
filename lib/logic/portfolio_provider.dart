@@ -12,6 +12,7 @@ import '../data/models/leaderboard_entry.dart';
 import '../data/models/market_schedule.dart';
 import '../data/models/loan_model.dart';
 import '../data/repositories/trading_repository.dart';
+import '../data/repositories/local_trading_repository.dart';
 import '../data/repositories/firebase_trading_repository.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'market_engine.dart';
@@ -28,7 +29,6 @@ import 'dart:math';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../data/models/savings_plan.dart';
 import 'savings_plan_service.dart';
-import '../data/mock_data/initial_copy_traders.dart';
 import 'automation_service.dart';
 import 'achievement_service.dart';
 import 'live_market_data_service.dart';
@@ -62,6 +62,8 @@ class PortfolioProvider extends ChangeNotifier {
   StreamSubscription<List<LeaderboardEntry>>? _leaderboardSubscription;
   StreamSubscription<User?>? _authSubscription;
   Timer? _liveMarketRefreshTimer;
+  bool _refreshingQuotes = false;
+  final Map<String, DateTime> _quoteUpdatedAt = {};
   String _activeUid = 'local_player';
 
   bool _isInsolvent = false;
@@ -89,6 +91,13 @@ class PortfolioProvider extends ChangeNotifier {
   List<Asset> get watchlistAssets => _assets.where((a) => a.isWatchlisted).toList();
   bool get isSimplisticMode => _isSimplisticMode;
   bool get isRealisticOrderDelay => _isRealisticOrderDelay;
+  DateTime? quoteUpdatedAt(Asset asset) => _quoteUpdatedAt[asset.id];
+  String quoteStatus(Asset asset) {
+    final updated = quoteUpdatedAt(asset);
+    if (updated == null) return 'Katalogkurs · nicht aktualisiert';
+    final time = '${updated.hour.toString().padLeft(2, '0')}:${updated.minute.toString().padLeft(2, '0')}';
+    return 'Abgerufen $time';
+  }
   List<SavingsPlan> get savingsPlans => savingsPlanService.plans;
   List<SavingsPlan> get activeSavingsPlans => savingsPlanService.activePlans;
 
@@ -113,10 +122,11 @@ class PortfolioProvider extends ChangeNotifier {
   List<Loan> get loans => _loans;
   List<Loan> get activeLoans => _loans.where((l) => !l.isPaid).toList();
   List<NewsEvent> get newsEvents => _newsEvents;
-  NewsEvent? get latestBreakingNews => newsService.latestNews ?? (_newsEvents.isNotEmpty ? _newsEvents.first : null);
+  NewsEvent? get latestBreakingNews => _newsEvents.isNotEmpty ? _newsEvents.first : null;
   List<DailyQuest> get dailyQuests => questService.quests;
   int get loginStreakDays => questService.loginStreakDays;
-  List<CopyTrader> get copyTraders => InitialCopyTraders.getTraders();
+  // No public portfolio feed is available yet.
+  List<CopyTrader> get copyTraders => const [];
   double get totalAnnualDividends => DividendService.calculateAnnualDividendRunRate(_positions, _assets);
   double get monthlyPassiveIncome => DividendService.calculateMonthlyPassiveIncome(_positions, _assets);
   List<DividendScheduleItem> get dividendSchedule => DividendService.getDividendSchedule(_positions, _assets);
@@ -153,10 +163,11 @@ class PortfolioProvider extends ChangeNotifier {
   }
 
   bool get canTakeLoan {
+    if (_isInsolvent) return false;
     if (isUnderCreditLockout) return false;
     if (isLoanOnCooldown) return false;
     // Maximal 1 aktiver Bankkredit neben dem Startkredit
-    final bankLoans = activeLoans.where((l) => l.id != 'initial_start_loan_50k').length;
+    final bankLoans = activeLoans.where((l) => !l.id.startsWith('initial_start_loan_')).length;
     if (bankLoans >= 1) return false;
     return true;
   }
@@ -191,7 +202,17 @@ class PortfolioProvider extends ChangeNotifier {
   }
 
   // Net Worth berücksichtigt Cash + Positionen + Luxusgegenstände ABZÜGLICH Verbindlichkeiten/Kredite
-  double get netWorth => _cash + totalPositionsValue + totalLuxuryValue - totalDebt;
+  double get pendingOrderValue => pendingOrders.fold(0.0, (sum, order) {
+    if (order.isBuy) return sum + order.totalEstimatedCost;
+    final asset = _assets.where((a) => a.id == order.assetId).firstOrNull;
+    final price = asset?.currentPrice ?? order.estimatedPrice;
+    if (order.leverage == 1 && !order.isShort) return sum + order.amount * price;
+    final entryPrice = order.averageBuyPrice ?? order.estimatedPrice;
+    final pnl = (price - entryPrice) * order.amount * (order.isShort ? -1 : 1);
+    return sum + max(0.0, (order.collateral ?? order.amount * entryPrice / order.leverage) + pnl);
+  });
+
+  double get netWorth => _cash + totalPositionsValue + pendingOrderValue + totalLuxuryValue - totalDebt;
 
   CreditRating get creditRating {
     final lossRecords = _transactions.where((t) => (t.realizedPnL ?? 0) < 0);
@@ -231,10 +252,9 @@ class PortfolioProvider extends ChangeNotifier {
   double get totalRealizedPnL =>
       _transactions.fold<double>(0.0, (sum, t) => sum + (t.realizedPnL ?? 0.0));
 
-  double get totalRoiPercent {
-    const startingCapital = 50000.0;
-    return netWorth / startingCapital;
-  }
+  // 50,000 cash minus the 25,000 initial loan is the player's starting equity.
+  double get netProfit => netWorth - 25000.0;
+  double get totalRoiPercent => netProfit / 25000.0;
 
   int get totalPrestigePoints {
     int sum = 0;
@@ -303,14 +323,10 @@ class PortfolioProvider extends ChangeNotifier {
       newsCallback: _onNewsGenerated,
     );
 
-    // Initialisiere News Service
-    newsService.initialize(_assets);
-    newsService.onNewsDropped = (news) {
-      _applyNewsImpact(news);
-    };
+    // Fabricated news must not move prices supplied by market feeds.
 
     // Initialisiere Daily Quests
-    questService.initialize();
+    await _initializeQuests();
     questService.recordTrade(
       tradeAmount: 0,
       isCommodity: false,
@@ -351,6 +367,13 @@ class PortfolioProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> _initializeQuests() async {
+    final profileId = repository is LocalTradingRepository
+        ? (repository as LocalTradingRepository).userId
+        : (_activeUid == 'local_player' ? 'local' : _activeUid);
+    await questService.initialize(profileId: profileId);
+  }
+
   void _listenToAuthChanges() {
     _authSubscription?.cancel();
     try {
@@ -386,6 +409,7 @@ class PortfolioProvider extends ChangeNotifier {
       _luxuryItems = await repository.getLuxuryItems();
       _pendingOrders = await repository.getPendingOrders();
       _loans = await repository.getLoans();
+      await _initializeQuests();
 
       _leaderboardSubscription?.cancel();
       final stream = repository.streamLeaderboard();
@@ -418,6 +442,8 @@ class PortfolioProvider extends ChangeNotifier {
 
   /// Holt echte Live-Kurse aus Binance & Yahoo / Cloud Function und aktualisiert Assets & Depot
   Future<void> fetchLiveMarketQuotes() async {
+    if (_refreshingQuotes) return;
+    _refreshingQuotes = true;
     try {
       final quotes = await liveDataService.refreshQuotesForAssets(_assets);
       if (quotes.isNotEmpty) {
@@ -425,13 +451,16 @@ class PortfolioProvider extends ChangeNotifier {
         final updatedAssets = _assets.map((asset) {
           if (quotes.containsKey(asset.symbol)) {
             final q = quotes[asset.symbol]!;
-            if ((asset.currentPrice - q.currentPrice).abs() > 0.0001) {
+            if (q.currentPrice.isFinite && q.currentPrice > 0 &&
+                q.previousClose.isFinite && q.previousClose > 0) {
+              _quoteUpdatedAt[asset.id] = DateTime.now();
               anyChanged = true;
               return asset.copyWith(
                 currentPrice: q.currentPrice,
                 previousClose: q.previousClose,
                 dailyHigh: q.high ?? asset.dailyHigh,
                 dailyLow: q.low ?? asset.dailyLow,
+                priceHistory: q.series?.where((v) => v.isFinite && v > 0).toList() ?? [q.currentPrice],
               );
             }
           }
@@ -450,6 +479,8 @@ class PortfolioProvider extends ChangeNotifier {
       }
     } catch (e) {
       debugPrint('fetchLiveMarketQuotes error: $e');
+    } finally {
+      _refreshingQuotes = false;
     }
   }
 
@@ -576,6 +607,16 @@ class PortfolioProvider extends ChangeNotifier {
     int leverage = 1,
     bool isShort = false,
   }) async {
+    final currentAsset = _assets.where((a) => a.id == asset.id).firstOrNull;
+    if (currentAsset == null) return false;
+    asset = currentAsset;
+    if (!amount.isFinite || amount <= 0 ||
+        !asset.currentPrice.isFinite || asset.currentPrice <= 0 ||
+        leverage < 1 || leverage > asset.maxLeverage) {
+      _lastAlertMessage = 'Ungültige Order: Menge, Kurs oder Hebel prüfen.';
+      notifyListeners();
+      return false;
+    }
     final isOpen = isAssetMarketOpen(asset);
     final breakdown = TradingFeeService.calculateBuyFee(
       asset: asset,
@@ -585,7 +626,7 @@ class PortfolioProvider extends ChangeNotifier {
     final totalCost = breakdown.totalCashRequired;
     final fee = breakdown.transactionFee;
 
-    if (totalCost > _cash) {
+    if (!totalCost.isFinite || totalCost > _cash) {
       _lastAlertMessage =
           'Nicht genügend Bargeld vorhanden! (Inkl. ${fee.toStringAsFixed(2)} € Börsenspesen)';
       notifyListeners();
@@ -767,6 +808,14 @@ class PortfolioProvider extends ChangeNotifier {
     required Position position,
     required double sellAmount,
   }) async {
+    final owned = _positions.where((p) => p.id == position.id).firstOrNull;
+    if (owned == null || !sellAmount.isFinite || sellAmount <= 0 ||
+        sellAmount > owned.amount) {
+      _lastAlertMessage = 'Ungültige Verkaufsmenge oder Position nicht mehr verfügbar.';
+      notifyListeners();
+      return false;
+    }
+    position = owned;
     final matchingAssets = _assets.where(
       (a) => a.id == position.assetId || a.symbol == position.symbol,
     );
@@ -873,7 +922,6 @@ class PortfolioProvider extends ChangeNotifier {
     }
 
     _cash += cashReturn;
-    await repository.saveCashBalance(_cash);
 
     if (sellAmount >= position.amount) {
       _positions.removeWhere((p) => p.id == position.id);
@@ -890,6 +938,7 @@ class PortfolioProvider extends ChangeNotifier {
       }
     }
 
+    await repository.saveCashBalance(_cash);
     await repository.savePositions(_positions);
 
     final record = TransactionRecord(
@@ -1374,6 +1423,11 @@ class PortfolioProvider extends ChangeNotifier {
     required double principal,
     required int durationDays,
   }) async {
+    if (!principal.isFinite || principal <= 0 || durationDays <= 0 || durationDays > 365) {
+      _lastAlertMessage = 'Kreditbetrag und Laufzeit sind ungültig.';
+      notifyListeners();
+      return false;
+    }
     // Erste Kreditaufnahme ist bankenseitig auf maximal 25.000 € gedeckelt
     final previousBankLoans = _transactions.where((t) => t.type == TransactionType.loanPayout);
     if (previousBankLoans.isEmpty && principal > 25000.0) {
@@ -1458,8 +1512,17 @@ class PortfolioProvider extends ChangeNotifier {
     return true;
   }
 
-  /// Notfall-Sanierungskredit der Bank: Nach Insolvenz hilft die Bank immer mit 10.000 € Rettungsgeld
+  bool get canTakeRecoveryLoan => _isInsolvent &&
+      _insolvencyLockoutUntil != null && !isUnderCreditLockout && !isLoanOnCooldown &&
+      !activeLoans.any((l) => l.id.startsWith('sanierung_loan_'));
+
+  /// Einmaliger Neustart nach Ablauf der Insolvenz-Kreditsperre.
   Future<bool> takeSanierungsKredit() async {
+    if (!canTakeRecoveryLoan) {
+      _lastAlertMessage = 'Sanierungskredit erst nach Insolvenz und Ablauf der Kreditsperre verfügbar.';
+      notifyListeners();
+      return false;
+    }
     final loan = Loan.createSanierungsLoan();
     _cash += loan.principal;
     _loans.insert(0, loan);
@@ -1499,7 +1562,10 @@ class PortfolioProvider extends ChangeNotifier {
   }
 
   Future<bool> repayLoan(Loan loan, double amount) async {
-    if (amount <= 0 || loan.isPaid) return false;
+    if (!amount.isFinite || amount <= 0 || loan.isPaid ||
+        !_loans.any((l) => identical(l, loan))) {
+      return false;
+    }
     final actualRepay = amount > loan.remainingDebt ? loan.remainingDebt : amount;
     if (actualRepay <= 0) return false;
 
@@ -1615,6 +1681,7 @@ class PortfolioProvider extends ChangeNotifier {
 
   // --- 2. SOCIAL TRADING & COPY-TRADING ---
   Future<bool> copyTrader(CopyTrader trader, double allocatedAmount) async {
+    if (!allocatedAmount.isFinite || !copyTraders.contains(trader)) return false;
     if (_cash < allocatedAmount || allocatedAmount < 500) return false;
 
     _cash -= allocatedAmount;
@@ -1681,7 +1748,15 @@ class PortfolioProvider extends ChangeNotifier {
   }
 
   // --- 4. DIVIDENDEN & PASSIVES EINKOMMEN ---
+  bool get canClaimMonthlyDividends {
+    final now = DateTime.now();
+    return monthlyPassiveIncome > 0 && !_transactions.any((t) =>
+        t.type == TransactionType.dividendPayout &&
+        t.timestamp.year == now.year && t.timestamp.month == now.month);
+  }
+
   void payoutSimulatedDividends() {
+    if (!canClaimMonthlyDividends) return;
     final payout = monthlyPassiveIncome;
     if (payout <= 0) return;
 
@@ -1812,7 +1887,8 @@ class PortfolioProvider extends ChangeNotifier {
   // --- 7. GAMIFICATION & ACHIEVEMENTS EVALUATION ---
   void _checkAllAchievements() {
     final playerEntry = _leaderboard.where((e) => e.isPlayer).firstOrNull;
-    final playerRank = playerEntry?.rank ?? (_leaderboard.isNotEmpty ? _leaderboard.first.rank : 1);
+    final hasCompetitors = _leaderboard.any((e) => !e.isPlayer);
+    final playerRank = hasCompetitors ? (playerEntry?.rank ?? 0) : 0;
     final totalTrades = _transactions.where((t) => t.type == TransactionType.buy || t.type == TransactionType.sell).length;
     final winningStreak = _calculateWinningStreak();
     final hasWonLeveraged = _transactions.any((t) => (t.note?.contains('Hebel') == true || t.note?.contains('CFD') == true) && (t.realizedPnL ?? 0) > 0);

@@ -456,7 +456,7 @@ class _MainScreenState extends State<MainScreen> {
         // --- MOBILE / NARROW LAYOUT (ANDROID, IOS, NARROW DESKTOP) ---
         return Scaffold(
           appBar: AppBar(
-            toolbarHeight: 46,
+            toolbarHeight: 56,
             title: const Text(
               'TRADING GAME',
               style: TextStyle(
@@ -468,44 +468,36 @@ class _MainScreenState extends State<MainScreen> {
             ),
             actions: [
               IconButton(
-                icon: Icon(
-                  provider.isSimplisticMode ? Icons.auto_awesome : Icons.tune,
-                  size: 20,
-                  color: provider.isSimplisticMode ? AppColors.accent : AppColors.textSecondary,
-                ),
-                tooltip: provider.isSimplisticMode ? 'Profi-Modus (Voll)' : 'Simplistic Modus (Clean)',
-                onPressed: () {
-                  provider.setSimplisticMode(!provider.isSimplisticMode);
-                },
-              ),
-              if (!provider.isSimplisticMode)
-                IconButton(
-                  icon: const Icon(Icons.military_tech, size: 22, color: Colors.amber),
-                  tooltip: 'Erfolge & Trophäen',
-                  onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const AchievementsScreen()),
-                  ),
-                ),
-              IconButton(
-                icon: const Icon(Icons.settings_outlined, size: 20),
-                tooltip: 'Einstellungen',
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const SettingsScreen()),
-                ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.system_update_alt, size: 20),
-                tooltip: 'Updates prüfen',
-                onPressed: () => _checkVersionUpdate(isManual: true),
-              ),
-              IconButton(
-                icon: const Icon(Icons.account_circle, size: 22),
+                icon: const Icon(Icons.account_circle_outlined),
                 tooltip: 'Profil & Login',
                 onPressed: () => _openProfileDialog(context, auth),
               ),
-              const SizedBox(width: 8),
+              PopupMenuButton<String>(
+                tooltip: 'Weitere Optionen',
+                onSelected: (value) {
+                  switch (value) {
+                    case 'mode':
+                      provider.setSimplisticMode(!provider.isSimplisticMode);
+                      setState(() => _currentIndex = 0);
+                      break;
+                    case 'achievements':
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const AchievementsScreen()));
+                      break;
+                    case 'settings':
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen()));
+                      break;
+                    case 'updates':
+                      _checkVersionUpdate(isManual: true);
+                      break;
+                  }
+                },
+                itemBuilder: (_) => [
+                  PopupMenuItem(value: 'mode', child: Text(provider.isSimplisticMode ? 'Profi-Modus' : 'Einfacher Modus')),
+                  const PopupMenuItem(value: 'achievements', child: Text('Erfolge & Trophäen')),
+                  const PopupMenuItem(value: 'settings', child: Text('Einstellungen')),
+                  const PopupMenuItem(value: 'updates', child: Text('Nach Updates suchen')),
+                ],
+              ),
             ],
           ),
           body: Column(

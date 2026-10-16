@@ -147,7 +147,7 @@ class AssetCard extends StatelessWidget {
                       const SizedBox(width: 5),
                       Expanded(
                         child: Text(
-                          isOpen ? 'Börse offen' : statusString,
+                          '${isOpen ? 'Börse offen' : statusString} · ${provider.quoteStatus(asset)}',
                           style: TextStyle(
                             fontSize: 10,
                             color: isOpen ? AppColors.profit : AppColors.textMuted,
@@ -165,10 +165,9 @@ class AssetCard extends StatelessWidget {
             // Mini Chart
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: MiniChart(
-                data: asset.priceHistory,
-                isPositive: isPos,
-              ),
+              child: provider.quoteUpdatedAt(asset) == null
+                  ? const SizedBox(width: 60, child: Center(child: Text('—', style: TextStyle(color: AppColors.textMuted))))
+                  : MiniChart(data: asset.priceHistory, isPositive: isPos),
             ),
 
             // Price & 24h PnL

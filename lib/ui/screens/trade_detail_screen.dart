@@ -276,8 +276,8 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Aktueller Kurs',
+                  Text(
+                    provider.quoteStatus(liveAsset),
                     style:
                         TextStyle(fontSize: 11, color: AppColors.textSecondary),
                   ),
@@ -363,7 +363,7 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
                       ),
                       Text(
                         isOpen
-                            ? 'Sofortige Ausführung zum Live-Marktpreis garantiert.'
+                            ? 'Sofortige Ausführung zum angezeigten Kursstand.'
                             : 'Markt aktuell geschlossen. Deine Kauforder wird als Vorab-Order gespeichert und bei Öffnung ausgeführt!',
                         style: TextStyle(
                           fontSize: 11,

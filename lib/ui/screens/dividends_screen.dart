@@ -88,7 +88,7 @@ class DividendsScreen extends StatelessWidget {
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
-                      onPressed: monthlyIncome > 0
+                      onPressed: portfolio.canClaimMonthlyDividends
                           ? () {
                               portfolio.payoutSimulatedDividends();
                               ScaffoldMessenger.of(context).showSnackBar(
@@ -100,7 +100,7 @@ class DividendsScreen extends StatelessWidget {
                             }
                           : null,
                       icon: const Icon(Icons.currency_exchange, size: 18),
-                      label: const Text('Monats-Dividenden jetzt ausschütten', style: TextStyle(fontWeight: FontWeight.bold)),
+                      label: Text(portfolio.canClaimMonthlyDividends ? 'Monats-Dividenden ausschütten' : 'Keine offene Ausschüttung', style: const TextStyle(fontWeight: FontWeight.bold)),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.greenAccent,
                         foregroundColor: Colors.black,

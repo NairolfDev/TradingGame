@@ -614,7 +614,7 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
             ),
           ] else ...[
             ...activeLoans.map((loan) {
-              final isStartLoan = loan.id == 'initial_start_loan_50k';
+              final isStartLoan = loan.id.startsWith('initial_start_loan_');
               final daysLeft = loan.daysRemaining;
               final isOverdue = loan.isOverdue;
               final total = loan.principal + (loan.principal * loan.interestRate * (loan.durationDays / 365));
@@ -754,171 +754,46 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
             }),
           ],
 
-          if (provider.isUnderCreditLockout) ...[
-            Container(
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                color: AppColors.loss.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: AppColors.loss, width: 2),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Row(
-                    children: [
-                      Icon(Icons.gavel, color: AppColors.loss, size: 24),
-                      SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          '🚨 5-TAGE-KREDITSPERRE AKTIV (PRIVATINSOLVENZ)',
-                          style: TextStyle(
-                            color: AppColors.loss,
-                            fontWeight: FontWeight.w900,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ),
-                    ],
+          if (provider.isInsolvent || provider.isUnderCreditLockout) ...[
+            Card(child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Text('Privatinsolvenz & Neustart',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 12),
+                if (provider.isUnderCreditLockout)
+                  Text('Kreditsperre: noch ${provider.creditLockoutTimeRemaining.inDays} Tage, '
+                    '${provider.creditLockoutTimeRemaining.inHours % 24} Stunden und '
+                    '${provider.creditLockoutTimeRemaining.inMinutes % 60} Minuten. '
+                    'Der Sanierungskredit ist nach Ablauf der Sperre verfügbar.',
+                    style: const TextStyle(color: AppColors.textSecondary, height: 1.5))
+                else if (provider.canTakeRecoveryLoan) ...[
+                  const Text('Die Kreditsperre ist abgelaufen. Du kannst einen Sanierungskredit beantragen.'),
+                  const SizedBox(height: 16),
+                  FilledButton.icon(
+                    icon: const Icon(Icons.handshake_outlined),
+                    label: const Text('Sanierungskredit: 10.000 €'),
+                    onPressed: () async {
+                      final success = await provider.takeSanierungsKredit();
+                      if (success && context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                          content: Text('Sanierungskredit ausgezahlt.'),
+                        ));
+                      }
+                    },
                   ),
-                  const SizedBox(height: 10),
-                  Text(
-                    'Verbleibende Sperre: ${provider.creditLockoutTimeRemaining.inDays} Tage, ${provider.creditLockoutTimeRemaining.inHours % 24} Std, ${provider.creditLockoutTimeRemaining.inMinutes % 60} Min',
-                    style: const TextStyle(
-                      color: AppColors.textPrimary,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 15,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  const Text(
-                    'Du hast Insolvenz angemeldet oder bist überschuldet. Reguläre Kredite sind gesperrt.',
-                    style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
-                  ),
-                  const SizedBox(height: 12),
-                  const Divider(color: AppColors.cardBorder),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      const Text('🤝', style: TextStyle(fontSize: 18)),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Rettungsanker der Bank (Zweite Chance):',
-                        style: TextStyle(
-                          color: AppColors.accentGold,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  const Text(
-                    'Die Bank lässt dich nicht im Stich! Aktiviere sofort einen Sanierungs-Notkredit über 10.000 € (12% p.a.), um die Sperre sofort zu beenden und weiterzuspielen.',
-                    style: TextStyle(color: AppColors.textSecondary, fontSize: 11.5),
-                  ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 44,
-                    child: ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.accentGold,
-                        foregroundColor: Colors.black,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                      icon: const Icon(Icons.handshake, size: 18),
-                      label: const Text(
-                        'Sanierungskredit (10.000 €) sofort aktivieren',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                      ),
-                      onPressed: () async {
-                        final success = await provider.takeSanierungsKredit();
-                        if (success && context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('🎉 10.000 € Sanierungskredit ausgezahlt! Du bist wieder voll im Spiel!'),
-                            ),
-                          );
-                        }
-                      },
-                    ),
+                ] else ...[
+                  const Text('Bei Zahlungsunfähigkeit kannst du Privatinsolvenz anmelden. Danach gilt eine Kreditsperre von fünf Tagen.',
+                    style: TextStyle(color: AppColors.textSecondary, height: 1.5)),
+                  const SizedBox(height: 16),
+                  OutlinedButton.icon(
+                    icon: const Icon(Icons.gavel_outlined),
+                    label: const Text('Privatinsolvenz anmelden'),
+                    onPressed: () => provider.declareInsolvency(),
                   ),
                 ],
-              ),
-            ),
-            const SizedBox(height: 20),
-          ] else if (provider.cash <= 0 && provider.netWorth <= -10000) ...[
-            Container(
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                color: AppColors.loss.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: AppColors.loss, width: 2),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Row(
-                    children: [
-                      Icon(Icons.warning, color: AppColors.loss, size: 24),
-                      SizedBox(width: 10),
-                      Text(
-                        'AKUTE ZAHLUNGSUNFÄHIGKEIT (PLEITE)',
-                        style: TextStyle(
-                          color: AppColors.loss,
-                          fontWeight: FontWeight.w900,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Dein Bargeld ist aufgebraucht. Du kannst entweder den Sanierungs-Notkredit der Bank über 10.000 € abrufen, oder Privatinsolvenz anmelden.',
-                    style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
-                  ),
-                  const SizedBox(height: 14),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: () async {
-                            final success = await provider.takeSanierungsKredit();
-                            if (success && context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('🎉 10.000 € Sanierungskredit erhalten! Weiter gehts!'),
-                                ),
-                              );
-                            }
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.accentGold,
-                            foregroundColor: Colors.black,
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                          ),
-                          icon: const Icon(Icons.handshake, size: 18),
-                          label: const Text('Sanierungs-Notkredit (10k €)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      OutlinedButton(
-                        onPressed: () {
-                          provider.declareInsolvency();
-                        },
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.loss,
-                          side: const BorderSide(color: AppColors.loss),
-                          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
-                        ),
-                        child: const Text('Insolvenz', style: TextStyle(fontSize: 12)),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
+              ]),
+            )),
             const SizedBox(height: 20),
           ],
 

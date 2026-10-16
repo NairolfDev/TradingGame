@@ -35,14 +35,23 @@ class LiveMarketDataService {
   DateTime? _lastSyncTime;
   DateTime? get lastSyncTime => _lastSyncTime;
 
+  static String? euroYahooSymbolFor(Asset asset) {
+    if (asset.type == AssetType.crypto) return '${asset.symbol}-EUR';
+    final symbol = asset.yahooSymbol ?? asset.symbol;
+    if (['.VI', '.DE', '.AS'].any(symbol.endsWith)) return symbol;
+    const etfs = {'EUNL': 'EUNL.DE', 'VUSA': 'VUSA.AS', 'EXS1': 'EXS1.DE', 'IS3N': 'IS3N.DE'};
+    // USD futures and foreign-currency securities need conversion before EUR display.
+    return etfs[symbol];
+  }
+
   /// Holt aktuelle Kursdaten für ein Asset (via Binance, Yahoo Finance oder CoinGecko)
   Future<LiveQuoteResult?> fetchLiveQuote(Asset asset) async {
     try {
       if (asset.type == AssetType.crypto) {
         final res = await _fetchCryptoQuote(asset);
         if (res != null) return res;
-      } else if (asset.yahooSymbol != null && asset.yahooSymbol!.isNotEmpty) {
-        final res = await _fetchYahooQuote(asset.yahooSymbol!);
+      } else if (euroYahooSymbolFor(asset) != null) {
+        final res = await _fetchYahooQuote(euroYahooSymbolFor(asset)!);
         if (res != null) return res;
       }
     } catch (e) {
@@ -54,39 +63,26 @@ class LiveMarketDataService {
   /// Batch-Update für mehrere Assets (z.B. Watchlist oder alle Depotwerte)
   Future<Map<String, LiveQuoteResult>> refreshQuotesForAssets(List<Asset> assets) async {
     final Map<String, LiveQuoteResult> updated = {};
-    _lastSyncTime = DateTime.now();
 
-    // 1. Zuerst alle Krypto-Assets schnell über Binance/CoinGecko
-    final cryptoAssets = assets.where((a) => a.type == AssetType.crypto).toList();
-    for (final asset in cryptoAssets) {
-      try {
-        final quote = await _fetchCryptoQuote(asset);
-        if (quote != null) {
-          updated[asset.symbol] = quote;
-        }
-      } catch (_) {}
+    final supported = assets.where((a) => euroYahooSymbolFor(a) != null).toList();
+    for (var i = 0; i < supported.length; i += 6) {
+      await Future.wait(supported.skip(i).take(6).map((asset) async {
+        try {
+          final quote = asset.type == AssetType.crypto
+              ? await _fetchCryptoQuote(asset)
+              : await _fetchYahooQuote(euroYahooSymbolFor(asset)!);
+          if (quote != null) updated[asset.symbol] = quote;
+        } catch (_) {}
+      }));
     }
-
-    // 2. Wichtige Aktien & Rohstoffe über Yahoo / Cloud Function
-    final stockAssets = assets
-        .where((a) => a.type != AssetType.crypto && a.yahooSymbol != null && a.yahooSymbol!.isNotEmpty)
-        .take(15)
-        .toList();
-
-    for (final asset in stockAssets) {
-      try {
-        final quote = await _fetchYahooQuote(asset.yahooSymbol!);
-        if (quote != null) {
-          updated[asset.symbol] = quote;
-        }
-      } catch (_) {}
-    }
-
+    if (updated.isNotEmpty) _lastSyncTime = DateTime.now();
     return updated;
   }
 
   /// Holt historische Zeitreihen für die verschiedenen Timeframes (1D, 1W, 1M, 1Y, 3Y, ALL)
   Future<List<double>?> fetchHistoricalSeries(Asset asset, String timeframe) async {
+    final symbol = euroYahooSymbolFor(asset);
+    if (symbol == null) return null;
     final assetKey = asset.symbol;
     if (_historicalSeriesCache.containsKey(assetKey) &&
         _historicalSeriesCache[assetKey]!.containsKey(timeframe)) {
@@ -94,8 +90,8 @@ class LiveMarketDataService {
     }
 
     try {
-      if (asset.yahooSymbol != null && asset.yahooSymbol!.isNotEmpty) {
-        final series = await _fetchYahooHistory(asset.yahooSymbol!, timeframe);
+      if (symbol.isNotEmpty) {
+        final series = await _fetchYahooHistory(symbol, timeframe);
         if (series != null && series.isNotEmpty) {
           _historicalSeriesCache.putIfAbsent(assetKey, () => {})[timeframe] = series;
           return series;

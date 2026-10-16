@@ -51,8 +51,11 @@ class DashboardScreen extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             children: [
               // Top Bar: Titel, Rang-Badge und Börsenzeit-Toggle
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              Wrap(
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 12,
+                runSpacing: 8,
                 children: [
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -241,8 +244,8 @@ class DashboardScreen extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    Wrap(
+                      alignment: WrapAlignment.spaceBetween, runSpacing: 8, spacing: 12,
                       children: [
                         const Text(
                           'GESAMTVERMÖGEN (NET WORTH)',
@@ -262,6 +265,7 @@ class DashboardScreen extends StatelessWidget {
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Row(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
                               Icon(
                                 isPosRoi
@@ -299,7 +303,7 @@ class DashboardScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Handelskapital: ${CurrencyFormatter.format(provider.cash + provider.totalPositionsValue + provider.totalLuxuryValue)} • Reingewinn: ${netWorth >= 0 ? "+" : ""}${CurrencyFormatter.format(netWorth)}',
+                      'Handelskapital: ${CurrencyFormatter.format(provider.cash + provider.totalPositionsValue + provider.pendingOrderValue + provider.totalLuxuryValue)} • Reingewinn: ${provider.netProfit >= 0 ? "+" : ""}${CurrencyFormatter.format(provider.netProfit)}',
                       style: TextStyle(
                         fontSize: 12,
                         color: netWorth >= 0
@@ -313,9 +317,10 @@ class DashboardScreen extends StatelessWidget {
                     const SizedBox(height: 14),
 
                     // Portfolio Aufteilung: Cash, Wertpapiere, Luxusgüter, Schulden
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
+                    LayoutBuilder(builder: (context, constraints) {
+                      final columns = constraints.maxWidth >= 600 ? 4 : 2;
+                      final width = (constraints.maxWidth - (columns - 1) * 16) / columns;
+                      return Wrap(spacing: 16, runSpacing: 16, children: [
                         _buildStatColumn(
                           'Cash',
                           CurrencyFormatter.format(provider.cash),
@@ -336,8 +341,8 @@ class DashboardScreen extends StatelessWidget {
                           '-${CurrencyFormatter.format(provider.totalDebt)}',
                           provider.totalDebt > 0 ? AppColors.loss : AppColors.textMuted,
                         ),
-                      ],
-                    ),
+                      ].map((child) => SizedBox(width: width, child: child)).toList());
+                    }),
                   ],
                 ),
               ).animate().fadeIn(duration: 400.ms).slideY(begin: 0.05, end: 0),
@@ -374,7 +379,7 @@ class DashboardScreen extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Row(
+                            Wrap(
                               children: [
                                 const Text(
                                   'Bank & Kredit-Schalter',
@@ -435,8 +440,8 @@ class DashboardScreen extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    Wrap(
+                      alignment: WrapAlignment.spaceBetween, runSpacing: 8, spacing: 12,
                       children: [
                         Row(
                           children: [
@@ -484,8 +489,8 @@ class DashboardScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 6),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    Wrap(
+                      alignment: WrapAlignment.spaceBetween, runSpacing: 8, spacing: 12,
                       children: [
                         Text(
                           'Prestige-Punkte: ${provider.totalPrestigePoints} 💎',
@@ -512,8 +517,8 @@ class DashboardScreen extends StatelessWidget {
               const SizedBox(height: 16),
 
               // 4 Neue Power-Features (Turbo-Optionen, Quests, Copy-Trading, Dividenden)
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              Wrap(
+                alignment: WrapAlignment.spaceBetween, runSpacing: 8, spacing: 12,
                 children: [
                   const Text(
                     '⚡ Trading- & Game-Features',
@@ -588,7 +593,7 @@ class DashboardScreen extends StatelessWidget {
                     child: _buildFeatureCard(
                       context: context,
                       title: 'Copy-Trading',
-                      subtitle: 'Whales & Legenden',
+                      subtitle: 'Öffentliche Portfolios',
                       detail: '${provider.copyTraders.length} Profile',
                       icon: Icons.people_alt,
                       color: Colors.lightBlueAccent,

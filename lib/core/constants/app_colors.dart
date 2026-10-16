@@ -17,19 +17,19 @@ class AppColors {
 
   // Trading status
   static const Color profit = Color(0xFF00E676);
-  static const Color loss = Color(0xFFFF3B30);
+  static const Color loss = Color(0xFFFF766D);
   static const Color bullish = profit;
   static const Color bearish = loss;
   static const Color warning = Color(0xFFFF9500);
   static const Color accentGold = Color(0xFFFFD700);
   static const Color profitGreen = Color(0xFF00E676);
-  static const Color lossRed = Color(0xFFFF3B30);
+  static const Color lossRed = Color(0xFFFF766D);
   static const Color surfaceLight = Color(0xFF1C273C);
 
   // Text
   static const Color textPrimary = Color(0xFFF0F4F8);
   static const Color textSecondary = Color(0xFF8B9CB2);
-  static const Color textMuted = Color(0xFF56677F);
+  static const Color textMuted = Color(0xFF92A3B9);
 
   // Asset Categories
   static const Color crypto = Color(0xFFF7931A); // Bitcoin Orange

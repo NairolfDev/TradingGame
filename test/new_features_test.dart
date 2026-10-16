@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:trading_game/data/models/asset.dart';
 import 'package:trading_game/data/models/position.dart';
 import 'package:trading_game/data/models/daily_quest.dart';
@@ -8,6 +9,8 @@ import 'package:trading_game/logic/quest_service.dart';
 import 'package:trading_game/logic/news_service.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  setUp(() => SharedPreferences.setMockInitialValues({}));
   group('Feature 1: NewsService & Dynamic Market Impact Tests', () {
     test('NewsService initializes with templates and selects random breaking news', () {
       final assets = [
@@ -41,9 +44,9 @@ void main() {
   });
 
   group('Feature 2: Daily Quests & Wall Street Pass Tests', () {
-    test('QuestService initializes 5 daily quests with proper progress ratio', () {
+    test('QuestService initializes 5 daily quests with proper progress ratio', () async {
       final questService = QuestService();
-      questService.initialize();
+      await questService.initialize();
 
       expect(questService.quests.length, 5);
       expect(questService.loginStreakDays, greaterThanOrEqualTo(1));
@@ -54,9 +57,9 @@ void main() {
       expect(firstQuest.isClaimed, isFalse);
     });
 
-    test('QuestService records trades and updates progress correctly', () {
+    test('QuestService records trades and updates progress correctly', () async {
       final questService = QuestService();
-      questService.initialize();
+      await questService.initialize();
 
       // Führe Trades aus
       questService.recordTrade(
@@ -141,9 +144,9 @@ void main() {
   });
 
   group('Feature 4: Social- & Copy-Trading Profiles Tests', () {
-    test('InitialCopyTraders contains diverse profiles with full allocation', () {
+    test('InitialCopyTraders has no fabricated public profiles', () {
       final traders = InitialCopyTraders.getTraders();
-      expect(traders.length, 4);
+      expect(traders, isEmpty);
 
       for (final trader in traders) {
         expect(trader.name.isNotEmpty, isTrue);
