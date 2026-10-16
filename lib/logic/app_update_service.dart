@@ -1,9 +1,11 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../core/constants/app_colors.dart';
+import 'platform_reload/reload_helper.dart';
 
 class AppUpdateInfo {
   final String currentVersion;
@@ -29,12 +31,12 @@ class AppUpdateService {
 
   /// Prüft, ob auf GitHub / im Backend eine neuere Version verfügbar ist
   static Future<AppUpdateInfo> checkForUpdate() async {
-    String currentVersion = '1.0.0';
+    String currentVersion = '1.1.0';
     try {
       final packageInfo = await PackageInfo.fromPlatform();
       currentVersion = packageInfo.version;
     } catch (_) {
-      currentVersion = '1.0.0';
+      currentVersion = '1.1.0';
     }
 
     try {
@@ -48,7 +50,7 @@ class AppUpdateService {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
-        final tagName = (data['tag_name'] as String? ?? 'v1.0.0')
+        final tagName = (data['tag_name'] as String? ?? 'v1.1.0')
             .replaceAll('v', '')
             .trim();
         final body = data['body'] as String? ?? 'Fehlerbehebungen und Performance-Verbesserungen.';
@@ -106,14 +108,18 @@ class AppUpdateService {
           borderRadius: BorderRadius.circular(20),
           side: const BorderSide(color: AppColors.primary, width: 1.5),
         ),
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.system_update, color: AppColors.primary, size: 28),
-            SizedBox(width: 10),
+            Icon(
+              kIsWeb ? Icons.bolt : Icons.system_update,
+              color: AppColors.primary,
+              size: 28,
+            ),
+            const SizedBox(width: 10),
             Expanded(
               child: Text(
-                '🚀 Update verfügbar!',
-                style: TextStyle(
+                kIsWeb ? '⚡ Neues Web-Update bereit!' : '🚀 Update verfügbar!',
+                style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
                   color: AppColors.textPrimary,
@@ -136,7 +142,7 @@ class AppUpdateService {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'Installiert: v${info.currentVersion}',
+                    'Aktuell: v${info.currentVersion}',
                     style: const TextStyle(
                       fontSize: 12,
                       color: AppColors.textSecondary,
@@ -155,9 +161,11 @@ class AppUpdateService {
               ),
             ),
             const SizedBox(height: 14),
-            const Text(
-              'Was ist neu in diesem Update:',
-              style: TextStyle(
+            Text(
+              kIsWeb
+                  ? 'Klicke auf "Jetzt neu laden", um die neueste Version sofort per Hard-Reload (Strg + Shift + R) zu laden:'
+                  : 'Was ist neu in diesem Update:',
+              style: const TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.bold,
                 color: AppColors.textPrimary,
@@ -168,7 +176,9 @@ class AppUpdateService {
               constraints: const BoxConstraints(maxHeight: 120),
               child: SingleChildScrollView(
                 child: Text(
-                  info.releaseNotes,
+                  kIsWeb
+                      ? '✨ Neue Features & Verbesserungen:\n• Neue Pro-Broker-Charts mit Candlesticks & SMA\n• Edelmetalle & Rohstoffe (Gold, Silber, Platin, Öl)\n• 5-Tage-Privatinsolvenzsperre & Kredit-Cooldown\n• Cyberpunk Neon Bull Branding'
+                      : info.releaseNotes,
                   style: const TextStyle(
                     fontSize: 12,
                     color: AppColors.textSecondary,
@@ -189,13 +199,18 @@ class AppUpdateService {
           ElevatedButton.icon(
             onPressed: () async {
               Navigator.pop(ctx);
-              final uri = Uri.parse(info.downloadUrl);
-              if (await canLaunchUrl(uri)) {
-                await launchUrl(uri, mode: LaunchMode.externalApplication);
+              if (kIsWeb) {
+                // Hard-reload the web app immediately without redirecting away!
+                reloadWebApp();
+              } else {
+                final uri = Uri.parse(info.downloadUrl);
+                if (await canLaunchUrl(uri)) {
+                  await launchUrl(uri, mode: LaunchMode.externalApplication);
+                }
               }
             },
-            icon: const Icon(Icons.download, size: 18),
-            label: const Text('Jetzt Updaten'),
+            icon: Icon(kIsWeb ? Icons.refresh : Icons.download, size: 18),
+            label: Text(kIsWeb ? 'Jetzt neu laden (Strg + Shift + R)' : 'Jetzt Updaten'),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primary,
               foregroundColor: Colors.black,
