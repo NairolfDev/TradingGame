@@ -292,6 +292,12 @@ class AuthProvider extends ChangeNotifier {
             notifyListeners();
             return false;
           }
+          if (e.code == 'unauthorized-domain') {
+            _errorMessage = 'Domain nicht autorisiert. Bitte starte über http://localhost:8088 oder http://127.0.0.1:8088';
+            _isLoading = false;
+            notifyListeners();
+            return false;
+          }
           _errorMessage = 'Google-Anmeldung fehlgeschlagen: ${e.message ?? e.code}';
           _isLoading = false;
           notifyListeners();

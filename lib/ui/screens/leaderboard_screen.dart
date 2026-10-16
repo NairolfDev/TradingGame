@@ -300,6 +300,47 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
 
           // Liste aller Teilnehmer
           ...entries.map((entry) => _buildLeaderboardTile(entry)),
+
+          if (entries.length <= 1) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                children: const [
+                  Icon(Icons.public, color: AppColors.primary, size: 28),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Echtes Cloud-Multiplayer-Ranking',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          'Keine Fake-Bots! Sobald weitere Spieler online handeln, siehst du sie hier in Echtzeit synchronisiert.',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 24),
         ],
       ),

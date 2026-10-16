@@ -29,18 +29,60 @@ class LiveMarketDataService {
   final Map<String, LiveQuoteResult> _quoteCache = {};
   final Map<String, Map<String, List<double>>> _historicalSeriesCache = {};
 
-  /// Holt aktuelle Kursdaten für ein Asset (via Yahoo Finance oder CoinGecko)
+  static const String _cloudApiBase =
+      'https://europe-west3-tradinggame-austria-prod.cloudfunctions.net/api';
+
+  DateTime? _lastSyncTime;
+  DateTime? get lastSyncTime => _lastSyncTime;
+
+  /// Holt aktuelle Kursdaten für ein Asset (via Binance, Yahoo Finance oder CoinGecko)
   Future<LiveQuoteResult?> fetchLiveQuote(Asset asset) async {
     try {
       if (asset.type == AssetType.crypto) {
-        return await _fetchCryptoQuote(asset);
+        final res = await _fetchCryptoQuote(asset);
+        if (res != null) return res;
       } else if (asset.yahooSymbol != null && asset.yahooSymbol!.isNotEmpty) {
-        return await _fetchYahooQuote(asset.yahooSymbol!);
+        final res = await _fetchYahooQuote(asset.yahooSymbol!);
+        if (res != null) return res;
       }
     } catch (e) {
       debugPrint('LiveMarketDataService: Fehler bei Quote für ${asset.symbol}: $e');
     }
     return _quoteCache[asset.symbol];
+  }
+
+  /// Batch-Update für mehrere Assets (z.B. Watchlist oder alle Depotwerte)
+  Future<Map<String, LiveQuoteResult>> refreshQuotesForAssets(List<Asset> assets) async {
+    final Map<String, LiveQuoteResult> updated = {};
+    _lastSyncTime = DateTime.now();
+
+    // 1. Zuerst alle Krypto-Assets schnell über Binance/CoinGecko
+    final cryptoAssets = assets.where((a) => a.type == AssetType.crypto).toList();
+    for (final asset in cryptoAssets) {
+      try {
+        final quote = await _fetchCryptoQuote(asset);
+        if (quote != null) {
+          updated[asset.symbol] = quote;
+        }
+      } catch (_) {}
+    }
+
+    // 2. Wichtige Aktien & Rohstoffe über Yahoo / Cloud Function
+    final stockAssets = assets
+        .where((a) => a.type != AssetType.crypto && a.yahooSymbol != null && a.yahooSymbol!.isNotEmpty)
+        .take(15)
+        .toList();
+
+    for (final asset in stockAssets) {
+      try {
+        final quote = await _fetchYahooQuote(asset.yahooSymbol!);
+        if (quote != null) {
+          updated[asset.symbol] = quote;
+        }
+      } catch (_) {}
+    }
+
+    return updated;
   }
 
   /// Holt historische Zeitreihen für die verschiedenen Timeframes (1D, 1W, 1M, 1Y, 3Y, ALL)
@@ -66,59 +108,111 @@ class LiveMarketDataService {
     return null;
   }
 
-  /// Yahoo Finance Quote Abfrage
+  /// Yahoo Finance Quote Abfrage (mit Cloud Function Proxy für Flutter Web)
   Future<LiveQuoteResult?> _fetchYahooQuote(String yahooSymbol) async {
-    final uri = Uri.parse(
-      'https://query1.finance.yahoo.com/v8/finance/chart/$yahooSymbol?interval=5m&range=1d',
-    );
+    // 1. Bei Flutter Web: Nutze Firebase Cloud Function Proxy (keine CORS-Blockade)
+    if (kIsWeb) {
+      try {
+        final uri = Uri.parse('$_cloudApiBase/quote?symbol=$yahooSymbol');
+        final response = await http.get(uri).timeout(const Duration(seconds: 5));
+        if (response.statusCode == 200) {
+          final json = jsonDecode(response.body) as Map<String, dynamic>;
+          final double price = (json['currentPrice'] as num?)?.toDouble() ?? 0.0;
+          final double prevClose = (json['previousClose'] as num?)?.toDouble() ?? price;
+          final double? high = (json['high'] as num?)?.toDouble();
+          final double? low = (json['low'] as num?)?.toDouble();
+          final seriesRaw = json['series'] as List<dynamic>?;
+          final series = seriesRaw?.where((v) => v != null).map((v) => (v as num).toDouble()).toList();
 
-    final response = await http.get(uri, headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-      'Accept': 'application/json',
-    }).timeout(const Duration(seconds: 4));
-
-    if (response.statusCode == 200) {
-      final json = jsonDecode(response.body) as Map<String, dynamic>;
-      final chart = json['chart']?['result']?[0];
-      if (chart == null) return null;
-
-      final meta = chart['meta'];
-      final double price = (meta['regularMarketPrice'] as num?)?.toDouble() ??
-          (meta['chartPreviousClose'] as num?)?.toDouble() ??
-          0.0;
-      final double prevClose = (meta['chartPreviousClose'] as num?)?.toDouble() ??
-          (meta['previousClose'] as num?)?.toDouble() ??
-          price;
-      final double? high = (meta['regularMarketDayHigh'] as num?)?.toDouble();
-      final double? low = (meta['regularMarketDayLow'] as num?)?.toDouble();
-
-      final indicators = chart['indicators']?['quote']?[0];
-      final rawCloses = indicators?['close'] as List<dynamic>?;
-      List<double>? series;
-      if (rawCloses != null) {
-        series = rawCloses
-            .where((v) => v != null)
-            .map((v) => (v as num).toDouble())
-            .toList();
-      }
-
-      if (price > 0) {
-        final result = LiveQuoteResult(
-          currentPrice: price,
-          previousClose: prevClose,
-          high: high,
-          low: low,
-          series: series,
-        );
-        _quoteCache[yahooSymbol] = result;
-        return result;
+          if (price > 0) {
+            final result = LiveQuoteResult(
+              currentPrice: price,
+              previousClose: prevClose,
+              high: high,
+              low: low,
+              series: series,
+            );
+            _quoteCache[yahooSymbol] = result;
+            return result;
+          }
+        }
+      } catch (webErr) {
+        debugPrint('Web Cloud Proxy notice for $yahooSymbol: $webErr');
       }
     }
+
+    // 2. Direktabfrage an Yahoo Finance (Desktop / Mobile oder Web-Fallback)
+    try {
+      final uri = Uri.parse(
+        'https://query1.finance.yahoo.com/v8/finance/chart/$yahooSymbol?interval=5m&range=1d',
+      );
+
+      final response = await http.get(uri, headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept': 'application/json',
+      }).timeout(const Duration(seconds: 4));
+
+      if (response.statusCode == 200) {
+        final json = jsonDecode(response.body) as Map<String, dynamic>;
+        final chart = json['chart']?['result']?[0];
+        if (chart == null) return null;
+
+        final meta = chart['meta'];
+        final double price = (meta['regularMarketPrice'] as num?)?.toDouble() ??
+            (meta['chartPreviousClose'] as num?)?.toDouble() ??
+            0.0;
+        final double prevClose = (meta['chartPreviousClose'] as num?)?.toDouble() ??
+            (meta['previousClose'] as num?)?.toDouble() ??
+            price;
+        final double? high = (meta['regularMarketDayHigh'] as num?)?.toDouble();
+        final double? low = (meta['regularMarketDayLow'] as num?)?.toDouble();
+
+        final indicators = chart['indicators']?['quote']?[0];
+        final rawCloses = indicators?['close'] as List<dynamic>?;
+        List<double>? series;
+        if (rawCloses != null) {
+          series = rawCloses
+              .where((v) => v != null)
+              .map((v) => (v as num).toDouble())
+              .toList();
+        }
+
+        if (price > 0) {
+          final result = LiveQuoteResult(
+            currentPrice: price,
+            previousClose: prevClose,
+            high: high,
+            low: low,
+            series: series,
+          );
+          _quoteCache[yahooSymbol] = result;
+          return result;
+        }
+      }
+    } catch (_) {}
+
     return null;
   }
 
-  /// Yahoo Finance Timeframe History Abfrage
+  /// Yahoo Finance Timeframe History Abfrage (mit Cloud Function Proxy für Flutter Web)
   Future<List<double>?> _fetchYahooHistory(String yahooSymbol, String timeframe) async {
+    // 1. Bei Flutter Web: Nutze Firebase Cloud Function Proxy
+    if (kIsWeb) {
+      try {
+        final uri = Uri.parse('$_cloudApiBase/history?symbol=$yahooSymbol&timeframe=$timeframe');
+        final response = await http.get(uri).timeout(const Duration(seconds: 6));
+        if (response.statusCode == 200) {
+          final json = jsonDecode(response.body) as Map<String, dynamic>;
+          final seriesRaw = json['series'] as List<dynamic>?;
+          if (seriesRaw != null && seriesRaw.isNotEmpty) {
+            return seriesRaw.map((v) => (v as num).toDouble()).toList();
+          }
+        }
+      } catch (webErr) {
+        debugPrint('Web Cloud Proxy history notice for $yahooSymbol: $webErr');
+      }
+    }
+
     String range;
     String interval;
 
@@ -150,71 +244,102 @@ class LiveMarketDataService {
         break;
     }
 
-    final uri = Uri.parse(
-      'https://query1.finance.yahoo.com/v8/finance/chart/$yahooSymbol?interval=$interval&range=$range',
-    );
+    try {
+      final uri = Uri.parse(
+        'https://query1.finance.yahoo.com/v8/finance/chart/$yahooSymbol?interval=$interval&range=$range',
+      );
 
-    final response = await http.get(uri, headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-      'Accept': 'application/json',
-    }).timeout(const Duration(seconds: 5));
+      final response = await http.get(uri, headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept': 'application/json',
+      }).timeout(const Duration(seconds: 5));
 
-    if (response.statusCode == 200) {
-      final json = jsonDecode(response.body) as Map<String, dynamic>;
-      final chart = json['chart']?['result']?[0];
-      if (chart == null) return null;
+      if (response.statusCode == 200) {
+        final json = jsonDecode(response.body) as Map<String, dynamic>;
+        final chart = json['chart']?['result']?[0];
+        if (chart == null) return null;
 
-      final indicators = chart['indicators']?['quote']?[0];
-      final rawCloses = indicators?['close'] as List<dynamic>?;
-      if (rawCloses != null) {
-        final filtered = rawCloses
-            .where((v) => v != null)
-            .map((v) => (v as num).toDouble())
-            .toList();
-        if (filtered.isNotEmpty) return filtered;
+        final indicators = chart['indicators']?['quote']?[0];
+        final rawCloses = indicators?['close'] as List<dynamic>?;
+        if (rawCloses != null) {
+          final filtered = rawCloses
+              .where((v) => v != null)
+              .map((v) => (v as num).toDouble())
+              .toList();
+          if (filtered.isNotEmpty) return filtered;
+        }
       }
-    }
+    } catch (_) {}
+
     return null;
   }
 
-  /// CoinGecko Live-Quote für Kryptowährungen
+  /// Realtime Live-Quote für Krypto (Binance 24hr API, Fallback auf CoinGecko)
   Future<LiveQuoteResult?> _fetchCryptoQuote(Asset asset) async {
-    final coinId = asset.coingeckoId ?? _mapSymbolToCoinGeckoId(asset.symbol);
-    final uri = Uri.parse(
-      'https://api.coingecko.com/api/v3/coins/markets?vs_currency=eur&ids=$coinId&sparkline=true',
-    );
+    // 1. Ultra-schnelle Binance 24hr API (CORS-unterstützt auf Web & Mobil)
+    try {
+      final binanceSymbol = '${asset.symbol.toUpperCase()}EUR';
+      final uri = Uri.parse('https://api.binance.com/api/v3/ticker/24hr?symbol=$binanceSymbol');
+      final resp = await http.get(uri).timeout(const Duration(seconds: 3));
+      if (resp.statusCode == 200) {
+        final data = jsonDecode(resp.body) as Map<String, dynamic>;
+        final price = double.tryParse(data['lastPrice']?.toString() ?? '') ?? 0.0;
+        final prevClose = double.tryParse(data['prevClosePrice']?.toString() ?? '') ?? price;
+        final high = double.tryParse(data['highPrice']?.toString() ?? '');
+        final low = double.tryParse(data['lowPrice']?.toString() ?? '');
 
-    final response = await http.get(uri, headers: {
-      'Accept': 'application/json',
-    }).timeout(const Duration(seconds: 4));
-
-    if (response.statusCode == 200) {
-      final list = jsonDecode(response.body) as List<dynamic>;
-      if (list.isNotEmpty) {
-        final coin = list.first as Map<String, dynamic>;
-        final double price = (coin['current_price'] as num?)?.toDouble() ?? asset.currentPrice;
-        final double change24h = (coin['price_change_24h'] as num?)?.toDouble() ?? 0.0;
-        final double prevClose = price - change24h;
-        final double? high = (coin['high_24h'] as num?)?.toDouble();
-        final double? low = (coin['low_24h'] as num?)?.toDouble();
-
-        final sparklineList = coin['sparkline_in_7d']?['price'] as List<dynamic>?;
-        List<double>? series;
-        if (sparklineList != null) {
-          series = sparklineList.map((v) => (v as num).toDouble()).toList();
+        if (price > 0) {
+          final result = LiveQuoteResult(
+            currentPrice: price,
+            previousClose: prevClose,
+            high: high,
+            low: low,
+          );
+          _quoteCache[asset.symbol] = result;
+          return result;
         }
-
-        final result = LiveQuoteResult(
-          currentPrice: price,
-          previousClose: prevClose > 0 ? prevClose : price,
-          high: high,
-          low: low,
-          series: series,
-        );
-        _quoteCache[asset.symbol] = result;
-        return result;
       }
-    }
+    } catch (_) {}
+
+    // 2. Fallback CoinGecko
+    try {
+      final coinId = asset.coingeckoId ?? _mapSymbolToCoinGeckoId(asset.symbol);
+      final uri = Uri.parse(
+        'https://api.coingecko.com/api/v3/coins/markets?vs_currency=eur&ids=$coinId&sparkline=true',
+      );
+
+      final response = await http.get(uri, headers: {
+        'Accept': 'application/json',
+      }).timeout(const Duration(seconds: 4));
+
+      if (response.statusCode == 200) {
+        final list = jsonDecode(response.body) as List<dynamic>;
+        if (list.isNotEmpty) {
+          final coin = list.first as Map<String, dynamic>;
+          final double price = (coin['current_price'] as num?)?.toDouble() ?? asset.currentPrice;
+          final double change24h = (coin['price_change_24h'] as num?)?.toDouble() ?? 0.0;
+          final double prevClose = price - change24h;
+          final double? high = (coin['high_24h'] as num?)?.toDouble();
+          final double? low = (coin['low_24h'] as num?)?.toDouble();
+
+          final sparklineList = coin['sparkline_in_7d']?['price'] as List<dynamic>?;
+          List<double>? series;
+          if (sparklineList != null) {
+            series = sparklineList.map((v) => (v as num).toDouble()).toList();
+          }
+
+          final result = LiveQuoteResult(
+            currentPrice: price,
+            previousClose: prevClose > 0 ? prevClose : price,
+            high: high,
+            low: low,
+            series: series,
+          );
+          _quoteCache[asset.symbol] = result;
+          return result;
+        }
+      }
+    } catch (_) {}
     return null;
   }
 
