@@ -8,6 +8,7 @@
 - Kreditbetrag/Laufzeit und Tilgungsbetrag validieren; Startkredite anhand ihres ID-Präfixes erkennen.
 - Sanierung erst nach angemeldeter Insolvenz und abgelaufener fünftägiger Sperre zulassen; passende UI-Aktion anbieten.
 - Monatliche Dividenden nicht mehrfach auszahlen.
+- Freitag nach Börsenschluss korrekt Montag statt Samstag ankündigen; Amsterdam-Aktien und EUR-ETFs den europäischen Handelszeiten zuordnen.
 - Keine globale Top-10-Belohnung für ein Profil ohne Konkurrenten; Start-Rendite und Reingewinn auf tatsächlichem Eigenkapital berechnen.
 - Tagesquests und eingelöste Belohnungen pro Profil speichern; echte aufeinanderfolgende Login-Tage zählen; Initialisierung zählt nicht als Trade.
 - Erfundene Copy-Trader, Zufallskurse, künstliche Nachrichtenimpulse, Zufallshistorien, OHLC-Kerzen und Orderbuchmengen aus dem aktiven Produkt entfernen.
@@ -28,7 +29,7 @@
 
 ## Validierung
 
-- 57 Flutter-Tests bestanden, einschließlich Trading-Regressionsfällen, Tageswechsel/Profiltrennung und 375-Pixel-Layouttest.
+- 59 Flutter-Tests bestanden, einschließlich Trading-Regressionsfällen, Tageswechsel/Profiltrennung und 375-Pixel-Layouttest.
 - Flutter-Analyse ohne Befund.
 - Web-Release-Build und unabhängiges Code-Review durchgeführt.
 - Öffentliche Kursendpunkte für OMV.VI und BTC-EUR antworten mit Kursen und historischen Punkten.
