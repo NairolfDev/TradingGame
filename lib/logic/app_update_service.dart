@@ -26,6 +26,7 @@ class AppUpdateInfo {
 class AppUpdateService {
   static const String githubRepoOwner = 'NairolfDev';
   static const String githubRepoName = 'TradingGame';
+  static const String androidPackageName = 'com.nairolfdev.tradinggame';
   static const String defaultReleaseUrl =
       'https://github.com/$githubRepoOwner/$githubRepoName/releases/latest';
 
@@ -53,7 +54,7 @@ class AppUpdateService {
         final tagName = (data['tag_name'] as String? ?? 'v1.1.0')
             .replaceAll('v', '')
             .trim();
-        final body = data['body'] as String? ?? 'Fehlerbehebungen und Performance-Verbesserungen.';
+        final body = data['body'] as String? ?? 'Wichtige Sicherheits-, Kurs- und Stabilitätsupdates.';
         final htmlUrl = data['html_url'] as String? ?? defaultReleaseUrl;
 
         final hasUpdate = _isVersionHigher(tagName, currentVersion);
@@ -97,129 +98,178 @@ class AppUpdateService {
     }
   }
 
-  /// Zeigt den Update-Dialog in der App an
+  /// Zeigt den ZWANGS-Update-Dialog an (Blockiert das Weiterspielen, bis aktualisiert wurde)
   static void showUpdateDialog(BuildContext context, AppUpdateInfo info) {
     showDialog(
       context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.surface,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-          side: const BorderSide(color: AppColors.primary, width: 1.5),
-        ),
-        title: Row(
-          children: [
-            Icon(
-              kIsWeb ? Icons.bolt : Icons.system_update,
-              color: AppColors.primary,
-              size: 28,
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                kIsWeb ? '⚡ Neues Web-Update bereit!' : '🚀 Update verfügbar!',
-                style: const TextStyle(
-                  fontSize: 18,
+      barrierDismissible: false, // Nicht wegklickbar!
+      builder: (ctx) => PopScope(
+        canPop: false, // Android Back-Button blockiert!
+        child: AlertDialog(
+          backgroundColor: AppColors.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+            side: const BorderSide(color: Colors.redAccent, width: 2.0),
+          ),
+          title: const Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 30),
+              SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  '🚨 Pflicht-Update erforderlich!',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.redAccent.withAlpha(25),
+                  border: Border.all(color: Colors.redAccent.withAlpha(80)),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.lock, color: Colors.redAccent, size: 20),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Um weiterspielen zu können, musst du die neueste Version installieren. Ältere Versionen werden gesperrt.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceElevated,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Installiert: v${info.currentVersion}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.redAccent,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const Icon(Icons.arrow_forward, size: 14, color: AppColors.primary),
+                    Text(
+                      'Pflicht: v${info.latestVersion}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+              const Text(
+                'Was ist neu in diesem Pflicht-Update:',
+                style: TextStyle(
+                  fontSize: 12,
                   fontWeight: FontWeight.bold,
                   color: AppColors.textPrimary,
                 ),
               ),
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppColors.surfaceElevated,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Aktuell: v${info.currentVersion}',
+              const SizedBox(height: 6),
+              Container(
+                constraints: const BoxConstraints(maxHeight: 120),
+                child: SingleChildScrollView(
+                  child: Text(
+                    kIsWeb
+                        ? '✨ Neue Features & Synchronisation:\n• Neue Pro-Broker-Charts (Candlesticks & SMA)\n• Edelmetalle & Rohstoffe (Gold, Silber, Platin, Öl)\n• 5-Tage-Privatinsolvenzsperre & Kredit-Cooldown\n• Cyberpunk Neon Bull Branding'
+                        : info.releaseNotes,
                     style: const TextStyle(
                       fontSize: 12,
                       color: AppColors.textSecondary,
                     ),
                   ),
-                  const Icon(Icons.arrow_forward, size: 14, color: AppColors.primary),
-                  Text(
-                    'Neu: v${info.latestVersion}',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.primary,
-                    ),
-                  ),
-                ],
+                ),
               ),
-            ),
-            const SizedBox(height: 14),
-            Text(
-              kIsWeb
-                  ? 'Klicke auf "Jetzt neu laden", um die neueste Version sofort per Hard-Reload (Strg + Shift + R) zu laden:'
-                  : 'Was ist neu in diesem Update:',
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Container(
-              constraints: const BoxConstraints(maxHeight: 120),
-              child: SingleChildScrollView(
-                child: Text(
+            ],
+          ),
+          actionsAlignment: MainAxisAlignment.center,
+          actions: [
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () async {
+                  if (kIsWeb) {
+                    // Sofortiger Hard-Reload im Webbrowser
+                    reloadWebApp();
+                  } else if (defaultTargetPlatform == TargetPlatform.android) {
+                    // Google Play Store öffnen
+                    final marketUri = Uri.parse('market://details?id=$androidPackageName');
+                    final webPlayStoreUri = Uri.parse('https://play.google.com/store/apps/details?id=$androidPackageName');
+                    if (await canLaunchUrl(marketUri)) {
+                      await launchUrl(marketUri, mode: LaunchMode.externalApplication);
+                    } else if (await canLaunchUrl(webPlayStoreUri)) {
+                      await launchUrl(webPlayStoreUri, mode: LaunchMode.externalApplication);
+                    } else {
+                      final githubUri = Uri.parse(info.downloadUrl);
+                      if (await canLaunchUrl(githubUri)) {
+                        await launchUrl(githubUri, mode: LaunchMode.externalApplication);
+                      }
+                    }
+                  } else {
+                    // Windows Desktop: GitHub Release / Installer öffnen
+                    final uri = Uri.parse(info.downloadUrl);
+                    if (await canLaunchUrl(uri)) {
+                      await launchUrl(uri, mode: LaunchMode.externalApplication);
+                    }
+                  }
+                },
+                icon: Icon(
                   kIsWeb
-                      ? '✨ Neue Features & Verbesserungen:\n• Neue Pro-Broker-Charts mit Candlesticks & SMA\n• Edelmetalle & Rohstoffe (Gold, Silber, Platin, Öl)\n• 5-Tage-Privatinsolvenzsperre & Kredit-Cooldown\n• Cyberpunk Neon Bull Branding'
-                      : info.releaseNotes,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textSecondary,
+                      ? Icons.refresh
+                      : (defaultTargetPlatform == TargetPlatform.android
+                          ? Icons.play_arrow
+                          : Icons.download),
+                  size: 20,
+                ),
+                label: Text(
+                  kIsWeb
+                      ? 'Jetzt neu laden (Strg + Shift + R)'
+                      : (defaultTargetPlatform == TargetPlatform.android
+                          ? 'Jetzt im Google Play Store updaten'
+                          : 'Jetzt Setup.exe herunterladen & updaten'),
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.black,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
                   ),
                 ),
               ),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text(
-              'Später erinnern',
-              style: TextStyle(color: AppColors.textMuted),
-            ),
-          ),
-          ElevatedButton.icon(
-            onPressed: () async {
-              Navigator.pop(ctx);
-              if (kIsWeb) {
-                // Hard-reload the web app immediately without redirecting away!
-                reloadWebApp();
-              } else {
-                final uri = Uri.parse(info.downloadUrl);
-                if (await canLaunchUrl(uri)) {
-                  await launchUrl(uri, mode: LaunchMode.externalApplication);
-                }
-              }
-            },
-            icon: Icon(kIsWeb ? Icons.refresh : Icons.download, size: 18),
-            label: Text(kIsWeb ? 'Jetzt neu laden (Strg + Shift + R)' : 'Jetzt Updaten'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.black,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }
