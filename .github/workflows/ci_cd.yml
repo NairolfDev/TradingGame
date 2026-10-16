@@ -125,7 +125,9 @@ jobs:
           path: trading_game.aab
 
       - name: Deploy to Google Play Console (Auto-Deploy)
-        if: "${{ secrets.PLAY_STORE_JSON_KEY != '' }}"
+        env:
+          PLAY_KEY: ${{ secrets.PLAY_STORE_JSON_KEY }}
+        if: env.PLAY_KEY != ''
         uses: r0adkll/upload-google-play@v1
         with:
           serviceAccountJsonPlainText: ${{ secrets.PLAY_STORE_JSON_KEY }}
