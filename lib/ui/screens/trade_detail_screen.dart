@@ -10,6 +10,7 @@ import '../../logic/trading_fee_service.dart';
 import '../../data/models/automation_order.dart';
 import '../widgets/interactive_broker_chart.dart';
 import '../widgets/order_routing_dialog.dart';
+import '../widgets/order_book_widget.dart';
 import 'auth_screen.dart';
 
 class TradeDetailScreen extends StatefulWidget {
@@ -637,6 +638,8 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
               ],
             ),
           ),
+          const SizedBox(height: 16),
+          OrderBookWidget(asset: liveAsset),
           const SizedBox(height: 16),
           _buildAutomationBotSection(context, liveAsset, provider),
           const SizedBox(height: 30),

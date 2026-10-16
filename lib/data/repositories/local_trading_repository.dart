@@ -186,6 +186,9 @@ class LocalTradingRepository implements TradingRepository {
   }
 
   @override
+  Stream<List<LeaderboardEntry>>? streamLeaderboard() => null;
+
+  @override
   Future<List<Loan>> getLoans() async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_keyLoans);

@@ -18,6 +18,8 @@ import 'quests_screen.dart';
 import 'social_trading_screen.dart';
 import 'dividends_screen.dart';
 import 'achievements_screen.dart';
+import 'simplistic_dashboard_screen.dart';
+import 'settings_screen.dart';
 import '../widgets/watchlist_marquee_ticker.dart';
 
 class MainScreen extends StatefulWidget {
@@ -181,14 +183,23 @@ class _MainScreenState extends State<MainScreen> {
     final auth = context.watch<AuthProvider>();
     final pendingCount = provider.pendingOrders.length;
 
-    final screens = [
-      DashboardScreen(onNavigateTab: _onTabTapped),
-      const MarketsScreen(),
-      const BankLoanScreen(),
-      const PrestigeShopScreen(),
-      const LeaderboardScreen(),
-      const HistoryNewsScreen(),
-    ];
+    final screens = provider.isSimplisticMode
+        ? [
+            SimplisticDashboardScreen(onNavigateTab: _onTabTapped),
+            const MarketsScreen(),
+            const HistoryNewsScreen(),
+            const SettingsScreen(),
+          ]
+        : [
+            DashboardScreen(onNavigateTab: _onTabTapped),
+            const MarketsScreen(),
+            const BankLoanScreen(),
+            const PrestigeShopScreen(),
+            const LeaderboardScreen(),
+            const HistoryNewsScreen(),
+          ];
+
+    final activeIndex = _currentIndex.clamp(0, screens.length - 1);
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -297,70 +308,96 @@ class _MainScreenState extends State<MainScreen> {
                         child: ListView(
                           padding: const EdgeInsets.symmetric(
                               vertical: 12, horizontal: 10),
-                          children: [
-                            _buildNavTile(0, Icons.pie_chart, 'Depot & Übersicht'),
-                            _buildNavTile(1, Icons.trending_up, 'Märkte & Trade'),
-                            _buildNavTile(
-                              2,
-                              Icons.account_balance,
-                              'Bank & Kredite',
-                              badgeText: provider.totalDebt > 0 ? '${provider.activeLoans.length}' : null,
-                            ),
-                            _buildNavTile(3, Icons.workspace_premium, 'Prestige-Shop'),
-                            _buildNavTile(4, Icons.leaderboard, 'Leaderboard'),
-                            _buildNavTile(
-                              5,
-                              Icons.history_edu,
-                              'News & Historie',
-                              badgeText: pendingCount > 0 ? '$pendingCount' : null,
-                            ),
-                            const Divider(color: AppColors.cardBorder, height: 20),
-                            const Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                              child: Text(
-                                'SPECIALS & GAMING',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  letterSpacing: 1.2,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.textMuted,
-                                ),
-                              ),
-                            ),
-                            _buildActionTile(
-                              Icons.military_tech,
-                              'Trophäen & Erfolge',
-                              AppColors.accentGold,
-                              () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AchievementsScreen())),
-                              badgeText: '${provider.achievementService.unlockedCount}/${provider.achievementService.totalCount}',
-                            ),
-                            _buildActionTile(
-                              Icons.emoji_events,
-                              'Wall Street Pass',
-                              Colors.amber,
-                              () => Navigator.push(context, MaterialPageRoute(builder: (_) => const QuestsScreen())),
-                              badgeText: provider.dailyQuests.where((q) => q.isCompleted && !q.isClaimed).isNotEmpty ? '🎁' : null,
-                            ),
-                            _buildActionTile(
-                              Icons.people_alt,
-                              'Social Trading',
-                              Colors.lightBlueAccent,
-                              () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SocialTradingScreen())),
-                            ),
-                            _buildActionTile(
-                              Icons.payments,
-                              'Dividenden',
-                              Colors.greenAccent,
-                              () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DividendsScreen())),
-                            ),
-                            _buildActionTile(
-                              Icons.military_tech,
-                              'Erfolge & Trophäen',
-                              Colors.orangeAccent,
-                              () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AchievementsScreen())),
-                              badgeText: '${provider.unlockedAchievementsCount}',
-                            ),
-                          ],
+                          children: provider.isSimplisticMode
+                              ? [
+                                  _buildNavTile(0, Icons.pie_chart, 'Depot & Positionen'),
+                                  _buildNavTile(1, Icons.trending_up, 'Märkte & Suche'),
+                                  _buildNavTile(
+                                    2,
+                                    Icons.history_edu,
+                                    'Orders & Historie',
+                                    badgeText: pendingCount > 0 ? '$pendingCount' : null,
+                                  ),
+                                  _buildNavTile(3, Icons.settings, 'Einstellungen'),
+                                  const Divider(color: AppColors.cardBorder, height: 20),
+                                  ListTile(
+                                    dense: true,
+                                    leading: const Icon(Icons.tune, color: AppColors.primary, size: 20),
+                                    title: const Text(
+                                      'Profi-Modus aktivieren',
+                                      style: TextStyle(
+                                        color: AppColors.primary,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    onTap: () => provider.setSimplisticMode(false),
+                                  ),
+                                ]
+                              : [
+                                  _buildNavTile(0, Icons.pie_chart, 'Depot & Übersicht'),
+                                  _buildNavTile(1, Icons.trending_up, 'Märkte & Trade'),
+                                  _buildNavTile(
+                                    2,
+                                    Icons.account_balance,
+                                    'Bank & Kredite',
+                                    badgeText: provider.totalDebt > 0 ? '${provider.activeLoans.length}' : null,
+                                  ),
+                                  _buildNavTile(3, Icons.workspace_premium, 'Prestige-Shop'),
+                                  _buildNavTile(4, Icons.leaderboard, 'Leaderboard'),
+                                  _buildNavTile(
+                                    5,
+                                    Icons.history_edu,
+                                    'News & Historie',
+                                    badgeText: pendingCount > 0 ? '$pendingCount' : null,
+                                  ),
+                                  const Divider(color: AppColors.cardBorder, height: 20),
+                                  _buildActionTile(
+                                    Icons.settings,
+                                    'Einstellungen',
+                                    AppColors.primary,
+                                    () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen())),
+                                  ),
+                                  const Divider(color: AppColors.cardBorder, height: 20),
+                                  const Padding(
+                                    padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                    child: Text(
+                                      'SPECIALS & GAMING',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        letterSpacing: 1.2,
+                                        fontWeight: FontWeight.bold,
+                                        color: AppColors.textMuted,
+                                      ),
+                                    ),
+                                  ),
+                                  _buildActionTile(
+                                    Icons.military_tech,
+                                    'Trophäen & Erfolge',
+                                    AppColors.accentGold,
+                                    () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AchievementsScreen())),
+                                    badgeText: '${provider.achievementService.unlockedCount}/${provider.achievementService.totalCount}',
+                                  ),
+                                  _buildActionTile(
+                                    Icons.emoji_events,
+                                    'Wall Street Pass',
+                                    Colors.amber,
+                                    () => Navigator.push(context, MaterialPageRoute(builder: (_) => const QuestsScreen())),
+                                    badgeText: provider.dailyQuests.where((q) => q.isCompleted && !q.isClaimed).isNotEmpty ? '🎁' : null,
+                                  ),
+                                  _buildActionTile(
+                                    Icons.people_alt,
+                                    'Social Trading',
+                                    Colors.lightBlueAccent,
+                                    () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SocialTradingScreen())),
+                                  ),
+                                  _buildActionTile(
+                                    Icons.payments,
+                                    'Dividenden',
+                                    Colors.greenAccent,
+                                    () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DividendsScreen())),
+                                  ),
+                                ],
                         ),
                       ),
 
@@ -406,7 +443,7 @@ class _MainScreenState extends State<MainScreen> {
                 Expanded(
                   child: Column(
                     children: [
-                      Expanded(child: screens[_currentIndex]),
+                      Expanded(child: screens[activeIndex]),
                       const WatchlistMarqueeTicker(),
                     ],
                   ),
@@ -431,11 +468,31 @@ class _MainScreenState extends State<MainScreen> {
             ),
             actions: [
               IconButton(
-                icon: const Icon(Icons.military_tech, size: 22, color: Colors.amber),
-                tooltip: 'Erfolge & Trophäen',
+                icon: Icon(
+                  provider.isSimplisticMode ? Icons.auto_awesome : Icons.tune,
+                  size: 20,
+                  color: provider.isSimplisticMode ? AppColors.accent : AppColors.textSecondary,
+                ),
+                tooltip: provider.isSimplisticMode ? 'Profi-Modus (Voll)' : 'Simplistic Modus (Clean)',
+                onPressed: () {
+                  provider.setSimplisticMode(!provider.isSimplisticMode);
+                },
+              ),
+              if (!provider.isSimplisticMode)
+                IconButton(
+                  icon: const Icon(Icons.military_tech, size: 22, color: Colors.amber),
+                  tooltip: 'Erfolge & Trophäen',
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const AchievementsScreen()),
+                  ),
+                ),
+              IconButton(
+                icon: const Icon(Icons.settings_outlined, size: 20),
+                tooltip: 'Einstellungen',
                 onPressed: () => Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => const AchievementsScreen()),
+                  MaterialPageRoute(builder: (_) => const SettingsScreen()),
                 ),
               ),
               IconButton(
@@ -455,7 +512,7 @@ class _MainScreenState extends State<MainScreen> {
             children: [
               Expanded(
                 child: IndexedStack(
-                  index: _currentIndex,
+                  index: activeIndex,
                   children: screens,
                 ),
               ),
@@ -464,88 +521,135 @@ class _MainScreenState extends State<MainScreen> {
           ),
           bottomNavigationBar: BottomNavigationBar(
             type: BottomNavigationBarType.fixed,
-            currentIndex: _currentIndex,
+            currentIndex: activeIndex,
             onTap: _onTabTapped,
-            items: [
-              const BottomNavigationBarItem(
-                icon: Icon(Icons.pie_chart_outline),
-                activeIcon: Icon(Icons.pie_chart),
-                label: 'Depot',
-              ),
-              const BottomNavigationBarItem(
-                icon: Icon(Icons.trending_up_outlined),
-                activeIcon: Icon(Icons.trending_up),
-                label: 'Märkte',
-              ),
-              BottomNavigationBarItem(
-                icon: Stack(
-                  children: [
-                    const Icon(Icons.account_balance_outlined),
-                    if (provider.totalDebt > 0)
-                      Positioned(
-                        right: 0,
-                        top: 0,
-                        child: Container(
-                          padding: const EdgeInsets.all(3),
-                          decoration: const BoxDecoration(
-                            color: AppColors.loss,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Text(
-                            '${provider.activeLoans.length}',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 9,
-                              fontWeight: FontWeight.bold,
+            items: provider.isSimplisticMode
+                ? [
+                    const BottomNavigationBarItem(
+                      icon: Icon(Icons.pie_chart_outline),
+                      activeIcon: Icon(Icons.pie_chart),
+                      label: 'Depot',
+                    ),
+                    const BottomNavigationBarItem(
+                      icon: Icon(Icons.trending_up_outlined),
+                      activeIcon: Icon(Icons.trending_up),
+                      label: 'Märkte',
+                    ),
+                    BottomNavigationBarItem(
+                      icon: Stack(
+                        children: [
+                          const Icon(Icons.history_edu_outlined),
+                          if (pendingCount > 0)
+                            Positioned(
+                              right: 0,
+                              top: 0,
+                              child: Container(
+                                padding: const EdgeInsets.all(3),
+                                decoration: const BoxDecoration(
+                                  color: AppColors.gold,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Text(
+                                  '$pendingCount',
+                                  style: const TextStyle(
+                                    color: Colors.black,
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
                             ),
-                          ),
-                        ),
+                        ],
                       ),
-                  ],
-                ),
-                activeIcon: const Icon(Icons.account_balance),
-                label: 'Bank',
-              ),
-              const BottomNavigationBarItem(
-                icon: Icon(Icons.workspace_premium_outlined),
-                activeIcon: Icon(Icons.workspace_premium),
-                label: 'Prestige',
-              ),
-              const BottomNavigationBarItem(
-                icon: Icon(Icons.leaderboard_outlined),
-                activeIcon: Icon(Icons.leaderboard),
-                label: 'Ranking',
-              ),
-              BottomNavigationBarItem(
-                icon: Stack(
-                  children: [
-                    const Icon(Icons.history_edu_outlined),
-                    if (pendingCount > 0)
-                      Positioned(
-                        right: 0,
-                        top: 0,
-                        child: Container(
-                          padding: const EdgeInsets.all(3),
-                          decoration: const BoxDecoration(
-                            color: AppColors.gold,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Text(
-                            '$pendingCount',
-                            style: const TextStyle(
-                              color: Colors.black,
-                              fontSize: 9,
-                              fontWeight: FontWeight.bold,
+                      activeIcon: const Icon(Icons.history_edu),
+                      label: 'Orders',
+                    ),
+                    const BottomNavigationBarItem(
+                      icon: Icon(Icons.settings_outlined),
+                      activeIcon: Icon(Icons.settings),
+                      label: 'Settings',
+                    ),
+                  ]
+                : [
+                    const BottomNavigationBarItem(
+                      icon: Icon(Icons.pie_chart_outline),
+                      activeIcon: Icon(Icons.pie_chart),
+                      label: 'Depot',
+                    ),
+                    const BottomNavigationBarItem(
+                      icon: Icon(Icons.trending_up_outlined),
+                      activeIcon: Icon(Icons.trending_up),
+                      label: 'Märkte',
+                    ),
+                    BottomNavigationBarItem(
+                      icon: Stack(
+                        children: [
+                          const Icon(Icons.account_balance_outlined),
+                          if (provider.totalDebt > 0)
+                            Positioned(
+                              right: 0,
+                              top: 0,
+                              child: Container(
+                                padding: const EdgeInsets.all(3),
+                                decoration: const BoxDecoration(
+                                  color: AppColors.loss,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Text(
+                                  '${provider.activeLoans.length}',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
                             ),
-                          ),
-                        ),
+                        ],
                       ),
+                      activeIcon: const Icon(Icons.account_balance),
+                      label: 'Bank',
+                    ),
+                    const BottomNavigationBarItem(
+                      icon: Icon(Icons.workspace_premium_outlined),
+                      activeIcon: Icon(Icons.workspace_premium),
+                      label: 'Prestige',
+                    ),
+                    const BottomNavigationBarItem(
+                      icon: Icon(Icons.leaderboard_outlined),
+                      activeIcon: Icon(Icons.leaderboard),
+                      label: 'Ranking',
+                    ),
+                    BottomNavigationBarItem(
+                      icon: Stack(
+                        children: [
+                          const Icon(Icons.history_edu_outlined),
+                          if (pendingCount > 0)
+                            Positioned(
+                              right: 0,
+                              top: 0,
+                              child: Container(
+                                padding: const EdgeInsets.all(3),
+                                decoration: const BoxDecoration(
+                                  color: AppColors.gold,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Text(
+                                  '$pendingCount',
+                                  style: const TextStyle(
+                                    color: Colors.black,
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                      activeIcon: const Icon(Icons.history_edu),
+                      label: 'Historie',
+                    ),
                   ],
-                ),
-                activeIcon: const Icon(Icons.history_edu),
-                label: 'Historie',
-              ),
-            ],
           ),
         );
       },

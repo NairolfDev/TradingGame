@@ -12,6 +12,7 @@ import '../data/models/leaderboard_entry.dart';
 import '../data/models/market_schedule.dart';
 import '../data/models/loan_model.dart';
 import '../data/repositories/trading_repository.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'market_engine.dart';
 import 'trading_fee_service.dart';
 import 'credit_rating_service.dart';
@@ -22,6 +23,10 @@ import '../data/models/copy_trader.dart';
 import '../data/models/daily_quest.dart';
 import '../data/models/automation_order.dart';
 import '../data/models/achievement.dart';
+import 'dart:math';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../data/models/savings_plan.dart';
+import 'savings_plan_service.dart';
 import '../data/mock_data/initial_copy_traders.dart';
 import 'automation_service.dart';
 import 'achievement_service.dart';
@@ -35,7 +40,14 @@ class PortfolioProvider extends ChangeNotifier {
   final AutomationService automationService = AutomationService();
   final AchievementService achievementService = AchievementService();
   final LiveMarketDataService liveDataService = LiveMarketDataService();
+  final SavingsPlanService savingsPlanService = SavingsPlanService();
   final Uuid _uuid = const Uuid();
+
+  static const String _keySimplisticMode = 'tg_is_simplistic_mode';
+  static const String _keyRealisticOrderDelay = 'tg_is_realistic_order_delay';
+
+  bool _isSimplisticMode = false;
+  bool _isRealisticOrderDelay = true;
 
   double _cash = 50000.0;
   List<Asset> _assets = [];
@@ -46,6 +58,7 @@ class PortfolioProvider extends ChangeNotifier {
   List<LeaderboardEntry> _leaderboard = [];
   List<Loan> _loans = [];
   final List<NewsEvent> _newsEvents = [];
+  StreamSubscription<List<LeaderboardEntry>>? _leaderboardSubscription;
 
   bool _isInsolvent = false;
   DateTime? _insolvencyLockoutUntil;
@@ -70,6 +83,24 @@ class PortfolioProvider extends ChangeNotifier {
   List<Achievement> get achievements => achievementService.achievements;
   int get unlockedAchievementsCount => achievementService.unlockedCount;
   List<Asset> get watchlistAssets => _assets.where((a) => a.isWatchlisted).toList();
+  bool get isSimplisticMode => _isSimplisticMode;
+  bool get isRealisticOrderDelay => _isRealisticOrderDelay;
+  List<SavingsPlan> get savingsPlans => savingsPlanService.plans;
+  List<SavingsPlan> get activeSavingsPlans => savingsPlanService.activePlans;
+
+  Future<void> setSimplisticMode(bool enabled) async {
+    _isSimplisticMode = enabled;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_keySimplisticMode, enabled);
+    notifyListeners();
+  }
+
+  Future<void> setRealisticOrderDelay(bool enabled) async {
+    _isRealisticOrderDelay = enabled;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_keyRealisticOrderDelay, enabled);
+    notifyListeners();
+  }
   List<LuxuryItem> get luxuryItems => _luxuryItems;
   List<PendingOrder> get pendingOrders =>
       _pendingOrders.where((o) => o.status == PendingOrderStatus.pending).toList();
@@ -191,6 +222,11 @@ class PortfolioProvider extends ChangeNotifier {
     return totalUnrealizedPnL / totalInvestedCost;
   }
 
+  double get totalInvested => totalPositionsValue;
+  double get unrealizedPnLPercent => totalUnrealizedPnLPercent;
+  double get totalRealizedPnL =>
+      _transactions.fold<double>(0.0, (sum, t) => sum + (t.realizedPnL ?? 0.0));
+
   double get totalRoiPercent {
     const startingCapital = 50000.0;
     return netWorth / startingCapital;
@@ -229,6 +265,16 @@ class PortfolioProvider extends ChangeNotifier {
     _luxuryItems = await repository.getLuxuryItems();
     _pendingOrders = await repository.getPendingOrders();
     _leaderboard = await repository.getLeaderboard();
+    _leaderboardSubscription?.cancel();
+    final stream = repository.streamLeaderboard();
+    if (stream != null) {
+      _leaderboardSubscription = stream.listen((entries) {
+        if (entries.isNotEmpty) {
+          _leaderboard = entries;
+          notifyListeners();
+        }
+      });
+    }
     _loans = await repository.getLoans();
 
     if (_loans.isEmpty) {
@@ -281,6 +327,12 @@ class PortfolioProvider extends ChangeNotifier {
           '🏆 Trophäe freigeschaltet: "${ach.title}"! +${ach.cashReward.toStringAsFixed(0)} € & +${ach.prestigeReward} Prestige!';
       notifyListeners();
     };
+
+    // Initialisiere Sparpläne & Benutzereinstellungen
+    final prefs = await SharedPreferences.getInstance();
+    _isSimplisticMode = prefs.getBool(_keySimplisticMode) ?? false;
+    _isRealisticOrderDelay = prefs.getBool(_keyRealisticOrderDelay) ?? true;
+    await savingsPlanService.initialize();
 
     // Initiales Update der Positionspreise, Leaderboard & Achievements
     _updatePositionsWithCurrentAssetPrices();
@@ -444,6 +496,7 @@ class PortfolioProvider extends ChangeNotifier {
         totalEstimatedCost: totalCost,
         leverage: leverage,
         isShort: isShort,
+        executionReason: 'Wartet auf Börsenöffnung',
       );
 
       _pendingOrders.insert(0, pendingOrder);
@@ -455,7 +508,55 @@ class PortfolioProvider extends ChangeNotifier {
       return true;
     }
 
-    // BÖRSE GEÖFFNET -> SOFORTIGE AUSFÜHRUNG
+    // BÖRSE GEÖFFNET -> WENN REALISTISCHER MODUS AKTIV: 5-15 MINUTEN ROUTING DELAY
+    if (_isRealisticOrderDelay) {
+      _cash -= totalCost;
+      await repository.saveCashBalance(_cash);
+
+      String venue = 'Wiener Börse (WBAG)';
+      final sym = asset.symbol.toUpperCase();
+      if (sym.endsWith('.VI') || sym == 'EBS' || sym == 'OMV' || sym == 'VOE' || sym == 'ANDR') {
+        venue = 'Wiener Börse (WBAG)';
+      } else if (sym.endsWith('.DE') || sym.endsWith('.AS') || sym == 'BMW' || sym == 'SAP' || sym == 'ASML') {
+        venue = 'Deutsche Börse XETRA';
+      } else if (sym.contains('BTC') || sym.contains('ETH') || sym.contains('SOL') || sym.contains('NEAR') || sym.contains('LINK')) {
+        venue = 'Crypto Liquidity Pool';
+      } else if (sym.contains('=F')) {
+        venue = 'CME Globex';
+      } else {
+        venue = 'NASDAQ / NYSE';
+      }
+
+      final delayMinutes = 5 + Random().nextInt(11); // 5 bis 15 Minuten
+      final scheduledTime = DateTime.now().add(Duration(minutes: delayMinutes));
+
+      final pendingOrder = PendingOrder(
+        id: _uuid.v4(),
+        assetId: asset.id,
+        symbol: asset.symbol,
+        name: asset.name,
+        assetType: asset.type,
+        isBuy: true,
+        amount: amount,
+        estimatedPrice: asset.currentPrice,
+        totalEstimatedCost: totalCost,
+        leverage: leverage,
+        isShort: isShort,
+        scheduledExecutionTime: scheduledTime,
+        executionReason: 'Im Orderbuch',
+        brokerVenue: venue,
+      );
+
+      _pendingOrders.insert(0, pendingOrder);
+      await repository.savePendingOrders(_pendingOrders);
+
+      _lastAlertMessage =
+          '📡 Kauforder an $venue übermittelt! Geschätzte Ausführung: in ~$delayMinutes Min.';
+      notifyListeners();
+      return true;
+    }
+
+    // BÖRSE GEÖFFNET (INSTANT MODUS) -> SOFORTIGE AUSFÜHRUNG
     _cash -= totalCost;
     await repository.saveCashBalance(_cash);
 
@@ -567,7 +668,63 @@ class PortfolioProvider extends ChangeNotifier {
       return false;
     }
 
-    // Anteiliger PnL und Rückfluss
+    // WENN REALISTISCHER MODUS AKTIV: 5-15 MINUTEN BÖRSEN-ROUTING
+    if (_isRealisticOrderDelay) {
+      String venue = 'Wiener Börse (WBAG)';
+      final sym = asset.symbol.toUpperCase();
+      if (sym.endsWith('.VI') || sym == 'EBS' || sym == 'OMV' || sym == 'VOE' || sym == 'ANDR') {
+        venue = 'Wiener Börse (WBAG)';
+      } else if (sym.endsWith('.DE') || sym.endsWith('.AS') || sym == 'BMW' || sym == 'SAP' || sym == 'ASML') {
+        venue = 'Deutsche Börse XETRA';
+      } else if (sym.contains('BTC') || sym.contains('ETH') || sym.contains('SOL') || sym.contains('NEAR')) {
+        venue = 'Crypto Liquidity Pool';
+      } else if (sym.contains('=F')) {
+        venue = 'CME Globex';
+      } else {
+        venue = 'NASDAQ / NYSE';
+      }
+
+      final delayMinutes = 5 + Random().nextInt(11);
+      final scheduledTime = DateTime.now().add(Duration(minutes: delayMinutes));
+
+      // Reduziere Position temporär (Sperre für Verkauf)
+      if (sellAmount >= position.amount) {
+        _positions.removeWhere((p) => p.id == position.id);
+      } else {
+        final posIdx = _positions.indexWhere((p) => p.id == position.id);
+        if (posIdx != -1) {
+          _positions[posIdx] = position.copyWith(amount: position.amount - sellAmount);
+        }
+      }
+      await repository.savePositions(_positions);
+
+      final pendingOrder = PendingOrder(
+        id: _uuid.v4(),
+        assetId: asset.id,
+        symbol: asset.symbol,
+        name: asset.name,
+        assetType: asset.type,
+        isBuy: false,
+        amount: sellAmount,
+        estimatedPrice: asset.currentPrice,
+        totalEstimatedCost: sellAmount * asset.currentPrice,
+        leverage: position.leverage,
+        isShort: position.isShort,
+        scheduledExecutionTime: scheduledTime,
+        executionReason: 'Im Orderbuch',
+        brokerVenue: venue,
+      );
+
+      _pendingOrders.insert(0, pendingOrder);
+      await repository.savePendingOrders(_pendingOrders);
+
+      _lastAlertMessage =
+          '📡 Verkaufsorder an $venue übermittelt! Geschätzte Ausführung: in ~$delayMinutes Min.';
+      notifyListeners();
+      return true;
+    }
+
+    // Anteiliger PnL und Rückfluss (Instant Modus)
     final ratio = sellAmount / position.amount;
     double cashReturn = 0.0;
     double realizedPnL = 0.0;
@@ -631,40 +788,83 @@ class PortfolioProvider extends ChangeNotifier {
     return true;
   }
 
-  /// Prüft bei Marktöffnung, ob anstehende Vorab-Orders ausgeführt werden können
+  /// Prüft bei Marktöffnung und Ablauf der Ausführungszeit (5-15 Min.), ob anstehende Orders ausgeführt werden
   void _checkAndExecutePendingOrders() {
     bool changes = false;
+    final now = DateTime.now();
 
     for (final order in _pendingOrders) {
       if (order.status != PendingOrderStatus.pending) continue;
 
       final matchingAsset = _assets.firstWhere(
         (a) => a.id == order.assetId || a.symbol == order.symbol,
+        orElse: () => _assets.first,
       );
 
-      if (isAssetMarketOpen(matchingAsset)) {
-        // Börse ist JETZT offen! Ausführen zum aktuellen Markt-Eröffnungskurs
-        order.status = PendingOrderStatus.executed;
-        order.executedAt = DateTime.now();
-        order.executedPrice = matchingAsset.currentPrice;
-        changes = true;
+      // Börsenöffnungszeiten prüfen
+      if (!isAssetMarketOpen(matchingAsset)) continue;
 
-        // Position erzeugen
-        _positions.add(
-          Position(
-            id: _uuid.v4(),
-            assetId: matchingAsset.id,
-            symbol: matchingAsset.symbol,
-            name: matchingAsset.name,
-            type: matchingAsset.type,
-            amount: order.amount,
-            averageBuyPrice: matchingAsset.currentPrice,
-            currentPrice: matchingAsset.currentPrice,
-            leverage: order.leverage,
-            isShort: order.isShort,
-            collateral: (order.amount * matchingAsset.currentPrice) / order.leverage,
-          ),
-        );
+      // Realistische Verzögerung prüfen (5-15 Minuten)
+      if (order.scheduledExecutionTime != null && now.isBefore(order.scheduledExecutionTime!)) {
+        continue;
+      }
+
+      // Order ausführen
+      order.status = PendingOrderStatus.executed;
+      order.executedAt = now;
+      order.executedPrice = matchingAsset.currentPrice;
+      changes = true;
+
+      if (order.isBuy) {
+        // Kauf-Order abwickeln
+        if (order.leverage == 1 && !order.isShort) {
+          final existingIndex = _positions.indexWhere(
+            (p) => p.assetId == matchingAsset.id && !p.isLeveraged && !p.isShort,
+          );
+          if (existingIndex != -1) {
+            final existing = _positions[existingIndex];
+            final newTotalAmount = existing.amount + order.amount;
+            final newAvgPrice = ((existing.amount * existing.averageBuyPrice) +
+                    (order.amount * matchingAsset.currentPrice)) /
+                newTotalAmount;
+            _positions[existingIndex] = existing.copyWith(
+              amount: newTotalAmount,
+              averageBuyPrice: newAvgPrice,
+              currentPrice: matchingAsset.currentPrice,
+            );
+          } else {
+            _positions.add(
+              Position(
+                id: _uuid.v4(),
+                assetId: matchingAsset.id,
+                symbol: matchingAsset.symbol,
+                name: matchingAsset.name,
+                type: matchingAsset.type,
+                amount: order.amount,
+                averageBuyPrice: matchingAsset.currentPrice,
+                currentPrice: matchingAsset.currentPrice,
+                leverage: 1,
+                isShort: false,
+              ),
+            );
+          }
+        } else {
+          _positions.add(
+            Position(
+              id: _uuid.v4(),
+              assetId: matchingAsset.id,
+              symbol: matchingAsset.symbol,
+              name: matchingAsset.name,
+              type: matchingAsset.type,
+              amount: order.amount,
+              averageBuyPrice: matchingAsset.currentPrice,
+              currentPrice: matchingAsset.currentPrice,
+              leverage: order.leverage,
+              isShort: order.isShort,
+              collateral: (order.amount * matchingAsset.currentPrice) / order.leverage,
+            ),
+          );
+        }
 
         final record = TransactionRecord(
           id: _uuid.v4(),
@@ -674,35 +874,191 @@ class PortfolioProvider extends ChangeNotifier {
           amount: order.amount,
           price: matchingAsset.currentPrice,
           totalAmount: order.totalEstimatedCost,
-          timestamp: DateTime.now(),
-          note: 'Vorab-Order bei Börsenöffnung ausgeführt!',
+          timestamp: now,
+          note: 'Börsen-Kauf ausgeführt (${order.brokerVenue ?? "Orderbuch"})',
         );
-
         _transactions.insert(0, record);
         repository.saveTransaction(record);
 
         _lastAlertMessage =
-            '🔔 VORAB-ORDER AUSGEFÜHRT: Börse geöffnet für ${matchingAsset.symbol}! ${order.amount.toStringAsFixed(2)}x eingebucht.';
+            '✅ KAUF AUSGEFÜHRT: ${order.amount.toStringAsFixed(2)}x ${matchingAsset.symbol} @ ${matchingAsset.currentPrice.toStringAsFixed(2)} € eingebucht!';
+      } else {
+        // Verkaufs-Order abwickeln
+        final cashReturn = order.amount * matchingAsset.currentPrice;
+        _cash += cashReturn;
+        repository.saveCashBalance(_cash);
+
+        final record = TransactionRecord(
+          id: _uuid.v4(),
+          symbol: matchingAsset.symbol,
+          name: matchingAsset.name,
+          type: TransactionType.sell,
+          amount: order.amount,
+          price: matchingAsset.currentPrice,
+          totalAmount: cashReturn,
+          timestamp: now,
+          note: 'Börsen-Verkauf ausgeführt (${order.brokerVenue ?? "Orderbuch"})',
+        );
+        _transactions.insert(0, record);
+        repository.saveTransaction(record);
+
+        _lastAlertMessage =
+            '✅ VERKAUF AUSGEFÜHRT: ${order.amount.toStringAsFixed(2)}x ${matchingAsset.symbol} für ${cashReturn.toStringAsFixed(2)} € abgerechnet!';
       }
     }
 
     if (changes) {
       repository.savePendingOrders(_pendingOrders);
       repository.savePositions(_positions);
+      _checkAllAchievements();
+      notifyListeners();
+    }
+
+    _checkSavingsPlans();
+  }
+
+  /// Führt fällige Sparpläne automatisch aus
+  Future<void> _checkSavingsPlans() async {
+    final due = savingsPlanService.getDuePlans();
+    for (final plan in due) {
+      final asset = _assets.firstWhere(
+        (a) => a.symbol == plan.assetSymbol,
+        orElse: () => _assets.first,
+      );
+      if (_cash >= plan.amountEur && asset.currentPrice > 0) {
+        final shares = plan.amountEur / asset.currentPrice;
+        _cash -= plan.amountEur;
+        await repository.saveCashBalance(_cash);
+
+        final existingIndex = _positions.indexWhere(
+          (p) => p.symbol == asset.symbol && !p.isLeveraged && !p.isShort,
+        );
+        if (existingIndex != -1) {
+          final existing = _positions[existingIndex];
+          final newTotalAmount = existing.amount + shares;
+          final newAvgPrice = ((existing.amount * existing.averageBuyPrice) +
+                  (shares * asset.currentPrice)) /
+              newTotalAmount;
+          _positions[existingIndex] = existing.copyWith(
+            amount: newTotalAmount,
+            averageBuyPrice: newAvgPrice,
+            currentPrice: asset.currentPrice,
+          );
+        } else {
+          _positions.add(
+            Position(
+              id: _uuid.v4(),
+              assetId: asset.id,
+              symbol: asset.symbol,
+              name: asset.name,
+              type: asset.type,
+              amount: shares,
+              averageBuyPrice: asset.currentPrice,
+              currentPrice: asset.currentPrice,
+              leverage: 1,
+              isShort: false,
+            ),
+          );
+        }
+        await repository.savePositions(_positions);
+
+        final record = TransactionRecord(
+          id: _uuid.v4(),
+          symbol: asset.symbol,
+          name: asset.name,
+          type: TransactionType.buy,
+          amount: shares,
+          price: asset.currentPrice,
+          totalAmount: plan.amountEur,
+          timestamp: DateTime.now(),
+          note: 'Automatischer Sparplan (${plan.frequency.displayName})',
+        );
+        _transactions.insert(0, record);
+        await repository.saveTransaction(record);
+        await savingsPlanService.markExecuted(plan.id, plan.amountEur);
+        _lastAlertMessage = '🏦 Sparplan ausgeführt: ${plan.amountEur.toStringAsFixed(2)} € in ${plan.assetSymbol} investiert!';
+        notifyListeners();
+      }
     }
   }
 
-  /// Storniert eine noch nicht ausgeführte Vorab-Order und erstattet das reservierte Geld
+  /// Storniert eine noch nicht ausgeführte Order und erstattet Barmittel oder Depotbestand
   Future<void> cancelPendingOrder(PendingOrder order) async {
     if (order.status != PendingOrderStatus.pending) return;
 
     order.status = PendingOrderStatus.cancelled;
-    _cash += order.totalEstimatedCost; // Geld zurückerstatten
-    await repository.saveCashBalance(_cash);
+    if (order.isBuy) {
+      _cash += order.totalEstimatedCost; // Geld zurückerstatten
+      await repository.saveCashBalance(_cash);
+    } else {
+      // Verkaufsmenge zurück in Depotposition einbuchen
+      final idx = _positions.indexWhere((p) => p.assetId == order.assetId || p.symbol == order.symbol);
+      if (idx != -1) {
+        _positions[idx] = _positions[idx].copyWith(amount: _positions[idx].amount + order.amount);
+      } else {
+        _positions.add(
+          Position(
+            id: _uuid.v4(),
+            assetId: order.assetId,
+            symbol: order.symbol,
+            name: order.name,
+            type: order.assetType,
+            amount: order.amount,
+            averageBuyPrice: order.estimatedPrice,
+            currentPrice: order.estimatedPrice,
+            leverage: order.leverage,
+            isShort: order.isShort,
+          ),
+        );
+      }
+      await repository.savePositions(_positions);
+    }
     await repository.savePendingOrders(_pendingOrders);
 
-    _lastAlertMessage = 'Vorab-Order für ${order.symbol} storniert. Betrag erstattet.';
+    _lastAlertMessage = 'Order für ${order.symbol} storniert.';
     notifyListeners();
+  }
+
+  /// Generiert einen offiziellen Bank-Depotauszug als formatierten Text / Export
+  String generateDepotStatement() {
+    final buffer = StringBuffer();
+    final now = DateTime.now();
+    buffer.writeln('====================================================');
+    buffer.writeln('           TRADING GAME – DEPOTAUSZUG               ');
+    buffer.writeln('====================================================');
+    buffer.writeln('Erstellungsdatum: ${now.toIso8601String().substring(0, 16)}');
+    buffer.writeln('Depot-Inhaber:    Aktiver Händler');
+    buffer.writeln('Währung:          EUR (€)');
+    buffer.writeln('----------------------------------------------------');
+    buffer.writeln('FINANZSTATUS:');
+    buffer.writeln('Depotgesamtwert:  ${netWorth.toStringAsFixed(2)} €');
+    buffer.writeln('Freies Barmittel: ${_cash.toStringAsFixed(2)} €');
+    buffer.writeln('Positionswert:    ${totalInvested.toStringAsFixed(2)} €');
+    buffer.writeln('Kreditbestand:    ${totalDebt.toStringAsFixed(2)} €');
+    buffer.writeln('Realisierte G/V:  ${totalRealizedPnL.toStringAsFixed(2)} €');
+    buffer.writeln('----------------------------------------------------');
+    buffer.writeln('DEPOTBESTAND:');
+    if (_positions.isEmpty) {
+      buffer.writeln('Keine offenen Wertpapierpositionen.');
+    } else {
+      for (final p in _positions) {
+        buffer.writeln('- ${p.symbol} (${p.name}): ${p.amount} Stk. @ ${p.averageBuyPrice.toStringAsFixed(2)} € (Wert: ${(p.amount * p.currentPrice).toStringAsFixed(2)} €)');
+      }
+    }
+    buffer.writeln('----------------------------------------------------');
+    buffer.writeln('LETZTE TRANSAKTIONEN:');
+    final recent = _transactions.take(15);
+    if (recent.isEmpty) {
+      buffer.writeln('Keine Transaktionen verbucht.');
+    } else {
+      for (final t in recent) {
+        buffer.writeln('[${t.timestamp.toIso8601String().substring(0, 10)}] ${t.type.displayName.toUpperCase()}: ${t.amount}x ${t.symbol} @ ${t.price.toStringAsFixed(2)} € = ${t.totalAmount.toStringAsFixed(2)} €');
+      }
+    }
+    buffer.writeln('====================================================');
+    buffer.writeln('Elektronischer Kontoauszug – Trading Game Core API');
+    buffer.writeln('====================================================');
+    return buffer.toString();
   }
 
   // --- ANLEIHEN KUPON-AUSSCHÜTTUNG ---
@@ -999,23 +1355,39 @@ class PortfolioProvider extends ChangeNotifier {
 
   // --- LEADERBOARD SYNCHRONISATION ---
   void _updateLeaderboard() {
-    final playerEntryIndex = _leaderboard.indexWhere((e) => e.isPlayer);
     final luxuryCount = _luxuryItems.fold<int>(0, (sum, i) => sum + i.ownedCount);
 
+    String myUid = 'player_user';
+    String myName = 'Börsen-Profi';
+    try {
+      final fbUser = FirebaseAuth.instance.currentUser;
+      if (fbUser != null && fbUser.uid.isNotEmpty) {
+        myUid = fbUser.uid;
+        if (fbUser.displayName != null && fbUser.displayName!.trim().isNotEmpty) {
+          myName = fbUser.displayName!.trim();
+        } else if (fbUser.email != null && fbUser.email!.isNotEmpty) {
+          myName = fbUser.email!.split('@').first;
+        } else {
+          myName = 'Trader ${fbUser.uid.substring(0, 5)}';
+        }
+      }
+    } catch (_) {}
+
     final playerEntry = LeaderboardEntry(
-      id: 'player_user',
-      name: 'Du (Börsen-Profi)',
+      id: myUid,
+      name: 'Du ($myName)',
       city: 'Wien / Österreich',
       title: currentRank.title,
       badge: currentRank.badge,
       avatarEmoji: '😎',
-      strategy: 'Multi-Asset & Hebel',
+      strategy: positions.isEmpty ? 'Cash & Multi-Asset' : '${positions.first.symbol} & Momentum',
       netWorth: netWorth,
       roiPercent: totalRoiPercent * 100,
       isPlayer: true,
       luxuryCount: luxuryCount,
     );
 
+    final playerEntryIndex = _leaderboard.indexWhere((e) => e.isPlayer || e.id == myUid);
     if (playerEntryIndex != -1) {
       _leaderboard[playerEntryIndex] = playerEntry;
     } else {
@@ -1031,6 +1403,12 @@ class PortfolioProvider extends ChangeNotifier {
     }
 
     repository.saveLeaderboard(_leaderboard);
+  }
+
+  Future<void> reloadLeaderboard() async {
+    _leaderboard = await repository.getLeaderboard();
+    _updateLeaderboard();
+    notifyListeners();
   }
 
   // --- 1. DAILY QUESTS & REWARDS ---
@@ -1292,6 +1670,7 @@ class PortfolioProvider extends ChangeNotifier {
 
   @override
   void dispose() {
+    _leaderboardSubscription?.cancel();
     marketEngine.stop();
     newsService.dispose();
     super.dispose();

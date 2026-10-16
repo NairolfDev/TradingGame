@@ -84,14 +84,20 @@ class PendingOrderCard extends StatelessWidget {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
-                    color: AppColors.gold.withValues(alpha: 0.15),
+                    color: order.scheduledExecutionTime != null
+                        ? AppColors.primary.withValues(alpha: 0.15)
+                        : AppColors.gold.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(4),
                   ),
-                  child: const Text(
-                    '⏳ Wird bei Börsenöffnung ausgeführt',
+                  child: Text(
+                    order.scheduledExecutionTime != null
+                        ? '📡 Im Orderbuch • Ausführung in ~${order.minutesRemaining == 0 ? "< 1" : "${order.minutesRemaining}"} Min. (${order.brokerVenue ?? "Börsenplatz"})'
+                        : '⏳ Wird bei nächster Börsenöffnung ausgeführt',
                     style: TextStyle(
                       fontSize: 10,
-                      color: AppColors.gold,
+                      color: order.scheduledExecutionTime != null
+                          ? AppColors.primary
+                          : AppColors.gold,
                       fontWeight: FontWeight.w600,
                     ),
                   ),

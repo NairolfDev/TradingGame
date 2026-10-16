@@ -27,6 +27,7 @@ abstract class TradingRepository {
 
   Future<List<LeaderboardEntry>> getLeaderboard();
   Future<void> saveLeaderboard(List<LeaderboardEntry> entries);
+  Stream<List<LeaderboardEntry>>? streamLeaderboard() => null;
 
   Future<List<Loan>> getLoans();
   Future<void> saveLoans(List<Loan> loans);

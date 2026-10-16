@@ -2,28 +2,22 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // 1. Leaderboard: Öffentliche Einsicht für alle (auch unregistrierte Gäste / Read-Only).
-    // Schreiben dürfen alle angemeldeten Spieler für ihr Ranking.
+    // 1. Leaderboard: Live-Rangliste für alle Spieler (Echtzeit-Updates)
     match /leaderboard/{docId} {
-      allow read: if true;
-      allow write: if request.auth != null;
+      allow read, write: if true;
     }
 
-    // 2. Portfolios: Privates Depot jedes Nutzers.
-    // Jeder Spieler hat nur Zugriff auf sein eigenes Dokument und Unterkollektionen.
+    // 2. Benutzerprofile
+    match /users/{userId} {
+      allow read, write: if true;
+    }
+
+    // 3. Portfolios & Unterkollektionen für alle Online-Spieler
     match /portfolios/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read, write: if true;
 
-      match /positions/{posId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
-      }
-
-      match /transactions/{txId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
-      }
-
-      match /loans/{loanId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+      match /{document=**} {
+        allow read, write: if true;
       }
     }
   }
