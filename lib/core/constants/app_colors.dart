@@ -18,6 +18,8 @@ class AppColors {
   // Trading status
   static const Color profit = Color(0xFF00E676);
   static const Color loss = Color(0xFFFF3B30);
+  static const Color bullish = profit;
+  static const Color bearish = loss;
   static const Color warning = Color(0xFFFF9500);
 
   // Text

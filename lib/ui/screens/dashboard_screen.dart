@@ -7,6 +7,11 @@ import '../../logic/portfolio_provider.dart';
 import '../widgets/rank_badge.dart';
 import '../widgets/position_tile.dart';
 import '../widgets/pending_order_card.dart';
+import '../widgets/breaking_news_ticker.dart';
+import 'turbo_options_screen.dart';
+import 'quests_screen.dart';
+import 'social_trading_screen.dart';
+import 'dividends_screen.dart';
 
 class DashboardScreen extends StatelessWidget {
   final Function(int) onNavigateTab;
@@ -73,6 +78,96 @@ class DashboardScreen extends StatelessWidget {
               ),
 
               const SizedBox(height: 16),
+
+              // Breaking News Ticker (Marktbewegende Eilmeldungen)
+              if (provider.latestBreakingNews != null) ...[
+                BreakingNewsTicker(
+                  news: provider.latestBreakingNews,
+                  onTap: () {
+                    showDialog(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                        backgroundColor: AppColors.surface,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          side: BorderSide(
+                            color: provider.latestBreakingNews!.isBullish
+                                ? AppColors.bullish
+                                : AppColors.bearish,
+                            width: 1.2,
+                          ),
+                        ),
+                        title: Row(
+                          children: [
+                            Icon(
+                              Icons.bolt,
+                              color: provider.latestBreakingNews!.isBullish
+                                  ? AppColors.bullish
+                                  : AppColors.bearish,
+                            ),
+                            const SizedBox(width: 8),
+                            const Text(
+                              'Markt-Eilmeldung',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                          ],
+                        ),
+                        content: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              provider.latestBreakingNews!.headline,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 15,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              provider.latestBreakingNews!.description,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: AppColors.surfaceElevated,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                'Marktauswirkung: ${(provider.latestBreakingNews!.priceImpact * 100).toStringAsFixed(1)}% auf ${provider.latestBreakingNews!.affectedSymbol ?? "Gesamtmarkt"}',
+                                style: TextStyle(
+                                  color: provider.latestBreakingNews!.isBullish
+                                      ? AppColors.bullish
+                                      : AppColors.bearish,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(ctx),
+                            child: const Text('Schließen'),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ],
 
               // Alert Banner (falls vorhanden)
               if (provider.lastAlertMessage != null) ...[
@@ -412,6 +507,115 @@ class DashboardScreen extends StatelessWidget {
 
               const SizedBox(height: 16),
 
+              // 4 Neue Power-Features (Turbo-Optionen, Quests, Copy-Trading, Dividenden)
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    '⚡ Trading- & Game-Features',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Text(
+                      'NEU',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildFeatureCard(
+                      context: context,
+                      title: '60s Turbo',
+                      subtitle: 'Blitz-Optionen',
+                      detail: '+85% Payout',
+                      icon: Icons.bolt,
+                      color: AppColors.primary,
+                      badge: provider.activeTurboOptions.isNotEmpty
+                          ? '${provider.activeTurboOptions.length} aktiv'
+                          : null,
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const TurboOptionsScreen()),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _buildFeatureCard(
+                      context: context,
+                      title: 'Wall Street Pass',
+                      subtitle: 'Quests & Streak',
+                      detail: '${provider.loginStreakDays} Tage 🔥',
+                      icon: Icons.emoji_events,
+                      color: Colors.amber,
+                      badge: provider.dailyQuests.where((q) => q.isCompleted && !q.isClaimed).isNotEmpty
+                          ? '🎁 Belohnung'
+                          : null,
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const QuestsScreen()),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildFeatureCard(
+                      context: context,
+                      title: 'Copy-Trading',
+                      subtitle: 'Whales & Legenden',
+                      detail: '${provider.copyTraders.length} Profile',
+                      icon: Icons.people_alt,
+                      color: Colors.lightBlueAccent,
+                      badge: 'Social',
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const SocialTradingScreen()),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _buildFeatureCard(
+                      context: context,
+                      title: 'Dividenden',
+                      subtitle: 'Passiver Cashflow',
+                      detail: CurrencyFormatter.format(provider.monthlyPassiveIncome),
+                      icon: Icons.payments,
+                      color: Colors.greenAccent,
+                      badge: provider.monthlyPassiveIncome > 0 ? 'Ausschütten' : null,
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const DividendsScreen()),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 16),
+
               // Börsensimulations-Info & Schnelltest-Modus
               // Anstehende Vorab-Orders (falls vorhanden)
               if (provider.pendingOrders.isNotEmpty) ...[
@@ -676,6 +880,102 @@ class DashboardScreen extends StatelessWidget {
           },
         );
       },
+    );
+  }
+
+  Widget _buildFeatureCard({
+    required BuildContext context,
+    required String title,
+    required String subtitle,
+    required String detail,
+    required IconData icon,
+    required Color color,
+    String? badge,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: badge != null ? color.withValues(alpha: 0.5) : AppColors.cardBorder,
+            width: badge != null ? 1.2 : 1,
+          ),
+          boxShadow: badge != null
+              ? [
+                  BoxShadow(
+                    color: color.withValues(alpha: 0.1),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(7),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(icon, color: color, size: 18),
+                ),
+                if (badge != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      badge,
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: color,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              subtitle,
+              style: const TextStyle(
+                fontSize: 11,
+                color: AppColors.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              detail,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

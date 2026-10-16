@@ -37,6 +37,7 @@ class Asset {
   final double volatility;
   final String description;
   final double? couponRate; // Für Anleihen (z. B. 0.035 für 3.5%)
+  final double? dividendYield; // Für Aktien & ETFs (z. B. 0.072 für 7.2% Dividende p.a.)
   final int maxLeverage; // Für CFDs (z. B. 50x)
   final String category;
 
@@ -53,6 +54,7 @@ class Asset {
     required this.volatility,
     required this.description,
     this.couponRate,
+    this.dividendYield,
     this.maxLeverage = 1,
     this.category = '',
   });
@@ -77,6 +79,7 @@ class Asset {
         'volatility': volatility,
         'description': description,
         'couponRate': couponRate,
+        'dividendYield': dividendYield,
         'maxLeverage': maxLeverage,
         'category': category,
       };
@@ -97,6 +100,7 @@ class Asset {
         volatility: (json['volatility'] as num).toDouble(),
         description: json['description'] as String? ?? '',
         couponRate: (json['couponRate'] as num?)?.toDouble(),
+        dividendYield: (json['dividendYield'] as num?)?.toDouble(),
         maxLeverage: (json['maxLeverage'] as num?)?.toInt() ?? 1,
         category: json['category'] as String? ?? '',
       );
@@ -119,6 +123,7 @@ class Asset {
       volatility: volatility,
       description: description,
       couponRate: couponRate,
+      dividendYield: dividendYield,
       maxLeverage: maxLeverage,
       category: category,
     );

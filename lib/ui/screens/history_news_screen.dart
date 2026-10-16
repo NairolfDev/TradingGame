@@ -176,6 +176,9 @@ class HistoryNewsScreen extends StatelessWidget {
           case TransactionType.loanRepayment:
             badgeColor = AppColors.profit;
             break;
+          case TransactionType.dividendPayout:
+            badgeColor = Colors.greenAccent;
+            break;
         }
 
         return Container(

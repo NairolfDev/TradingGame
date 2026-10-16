@@ -13,6 +13,10 @@ import 'prestige_shop_screen.dart';
 import 'leaderboard_screen.dart';
 import 'history_news_screen.dart';
 import 'auth_screen.dart';
+import 'turbo_options_screen.dart';
+import 'quests_screen.dart';
+import 'social_trading_screen.dart';
+import 'dividends_screen.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -308,6 +312,45 @@ class _MainScreenState extends State<MainScreen> {
                               'News & Historie',
                               badgeText: pendingCount > 0 ? '$pendingCount' : null,
                             ),
+                            const Divider(color: AppColors.cardBorder, height: 20),
+                            const Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              child: Text(
+                                'SPECIALS & GAMING',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  letterSpacing: 1.2,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.textMuted,
+                                ),
+                              ),
+                            ),
+                            _buildActionTile(
+                              Icons.bolt,
+                              '60s Turbo-Optionen',
+                              AppColors.primary,
+                              () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TurboOptionsScreen())),
+                              badgeText: provider.activeTurboOptions.isNotEmpty ? '${provider.activeTurboOptions.length}' : null,
+                            ),
+                            _buildActionTile(
+                              Icons.emoji_events,
+                              'Wall Street Pass',
+                              Colors.amber,
+                              () => Navigator.push(context, MaterialPageRoute(builder: (_) => const QuestsScreen())),
+                              badgeText: provider.dailyQuests.where((q) => q.isCompleted && !q.isClaimed).isNotEmpty ? '🎁' : null,
+                            ),
+                            _buildActionTile(
+                              Icons.people_alt,
+                              'Social Trading',
+                              Colors.lightBlueAccent,
+                              () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SocialTradingScreen())),
+                            ),
+                            _buildActionTile(
+                              Icons.payments,
+                              'Dividenden',
+                              Colors.greenAccent,
+                              () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DividendsScreen())),
+                            ),
                           ],
                         ),
                       ),
@@ -530,6 +573,53 @@ class _MainScreenState extends State<MainScreen> {
               )
             : null,
         onTap: () => _onTabTapped(index),
+      ),
+    );
+  }
+
+  Widget _buildActionTile(
+    IconData icon,
+    String title,
+    Color color,
+    VoidCallback onTap, {
+    String? badgeText,
+  }) {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 2),
+      decoration: BoxDecoration(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: ListTile(
+        dense: true,
+        leading: Icon(icon, color: color, size: 20),
+        title: Text(
+          title,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        trailing: badgeText != null
+            ? Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: color.withValues(alpha: 0.5)),
+                ),
+                child: Text(
+                  badgeText,
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              )
+            : null,
+        onTap: onTap,
       ),
     );
   }
