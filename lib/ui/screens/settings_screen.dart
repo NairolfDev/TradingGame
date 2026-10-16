@@ -255,14 +255,81 @@ class SettingsScreen extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     const Text(
+                      'Cloud Backend & DB',
+                      style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                    ),
+                    Row(
+                      children: const [
+                        Icon(Icons.cloud_done, size: 14, color: AppColors.profit),
+                        SizedBox(width: 4),
+                        Text(
+                          'Firestore & Functions',
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.profit),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Börsen-Feed',
+                      style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                    ),
+                    Row(
+                      children: const [
+                        Icon(Icons.sensors, size: 14, color: AppColors.primary),
+                        SizedBox(width: 4),
+                        Text(
+                          'Binance & Yahoo Live',
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.primary),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
                       'App Version',
                       style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
                     ),
                     const Text(
-                      'v1.4.0 (Build 5)',
+                      'v1.4.1 (Build 6)',
                       style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
                     ),
                   ],
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () async {
+                      await provider.fetchLiveMarketQuotes();
+                      await provider.reloadLeaderboard();
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Echte Live-Kurse & Cloud-Daten erfolgreich synchronisiert!'),
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+                      }
+                    },
+                    icon: const Icon(Icons.sync, size: 16, color: AppColors.primary),
+                    label: const Text(
+                      'Jetzt Live-Kurse & Cloud synchronisieren',
+                      style: TextStyle(fontSize: 12, color: AppColors.primary, fontWeight: FontWeight.bold),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: AppColors.cardBorder),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
                 ),
               ],
             ),

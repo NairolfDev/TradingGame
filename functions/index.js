@@ -31,34 +31,115 @@ apiRouter.get("/time", (req, res) => {
   });
 });
 
-// 2. Market Quotes Feed
-apiRouter.get("/markets", (req, res) => {
-  const quotes = [
-    { symbol: "XAU/EUR", name: "Gold (Feinunze)", price: 2450.0, type: "commodity", category: "Edelmetalle" },
-    { symbol: "XAG/EUR", name: "Silber (Feinunze)", price: 28.8, type: "commodity", category: "Edelmetalle" },
-    { symbol: "XPT/EUR", name: "Platin (Feinunze)", price: 940.0, type: "commodity", category: "Edelmetalle" },
-    { symbol: "BRENT/OIL", name: "Brent Crude Rohöl", price: 78.5, type: "commodity", category: "Energie" },
-    { symbol: "EBS.VI", name: "Erste Group Bank AG", price: 49.2, type: "stock", category: "ATX" },
-    { symbol: "OMV.VI", name: "OMV AG Wien", price: 41.8, type: "stock", category: "ATX" },
-    { symbol: "PLTR", name: "Palantir Technologies", price: 42.5, type: "stock", category: "US Tech" },
-    { symbol: "AMD", name: "Advanced Micro Devices", price: 156.0, type: "stock", category: "US Tech" },
-    { symbol: "NFLX", name: "Netflix Inc.", price: 695.0, type: "stock", category: "US Tech" },
-    { symbol: "ASML.AS", name: "ASML Holding N.V.", price: 840.0, type: "stock", category: "EU Tech" },
-    { symbol: "BTC", name: "Bitcoin", price: 68500.0, type: "crypto", category: "Krypto 24/7" },
-    { symbol: "ETH", name: "Ethereum", price: 3550.0, type: "crypto", category: "Krypto 24/7" },
-    { symbol: "SOL", name: "Solana", price: 155.0, type: "crypto", category: "Krypto 24/7" },
-    { symbol: "NEAR", name: "NEAR Protocol", price: 5.2, type: "crypto", category: "Krypto 24/7" },
-    { symbol: "BUND-10Y", name: "Deutschland 10Y Bundesanleihe", price: 99.8, type: "bond", coupon: 0.026 },
-    { symbol: "RAGB-10Y", name: "Republik Österreich 10Y Bund", price: 101.2, type: "bond", coupon: 0.032 },
-  ];
-  res.json({ count: quotes.length, quotes });
+// In-Memory-Cache für Quotes (TTL: 15s)
+const quoteCache = new Map();
+
+// 2. Real Live Quote Proxy (CORS-frei für Flutter Web & Apps)
+apiRouter.get("/quote", async (req, res) => {
+  const symbol = req.query.symbol;
+  if (!symbol) {
+    return res.status(400).json({ error: "Query-Parameter 'symbol' erforderlich" });
+  }
+
+  const cached = quoteCache.get(symbol);
+  if (cached && Date.now() - cached.timestamp < 15000) {
+    return res.json(cached.data);
+  }
+
+  try {
+    const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=5m&range=1d`;
+    const resp = await fetch(yahooUrl, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "application/json",
+      },
+    });
+
+    if (!resp.ok) {
+      return res.status(resp.status).json({ error: `Yahoo returned HTTP ${resp.status}` });
+    }
+
+    const json = await resp.json();
+    const chart = json?.chart?.result?.[0];
+    if (!chart) {
+      return res.status(404).json({ error: "Symbol nicht gefunden" });
+    }
+
+    const meta = chart.meta || {};
+    const price = meta.regularMarketPrice ?? meta.chartPreviousClose ?? 0;
+    const previousClose = meta.chartPreviousClose ?? meta.previousClose ?? price;
+    const high = meta.regularMarketDayHigh ?? null;
+    const low = meta.regularMarketDayLow ?? null;
+    const indicators = chart.indicators?.quote?.[0];
+    const series = (indicators?.close || []).filter((v) => v !== null && typeof v === "number");
+
+    const payload = {
+      symbol,
+      currentPrice: price,
+      previousClose,
+      high,
+      low,
+      series,
+      timestamp: Date.now(),
+      isLive: true,
+    };
+
+    quoteCache.set(symbol, { timestamp: Date.now(), data: payload });
+    res.json(payload);
+  } catch (err) {
+    res.status(500).json({ error: err.message, symbol });
+  }
 });
 
-// 3. Leaderboard Aggregate
+// 2b. Real Historical Chart Series (1D, 1W, 1M, 1Y, 3Y, ALL)
+apiRouter.get("/history", async (req, res) => {
+  const symbol = req.query.symbol;
+  const timeframe = req.query.timeframe || "1M";
+
+  if (!symbol) {
+    return res.status(400).json({ error: "Query-Parameter 'symbol' erforderlich" });
+  }
+
+  let range = "1mo";
+  let interval = "1d";
+  switch (timeframe) {
+    case "1D": range = "1d"; interval = "5m"; break;
+    case "1W": range = "5d"; interval = "15m"; break;
+    case "1M": range = "1mo"; interval = "1d"; break;
+    case "1Y": range = "1y"; interval = "1wk"; break;
+    case "3Y": range = "3y"; interval = "1wk"; break;
+    case "ALL": default: range = "max"; interval = "1mo"; break;
+  }
+
+  try {
+    const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=${interval}&range=${range}`;
+    const resp = await fetch(yahooUrl, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)",
+        "Accept": "application/json",
+      },
+    });
+
+    if (!resp.ok) {
+      return res.status(resp.status).json({ error: `Yahoo returned HTTP ${resp.status}` });
+    }
+
+    const json = await resp.json();
+    const chart = json?.chart?.result?.[0];
+    const indicators = chart?.indicators?.quote?.[0];
+    const series = (indicators?.close || []).filter((v) => v !== null && typeof v === "number");
+
+    res.json({ symbol, timeframe, series, count: series.length });
+  } catch (err) {
+    res.status(500).json({ error: err.message, symbol });
+  }
+});
+
+// 3. Echte Live-Rangliste aus Firestore
 apiRouter.get("/leaderboard", async (req, res) => {
   const timeframe = req.query.timeframe || "allTime";
   try {
-    const snapshot = await admin.firestore().collection("leaderboard").orderBy("netWorth", "desc").limit(50).get();
+    const snapshot = await admin.firestore().collection("leaderboard").orderBy("netWorth", "desc").limit(100).get();
     const entries = snapshot.docs.map((doc, idx) => ({
       rank: idx + 1,
       id: doc.id,
@@ -69,11 +150,7 @@ apiRouter.get("/leaderboard", async (req, res) => {
     res.json({
       timeframe,
       count: 0,
-      entries: [
-        { rank: 1, name: "Maximilian Rothschild", netWorth: 4850000.0, title: "Finanz-Oligarch", badge: "👑" },
-        { rank: 2, name: "Sophia von Wall Street", netWorth: 1820000.0, title: "Hedgefonds-Titan", badge: "💎" },
-        { rank: 3, name: "Lukas (Krypto-Whale)", netWorth: 740000.0, title: "Market Maker", badge: "⚡" },
-      ],
+      entries: [],
     });
   }
 });

@@ -12,6 +12,7 @@ import '../data/models/leaderboard_entry.dart';
 import '../data/models/market_schedule.dart';
 import '../data/models/loan_model.dart';
 import '../data/repositories/trading_repository.dart';
+import '../data/repositories/firebase_trading_repository.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'market_engine.dart';
 import 'trading_fee_service.dart';
@@ -59,6 +60,9 @@ class PortfolioProvider extends ChangeNotifier {
   List<Loan> _loans = [];
   final List<NewsEvent> _newsEvents = [];
   StreamSubscription<List<LeaderboardEntry>>? _leaderboardSubscription;
+  StreamSubscription<User?>? _authSubscription;
+  Timer? _liveMarketRefreshTimer;
+  String _activeUid = 'local_player';
 
   bool _isInsolvent = false;
   DateTime? _insolvencyLockoutUntil;
@@ -339,8 +343,114 @@ class PortfolioProvider extends ChangeNotifier {
     _updateLeaderboard();
     _checkAllAchievements();
 
+    // Echte Live-Börsenkurse im Hintergrund abrufen & Auth-Änderungen überwachen
+    _listenToAuthChanges();
+    _startLiveMarketRefresh();
+
     _isLoading = false;
     notifyListeners();
+  }
+
+  void _listenToAuthChanges() {
+    _authSubscription?.cancel();
+    try {
+      _authSubscription = FirebaseAuth.instance.authStateChanges().listen((fbUser) async {
+        final newUid = fbUser?.uid ?? 'local_player';
+        if (_activeUid != newUid) {
+          _activeUid = newUid;
+          await _onUserSwitched(fbUser);
+        }
+      });
+    } catch (_) {}
+  }
+
+  Future<void> _onUserSwitched(User? fbUser) async {
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      if (repository is FirebaseTradingRepository) {
+        await (repository as FirebaseTradingRepository).syncUserToCloud(
+          cash: _cash,
+          positions: _positions,
+          transactions: _transactions,
+          luxuryItems: _luxuryItems,
+          loans: _loans,
+          pendingOrders: _pendingOrders,
+        );
+      }
+
+      _cash = await repository.getCashBalance();
+      _positions = await repository.getPositions();
+      _transactions = await repository.getTransactions();
+      _luxuryItems = await repository.getLuxuryItems();
+      _pendingOrders = await repository.getPendingOrders();
+      _loans = await repository.getLoans();
+
+      _leaderboardSubscription?.cancel();
+      final stream = repository.streamLeaderboard();
+      if (stream != null) {
+        _leaderboardSubscription = stream.listen((entries) {
+          if (entries.isNotEmpty) {
+            _leaderboard = entries;
+            notifyListeners();
+          }
+        });
+      }
+
+      _updatePositionsWithCurrentAssetPrices();
+      _updateLeaderboard();
+    } catch (e) {
+      debugPrint('Error on user switched: $e');
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  void _startLiveMarketRefresh() {
+    _liveMarketRefreshTimer?.cancel();
+    fetchLiveMarketQuotes();
+    _liveMarketRefreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      fetchLiveMarketQuotes();
+    });
+  }
+
+  /// Holt echte Live-Kurse aus Binance & Yahoo / Cloud Function und aktualisiert Assets & Depot
+  Future<void> fetchLiveMarketQuotes() async {
+    try {
+      final quotes = await liveDataService.refreshQuotesForAssets(_assets);
+      if (quotes.isNotEmpty) {
+        bool anyChanged = false;
+        final updatedAssets = _assets.map((asset) {
+          if (quotes.containsKey(asset.symbol)) {
+            final q = quotes[asset.symbol]!;
+            if ((asset.currentPrice - q.currentPrice).abs() > 0.0001) {
+              anyChanged = true;
+              return asset.copyWith(
+                currentPrice: q.currentPrice,
+                previousClose: q.previousClose,
+                dailyHigh: q.high ?? asset.dailyHigh,
+                dailyLow: q.low ?? asset.dailyLow,
+              );
+            }
+          }
+          return asset;
+        }).toList();
+
+        if (anyChanged) {
+          _assets = updatedAssets;
+          marketEngine.updateAssetsReference(_assets);
+          _updatePositionsWithCurrentAssetPrices();
+          _checkAndExecutePendingOrders();
+          _checkAndExecuteAutomationOrders();
+          _updateLeaderboard();
+          notifyListeners();
+        }
+      }
+    } catch (e) {
+      debugPrint('fetchLiveMarketQuotes error: $e');
+    }
   }
 
   bool isAssetMarketOpen(Asset asset) {
@@ -1670,7 +1780,9 @@ class PortfolioProvider extends ChangeNotifier {
 
   @override
   void dispose() {
+    _authSubscription?.cancel();
     _leaderboardSubscription?.cancel();
+    _liveMarketRefreshTimer?.cancel();
     marketEngine.stop();
     newsService.dispose();
     super.dispose();

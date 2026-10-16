@@ -364,11 +364,15 @@ class FirebaseTradingRepository implements TradingRepository {
           orElse: () => entries.first,
         );
 
-        String cleanName = player.name
-            .replaceAll(RegExp(r'^Du \((.*)\)$'), r'$1')
-            .replaceAll('Du (Börsen-Profi)', 'Börsen-Profi')
-            .trim();
-        if (cleanName.isEmpty) cleanName = 'Trader';
+        String cleanName = player.name;
+        final match = RegExp(r'^Du \((.*)\)$').firstMatch(cleanName);
+        if (match != null) {
+          cleanName = match.group(1) ?? cleanName;
+        } else if (cleanName.startsWith('Du (')) {
+          cleanName = cleanName.replaceAll('Du (', '').replaceAll(')', '');
+        }
+        cleanName = cleanName.trim();
+        if (cleanName.isEmpty || cleanName == r'$1') cleanName = 'Trader';
 
         // 1. Speichere Spieler-Rang im echten Firestore Cloud Leaderboard
         await FirebaseFirestore.instance
@@ -415,6 +419,28 @@ class FirebaseTradingRepository implements TradingRepository {
         // Fallback gracefully on network error
       }
     }
+  }
+
+  /// Synchronisiert den lokalen Stand in die Cloud, falls in Firestore noch kein Portfolio existiert
+  Future<void> syncUserToCloud({
+    required double cash,
+    required List<Position> positions,
+    required List<TransactionRecord> transactions,
+    required List<LuxuryItem> luxuryItems,
+    required List<Loan> loans,
+    required List<PendingOrder> pendingOrders,
+  }) async {
+    if (!_isFirebaseConfigured || _currentUserId == 'local_player') return;
+    try {
+      final doc = await FirebaseFirestore.instance.collection('portfolios').doc(_currentUserId).get();
+      if (!doc.exists) {
+        await saveCashBalance(cash);
+        await savePositions(positions);
+        await saveLuxuryItems(luxuryItems);
+        await saveLoans(loans);
+        await savePendingOrders(pendingOrders);
+      }
+    } catch (_) {}
   }
 
   // --- LOANS ---
