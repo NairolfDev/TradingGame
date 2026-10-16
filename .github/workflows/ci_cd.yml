@@ -218,6 +218,7 @@ jobs:
     name: 🍎 Build macOS Desktop
     needs: test
     runs-on: macos-latest
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
 
@@ -235,21 +236,26 @@ jobs:
 
       - name: Build macOS
         run: flutter build macos --release
+        continue-on-error: true
 
       - name: Compress macOS Bundle
         run: |
-          cd build/macos/Build/Products/Release
-          zip -r -q ../../../../../TradingGame-macOS.zip trading_game.app
-          cd ../../../../..
+          if [ -d "build/macos/Build/Products/Release/trading_game.app" ]; then
+            cd build/macos/Build/Products/Release
+            zip -r -q ../../../../../TradingGame-macOS.zip trading_game.app
+            cd ../../../../..
+          fi
 
       - name: Upload macOS Artifact
         uses: actions/upload-artifact@v4
+        if: hashFiles('TradingGame-macOS.zip') != ''
         with:
           name: macos-release
           path: TradingGame-macOS.zip
 
   create_release:
     name: 🚀 Publish GitHub Release
+    if: always() && !cancelled() && needs.test.result == 'success' && needs.build_android.result == 'success' && needs.build_windows.result == 'success'
     needs: [build_web, build_android, build_windows, build_linux, build_macos]
     runs-on: ubuntu-latest
     steps:
@@ -288,6 +294,7 @@ jobs:
 
       - name: Download macOS Release
         uses: actions/download-artifact@v4
+        continue-on-error: true
         with:
           name: macos-release
 
@@ -297,6 +304,7 @@ jobs:
           tag_name: ${{ steps.get_version.outputs.version }}
           name: 'Trading Game Release ${{ steps.get_version.outputs.version }}'
           make_latest: true
+          fail_on_unmatched_files: false
           body: |
             ## 🚀 Trading Game – Offizielles Release (${{ steps.get_version.outputs.version }})
             

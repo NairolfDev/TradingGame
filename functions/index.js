@@ -18,7 +18,7 @@ apiRouter.get("/health", (req, res) => {
   res.json({
     status: "ok",
     service: "Trading Game Core Backend",
-    version: "1.0.0",
+    version: "1.3.0",
     serverTimeUtc: new Date().toISOString(),
     uptimeSeconds: Math.floor(process.uptime()),
   });
@@ -40,8 +40,14 @@ apiRouter.get("/markets", (req, res) => {
     { symbol: "BRENT/OIL", name: "Brent Crude Rohöl", price: 78.5, type: "commodity", category: "Energie" },
     { symbol: "EBS.VI", name: "Erste Group Bank AG", price: 49.2, type: "stock", category: "ATX" },
     { symbol: "OMV.VI", name: "OMV AG Wien", price: 41.8, type: "stock", category: "ATX" },
+    { symbol: "PLTR", name: "Palantir Technologies", price: 42.5, type: "stock", category: "US Tech" },
+    { symbol: "AMD", name: "Advanced Micro Devices", price: 156.0, type: "stock", category: "US Tech" },
+    { symbol: "NFLX", name: "Netflix Inc.", price: 695.0, type: "stock", category: "US Tech" },
+    { symbol: "ASML.AS", name: "ASML Holding N.V.", price: 840.0, type: "stock", category: "EU Tech" },
     { symbol: "BTC", name: "Bitcoin", price: 68500.0, type: "crypto", category: "Krypto 24/7" },
     { symbol: "ETH", name: "Ethereum", price: 3550.0, type: "crypto", category: "Krypto 24/7" },
+    { symbol: "SOL", name: "Solana", price: 155.0, type: "crypto", category: "Krypto 24/7" },
+    { symbol: "NEAR", name: "NEAR Protocol", price: 5.2, type: "crypto", category: "Krypto 24/7" },
     { symbol: "BUND-10Y", name: "Deutschland 10Y Bundesanleihe", price: 99.8, type: "bond", coupon: 0.026 },
     { symbol: "RAGB-10Y", name: "Republik Österreich 10Y Bund", price: 101.2, type: "bond", coupon: 0.032 },
   ];
@@ -74,10 +80,19 @@ apiRouter.get("/leaderboard", async (req, res) => {
 
 // 4. Server-Side Loan Validation & Credit Check
 apiRouter.post("/loans/validate", (req, res) => {
-  const { principal, durationDays, creditRatingScore, netWorth, totalDebt, lockoutUntil } = req.body;
+  const { principal, durationDays, creditRatingScore, netWorth, totalDebt, lockoutUntil, isFirstLoan } = req.body;
 
   if (!principal || !durationDays) {
     return res.status(400).json({ error: "principal and durationDays are required" });
+  }
+
+  // 25.000 € Obergrenze für den Erstkredit
+  if (isFirstLoan && principal > 25000) {
+    return res.status(400).json({
+      eligible: false,
+      reason: "Der erste Bankkredit ist regulatorisch auf maximal 25.000 € begrenzt.",
+      principal,
+    });
   }
 
   // Check 5-day real calendar time lockout
@@ -129,6 +144,17 @@ apiRouter.post("/loans/validate", (req, res) => {
     totalRepay,
     durationDays,
     principal,
+  });
+});
+
+// 5. Sanierungs-Notkredit bei Insolvenz (10.000 € @ 12%)
+apiRouter.post("/loans/sanierung", (req, res) => {
+  res.json({
+    eligible: true,
+    principal: 10000.0,
+    interestRate: 0.12,
+    durationDays: 30,
+    note: "Sanierungs-Notkredit nach Insolvenz – 10.000 € Sofort-Liquidität",
   });
 });
 
