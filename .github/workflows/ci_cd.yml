@@ -124,6 +124,17 @@ jobs:
           name: android-aab
           path: trading_game.aab
 
+      - name: Deploy to Google Play Console (Auto-Deploy)
+        if: "${{ secrets.PLAY_STORE_JSON_KEY != '' }}"
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_STORE_JSON_KEY }}
+          packageName: com.nairolfdev.tradinggame
+          releaseFiles: trading_game.aab
+          track: internal
+          status: completed
+        continue-on-error: true
+
   build_windows:
     name: 🪟 Build Windows Desktop
     needs: test
