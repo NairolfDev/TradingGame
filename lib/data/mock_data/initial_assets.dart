@@ -18,6 +18,7 @@ class InitialAssets {
         priceHistory: [46.5, 47.2, 48.0, 48.6, 49.2],
         volatility: 0.018,
         description: 'Größte Bankengruppe Österreichs und Marktführer in Zentral- und Osteuropa.',
+        dividendYield: 0.055,
         category: 'ATX / Finanzen',
       ),
       Asset(
@@ -32,6 +33,7 @@ class InitialAssets {
         priceHistory: [40.0, 41.2, 41.5, 42.1, 41.8],
         volatility: 0.020,
         description: 'Integrierter österreichischer Öl-, Gas- und Chemiekonzern.',
+        dividendYield: 0.072,
         category: 'ATX / Energie',
       ),
       Asset(

@@ -3,6 +3,7 @@ enum TransactionType {
   sell,
   liquidation,
   couponPayout,
+  dividendPayout,
   luxuryPurchase,
   loanPayout,
   loanRepayment;
@@ -17,6 +18,8 @@ enum TransactionType {
         return 'Zwangsliquidation';
       case TransactionType.couponPayout:
         return 'Anleihen-Zinskupon';
+      case TransactionType.dividendPayout:
+        return 'Dividenden-Ausschüttung';
       case TransactionType.luxuryPurchase:
         return 'Prestige-Kauf';
       case TransactionType.loanPayout:

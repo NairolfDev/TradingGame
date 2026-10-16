@@ -15,10 +15,21 @@ import '../data/repositories/trading_repository.dart';
 import 'market_engine.dart';
 import 'trading_fee_service.dart';
 import 'credit_rating_service.dart';
+import 'news_service.dart';
+import 'quest_service.dart';
+import 'turbo_options_service.dart';
+import 'dividend_service.dart';
+import '../data/models/turbo_option.dart';
+import '../data/models/copy_trader.dart';
+import '../data/models/daily_quest.dart';
+import '../data/mock_data/initial_copy_traders.dart';
 
 class PortfolioProvider extends ChangeNotifier {
   final TradingRepository repository;
   final MarketEngine marketEngine = MarketEngine();
+  final NewsService newsService = NewsService();
+  final QuestService questService = QuestService();
+  final TurboOptionsService turboService = TurboOptionsService();
   final Uuid _uuid = const Uuid();
 
   double _cash = 50000.0;
@@ -55,6 +66,16 @@ class PortfolioProvider extends ChangeNotifier {
   List<Loan> get loans => _loans;
   List<Loan> get activeLoans => _loans.where((l) => !l.isPaid).toList();
   List<NewsEvent> get newsEvents => _newsEvents;
+  NewsEvent? get latestBreakingNews => newsService.latestNews ?? (_newsEvents.isNotEmpty ? _newsEvents.first : null);
+  List<DailyQuest> get dailyQuests => questService.quests;
+  int get loginStreakDays => questService.loginStreakDays;
+  List<TurboOption> get activeTurboOptions => turboService.activeOptions;
+  List<TurboOption> get settledTurboOptions => turboService.settledOptions;
+  List<CopyTrader> get copyTraders => InitialCopyTraders.getTraders();
+  double get totalAnnualDividends => DividendService.calculateAnnualDividendRunRate(_positions, _assets);
+  double get monthlyPassiveIncome => DividendService.calculateMonthlyPassiveIncome(_positions, _assets);
+  List<DividendScheduleItem> get dividendSchedule => DividendService.getDividendSchedule(_positions, _assets);
+
   bool get isLoading => _isLoading;
   String? get lastAlertMessage => _lastAlertMessage;
 
@@ -222,6 +243,59 @@ class PortfolioProvider extends ChangeNotifier {
       newsCallback: _onNewsGenerated,
     );
 
+    // Initialisiere News Service
+    newsService.initialize(_assets);
+    newsService.onNewsDropped = (news) {
+      _applyNewsImpact(news);
+    };
+
+    // Initialisiere Daily Quests
+    questService.initialize();
+    questService.recordTrade(
+      tradeAmount: 0,
+      isCommodity: false,
+      leverage: 1,
+      profit: 0,
+      totalPositionsCount: _positions.length,
+    );
+
+    // Initialisiere Turbo Options Ticker
+    turboService.startTicker((symbol) {
+      final matching = _assets.firstWhere(
+        (a) => a.symbol == symbol,
+        orElse: () => _assets.first,
+      );
+      return matching.currentPrice;
+    });
+
+    turboService.onOptionSettled = (option) {
+      final record = TransactionRecord(
+        id: _uuid.v4(),
+        symbol: option.assetSymbol,
+        name: option.assetName,
+        type: TransactionType.sell,
+        amount: 1,
+        price: option.finalPrice ?? option.entryPrice,
+        totalAmount: option.isWon ? option.potentialPayout : 0.0,
+        realizedPnL: option.profit,
+        timestamp: DateTime.now(),
+        note: option.isWon
+            ? '⚡ 60s Turbo-Option (${option.direction == TurboDirection.call ? 'Call' : 'Put'}) GEWONNEN!'
+            : '⚡ 60s Turbo-Option (${option.direction == TurboDirection.call ? 'Call' : 'Put'}) VERLOREN',
+      );
+
+      if (option.isWon) {
+        _cash += option.potentialPayout;
+        _lastAlertMessage = '🎉 Turbo-Option gewonnen! +${option.potentialPayout.toStringAsFixed(2)} €!';
+      } else {
+        _lastAlertMessage = '❌ Turbo-Option verloren (-${option.stake.toStringAsFixed(2)} €).';
+      }
+      _transactions.insert(0, record);
+      repository.saveCashBalance(_cash);
+      repository.saveTransaction(record);
+      notifyListeners();
+    };
+
     // Initiales Update der Positionspreise & Leaderboard
     _updatePositionsWithCurrentAssetPrices();
     _updateLeaderboard();
@@ -256,11 +330,26 @@ class PortfolioProvider extends ChangeNotifier {
   }
 
   void _onNewsGenerated(NewsEvent news) {
+    _applyNewsImpact(news);
+  }
+
+  void _applyNewsImpact(NewsEvent news) {
+    if (news.affectedSymbol != null && news.affectedSymbol!.isNotEmpty) {
+      final idx = _assets.indexWhere((a) => a.symbol == news.affectedSymbol);
+      if (idx != -1) {
+        final asset = _assets[idx];
+        final newPrice = (asset.currentPrice * (1 + news.priceImpact)).clamp(0.0001, 1000000.0);
+        final rounded = double.parse(newPrice.toStringAsFixed(newPrice > 500 ? 2 : 4));
+        _assets[idx] = asset.copyWithPrice(rounded);
+        _updatePositionsWithCurrentAssetPrices();
+        repository.saveAssets(_assets);
+      }
+    }
     _newsEvents.insert(0, news);
-    if (_newsEvents.length > 20) {
+    if (_newsEvents.length > 30) {
       _newsEvents.removeLast();
     }
-    _lastAlertMessage = 'Eilmeldung: ${news.headline}';
+    _lastAlertMessage = '⚡ Eilmeldung: ${news.headline}';
     notifyListeners();
   }
 
@@ -452,6 +541,14 @@ class PortfolioProvider extends ChangeNotifier {
     _transactions.insert(0, record);
     await repository.saveTransaction(record);
 
+    questService.recordTrade(
+      tradeAmount: totalCost,
+      isCommodity: asset.type == AssetType.commodity,
+      leverage: leverage,
+      profit: 0,
+      totalPositionsCount: _positions.length,
+    );
+
     _lastAlertMessage = 'Erfolgreich gekauft: ${amount.toStringAsFixed(2)}x ${asset.symbol}';
     notifyListeners();
     return true;
@@ -530,6 +627,14 @@ class PortfolioProvider extends ChangeNotifier {
 
     _transactions.insert(0, record);
     await repository.saveTransaction(record);
+
+    questService.recordTrade(
+      tradeAmount: cashReturn,
+      isCommodity: position.type == AssetType.commodity,
+      leverage: position.leverage,
+      profit: realizedPnL,
+      totalPositionsCount: _positions.length,
+    );
 
     _lastAlertMessage =
         'Verkauft: ${sellAmount.toStringAsFixed(2)}x ${position.symbol} (Rendite: ${realizedPnL >= 0 ? "+" : ""}${realizedPnL.toStringAsFixed(2)} €)';
@@ -890,6 +995,150 @@ class PortfolioProvider extends ChangeNotifier {
     repository.saveLeaderboard(_leaderboard);
   }
 
+  // --- 1. DAILY QUESTS & REWARDS ---
+  void claimDailyQuest(String questId) {
+    questService.claimQuest(questId, (cashReward, prestigeReward) {
+      _cash += cashReward;
+      repository.saveCashBalance(_cash);
+      _lastAlertMessage = '🎁 Belohnung abgeholt: +${cashReward.toStringAsFixed(0)} € & +$prestigeReward Prestige!';
+      _updateLeaderboard();
+      notifyListeners();
+    });
+  }
+
+  // --- 2. 60-SEKUNDEN TURBO-BLITZOPTIONEN ---
+  bool placeTurboOption({
+    required String assetSymbol,
+    required String assetName,
+    required double entryPrice,
+    required TurboDirection direction,
+    required double stake,
+    required int durationSeconds,
+  }) {
+    if (_cash < stake || stake <= 0) return false;
+
+    _cash -= stake;
+    repository.saveCashBalance(_cash);
+
+    turboService.placeOption(
+      assetSymbol: assetSymbol,
+      assetName: assetName,
+      entryPrice: entryPrice,
+      direction: direction,
+      stake: stake,
+      durationSeconds: durationSeconds,
+    );
+
+    final record = TransactionRecord(
+      id: _uuid.v4(),
+      symbol: assetSymbol,
+      name: 'Turbo-Option (${direction == TurboDirection.call ? 'Call' : 'Put'})',
+      type: TransactionType.buy,
+      amount: 1,
+      price: stake,
+      totalAmount: stake,
+      timestamp: DateTime.now(),
+      note: 'Einsatz $durationSeconds Sekunden Blitz-Option',
+    );
+    _transactions.insert(0, record);
+    repository.saveTransaction(record);
+    notifyListeners();
+    return true;
+  }
+
+  // --- 3. SOCIAL TRADING & COPY-TRADING ---
+  Future<bool> copyTrader(CopyTrader trader, double allocatedAmount) async {
+    if (_cash < allocatedAmount || allocatedAmount < 500) return false;
+
+    _cash -= allocatedAmount;
+    await repository.saveCashBalance(_cash);
+
+    for (final entry in trader.portfolioAllocation.entries) {
+      final symbol = entry.key;
+      final weight = entry.value;
+      final sliceAmount = allocatedAmount * weight;
+
+      final asset = _assets.firstWhere(
+        (a) => a.symbol == symbol,
+        orElse: () => _assets.first,
+      );
+
+      final shares = sliceAmount / asset.currentPrice;
+
+      final existingIndex = _positions.indexWhere((p) => p.symbol == asset.symbol && !p.isLeveraged);
+      if (existingIndex != -1) {
+        final existing = _positions[existingIndex];
+        final totalOld = existing.amount * existing.averageBuyPrice;
+        final totalNew = totalOld + sliceAmount;
+        final newShares = existing.amount + shares;
+        _positions[existingIndex] = existing.copyWith(
+          amount: newShares,
+          averageBuyPrice: totalNew / newShares,
+          currentPrice: asset.currentPrice,
+        );
+      } else {
+        _positions.add(Position(
+          id: _uuid.v4(),
+          assetId: asset.id,
+          symbol: asset.symbol,
+          name: asset.name,
+          type: asset.type,
+          amount: shares,
+          averageBuyPrice: asset.currentPrice,
+          currentPrice: asset.currentPrice,
+          openedAt: DateTime.now(),
+        ));
+      }
+    }
+
+    final record = TransactionRecord(
+      id: _uuid.v4(),
+      symbol: 'COPY',
+      name: 'Social Trading: ${trader.name}',
+      type: TransactionType.buy,
+      amount: 1,
+      price: allocatedAmount,
+      totalAmount: allocatedAmount,
+      timestamp: DateTime.now(),
+      note: 'Kopiert Portfolio von ${trader.name}',
+    );
+    _transactions.insert(0, record);
+
+    await repository.savePositions(_positions);
+    await repository.saveTransaction(record);
+    _lastAlertMessage = '🤝 Du kopierst jetzt ${trader.name} mit ${allocatedAmount.toStringAsFixed(0)} €!';
+    _updateLeaderboard();
+    notifyListeners();
+    return true;
+  }
+
+  // --- 4. DIVIDENDEN & PASSIVES EINKOMMEN ---
+  void payoutSimulatedDividends() {
+    final payout = monthlyPassiveIncome;
+    if (payout <= 0) return;
+
+    _cash += payout;
+    repository.saveCashBalance(_cash);
+
+    final record = TransactionRecord(
+      id: _uuid.v4(),
+      symbol: 'DIV',
+      name: 'Monatliche Dividendenausschüttung',
+      type: TransactionType.dividendPayout,
+      amount: 1,
+      price: payout,
+      totalAmount: payout,
+      realizedPnL: payout,
+      timestamp: DateTime.now(),
+      note: 'Passives Einkommen aus Aktien- und ETF-Dividenden',
+    );
+    _transactions.insert(0, record);
+    repository.saveTransaction(record);
+    _lastAlertMessage = '💵 Dividenden gutgeschrieben: +${payout.toStringAsFixed(2)} €!';
+    _updateLeaderboard();
+    notifyListeners();
+  }
+
   // Spiel zurücksetzen (falls vom Nutzer gewünscht)
   Future<void> resetGame() async {
     await repository.resetGameToInitial();
@@ -899,6 +1148,8 @@ class PortfolioProvider extends ChangeNotifier {
   @override
   void dispose() {
     marketEngine.stop();
+    newsService.dispose();
+    turboService.dispose();
     super.dispose();
   }
 }

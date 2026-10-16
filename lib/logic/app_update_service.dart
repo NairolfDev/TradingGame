@@ -32,12 +32,12 @@ class AppUpdateService {
 
   /// Prüft, ob auf GitHub / im Backend eine neuere Version verfügbar ist
   static Future<AppUpdateInfo> checkForUpdate() async {
-    String currentVersion = '1.1.0';
+    String currentVersion = '1.2.0';
     try {
       final packageInfo = await PackageInfo.fromPlatform();
       currentVersion = packageInfo.version;
     } catch (_) {
-      currentVersion = '1.1.0';
+      currentVersion = '1.2.0';
     }
 
     try {
@@ -51,7 +51,7 @@ class AppUpdateService {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
-        final tagName = (data['tag_name'] as String? ?? 'v1.1.0')
+        final tagName = (data['tag_name'] as String? ?? 'v1.2.0')
             .replaceAll('v', '')
             .trim();
         final body = data['body'] as String? ?? 'Wichtige Sicherheits-, Kurs- und Stabilitätsupdates.';
