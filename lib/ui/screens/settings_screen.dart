@@ -299,7 +299,7 @@ class SettingsScreen extends StatelessWidget {
                       style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
                     ),
                     const Text(
-                      'v1.4.1 (Build 6)',
+                      'v1.5.0 (Build 7)',
                       style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
                     ),
                   ],
