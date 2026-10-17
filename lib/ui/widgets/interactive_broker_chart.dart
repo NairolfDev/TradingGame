@@ -79,114 +79,187 @@ class _InteractiveBrokerChartState extends State<InteractiveBrokerChart> {
     return spots;
   }
 
+  /// Timeframes that returned no data; shown disabled so nobody waits on them.
+  final Set<String> _emptyTimeframes = {};
+
+  void _selectTimeframe(String tf) {
+    setState(() {
+      _timeframe = tf;
+      _touchedPrice = null;
+      _liveFetchedSeries = null;
+    });
+    widget.onScrubPrice?.call(null);
+    _loadLiveSeries();
+  }
+
   @override
   Widget build(BuildContext context) {
     final series = _liveFetchedSeries ?? const <double>[];
+    if (!_isLoading && series.length < 2) _emptyTimeframes.add(_timeframe);
     final minVal = series.isEmpty ? 0.0 : series.reduce(min);
     final maxVal = series.isEmpty ? 0.0 : series.reduce(max);
     final diff = maxVal - minVal;
-    final chartColor = widget.isPositive ? AppColors.profit : AppColors.loss;
+    final periodChange = series.length >= 2
+        ? (series.last - series.first) / series.first
+        : null;
+    final chartColor = periodChange == null
+        ? (widget.isPositive ? AppColors.profit : AppColors.loss)
+        : (periodChange >= 0 ? AppColors.profit : AppColors.loss);
+    final textScale = MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 2.0);
 
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        _boundedHeight = constraints.hasBoundedHeight;
+        return _buildBody(
+          series,
+          minVal,
+          maxVal,
+          diff,
+          periodChange,
+          chartColor,
+          textScale,
+        );
+      },
+    );
+  }
+
+  Widget _buildBody(
+    List<double> series,
+    double minVal,
+    double maxVal,
+    double diff,
+    double? periodChange,
+    Color chartColor,
+    double textScale,
+  ) {
     return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Top Toolbar: Chart Type & Indicators & Scrubber Display
+        // Scrubbed or latest price + change over the selected period.
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          padding: const EdgeInsets.fromLTRB(14, 8, 4, 0),
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              // Display touched price or latest price
-              Row(
-                children: [
-                  Text(
-                    _touchedPrice != null
-                        ? CurrencyFormatter.format(_touchedPrice!)
-                        : CurrencyFormatter.format(widget.asset.currentPrice),
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w900,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  if (_touchedPrice != null) ...[
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 2,
+              Expanded(
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Text(
+                      CurrencyFormatter.format(
+                        _touchedPrice ?? widget.asset.currentPrice,
                       ),
-                      decoration: BoxDecoration(
-                        color: AppColors.accent.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: const Text(
-                        'FOKUS',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.accent,
-                        ),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.textPrimary,
+                        fontFeatures: const [FontFeature.tabularFigures()],
                       ),
                     ),
+                    if (_touchedPrice != null)
+                      _pill('Ausgewählter Punkt', AppColors.accent)
+                    else if (periodChange != null)
+                      _pill(
+                        '${CurrencyFormatter.formatPercent(periodChange)} · ${_label(_timeframe)}',
+                        chartColor,
+                      ),
                   ],
-                ],
+                ),
               ),
-
-              // Toggle Chart Mode (Line vs Candlestick) & SMA
-              Row(
-                children: [
-                  IconButton(
-                    icon: Icon(
-                      _showSMA ? Icons.auto_graph : Icons.show_chart,
-                      size: 20,
-                      color: _showSMA ? AppColors.gold : AppColors.textMuted,
-                    ),
-                    tooltip: 'Gleitender Durchschnitt (SMA 5)',
-                    visualDensity: VisualDensity.compact,
-                    onPressed: () {
-                      setState(() {
-                        _showSMA = !_showSMA;
-                      });
-                    },
-                  ),
-                ],
+              IconButton(
+                icon: Icon(
+                  _showSMA ? Icons.auto_graph : Icons.show_chart,
+                  color: _showSMA ? AppColors.gold : AppColors.textMuted,
+                ),
+                tooltip: _showSMA
+                    ? 'Gleitenden Durchschnitt ausblenden'
+                    : 'Gleitenden Durchschnitt (5 Punkte) einblenden',
+                onPressed: () => setState(() => _showSMA = !_showSMA),
               ),
             ],
           ),
         ),
 
-        // Main Chart Canvas
-        Expanded(
+        _canvasBox(
+          height: 200 * textScale,
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(10, 0, 16, 10),
+            padding: const EdgeInsets.fromLTRB(10, 4, 16, 8),
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : series.length < 2
                 ? Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.show_chart,
-                          color: AppColors.textSecondary,
-                        ),
-                        const SizedBox(height: 8),
-                        const Text('Keine Kursdaten für diesen Zeitraum'),
-                        TextButton(
-                          onPressed: _loadLiveSeries,
-                          child: const Text('Erneut laden'),
-                        ),
-                      ],
+                    child: SingleChildScrollView(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.show_chart,
+                            color: AppColors.textSecondary,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Keine EUR-Kursdaten für ${_label(_timeframe)}',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: AppColors.textPrimary),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Verläufe gibt es nur ohne Währungsumrechnung – '
+                            'wir zeichnen keine erfundenen Kurven.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: () {
+                              _emptyTimeframes.remove(_timeframe);
+                              _loadLiveSeries();
+                            },
+                            child: const Text('Erneut laden'),
+                          ),
+                        ],
+                      ),
                     ),
                   )
-                : _buildLineChart(series, minVal, maxVal, diff, chartColor),
+                : Semantics(
+                    label:
+                        'Kursverlauf ${_label(_timeframe)}: von '
+                        '${CurrencyFormatter.format(series.first)} auf '
+                        '${CurrencyFormatter.format(series.last)}, '
+                        'Tief ${CurrencyFormatter.format(minVal)}, '
+                        'Hoch ${CurrencyFormatter.format(maxVal)}',
+                    child: ExcludeSemantics(
+                      child: _buildLineChart(
+                        series,
+                        minVal,
+                        maxVal,
+                        diff,
+                        chartColor,
+                      ),
+                    ),
+                  ),
           ),
         ),
 
-        // Bottom Timeframe Selector: 1D, 1W, 1M, 1Y, ALL
+        // Data transparency: where the curve comes from.
+        if (series.length >= 2)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 0, 14, 6),
+            child: Text(
+              'Quelle: Yahoo Finance · ${series.length} Kurspunkte in EUR · '
+              'Tief ${CurrencyFormatter.format(minVal)} · '
+              'Hoch ${CurrencyFormatter.format(maxVal)}',
+              style: TextStyle(fontSize: 11, color: AppColors.textMuted),
+            ),
+          ),
+
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-          decoration: const BoxDecoration(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
             border: Border(
               top: BorderSide(color: AppColors.cardBorder, width: 0.8),
             ),
@@ -194,62 +267,99 @@ class _InteractiveBrokerChartState extends State<InteractiveBrokerChart> {
           child: SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
-              children: _timeframes.map((tf) {
-                final isSelected = _timeframe == tf;
-                return Semantics(
-                  button: true,
-                  selected: isSelected,
-                  label: 'Zeitraum $tf',
-                  child: InkWell(
-                    onTap: () {
-                      setState(() {
-                        _timeframe = tf;
-                        _touchedPrice = null;
-                        _liveFetchedSeries = null;
-                      });
-                      widget.onScrubPrice?.call(null);
-                      _loadLiveSeries();
-                    },
-                    borderRadius: BorderRadius.circular(6),
-                    child: Container(
-                      constraints: const BoxConstraints(
-                        minWidth: 44,
-                        minHeight: 44,
-                      ),
-                      alignment: Alignment.center,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: isSelected
-                            ? AppColors.primary.withValues(alpha: 0.2)
-                            : Colors.transparent,
-                        borderRadius: BorderRadius.circular(6),
-                        border: isSelected
-                            ? Border.all(color: AppColors.primary, width: 1.2)
-                            : null,
-                      ),
-                      child: Text(
-                        tf,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: isSelected
-                              ? FontWeight.bold
-                              : FontWeight.w500,
-                          color: isSelected
-                              ? AppColors.primary
-                              : AppColors.textSecondary,
-                        ),
-                      ),
-                    ),
+              children: [
+                for (final tf in _timeframes)
+                  _timeframeChip(
+                    tf,
+                    selected: _timeframe == tf,
+                    empty: _emptyTimeframes.contains(tf) && _timeframe != tf,
                   ),
-                );
-              }).toList(),
+              ],
             ),
           ),
         ),
       ],
+    );
+  }
+
+  /// Fills the parent when it has a fixed height, otherwise a fixed canvas.
+  Widget _canvasBox({required double height, required Widget child}) =>
+      _boundedHeight
+      ? Expanded(child: child)
+      : SizedBox(height: height, child: child);
+
+  bool _boundedHeight = false;
+
+  /// Enough decimals that neighbouring ticks never show the same number.
+  static String _axisLabel(double value, double range) {
+    if (value.abs() >= 10000) return CurrencyFormatter.formatCompact(value);
+    final decimals = range >= 30 ? 0 : (range >= 0.3 ? 2 : 4);
+    return '€${value.toStringAsFixed(decimals)}';
+  }
+
+  static String _label(String tf) => switch (tf) {
+    '1D' => '1 Tag',
+    '1W' => '1 Woche',
+    '1M' => '1 Monat',
+    '1Y' => '1 Jahr',
+    '3Y' => '3 Jahre',
+    _ => 'Gesamt',
+  };
+
+  Widget _pill(String text, Color color) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+    decoration: BoxDecoration(
+      color: color.withValues(alpha: 0.15),
+      borderRadius: BorderRadius.circular(6),
+    ),
+    child: Text(
+      text,
+      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: color),
+    ),
+  );
+
+  Widget _timeframeChip(
+    String tf, {
+    required bool selected,
+    required bool empty,
+  }) {
+    final color = selected
+        ? AppColors.primary
+        : empty
+        ? AppColors.textMuted.withValues(alpha: 0.5)
+        : AppColors.textSecondary;
+    return Tooltip(
+      message: empty ? '${_label(tf)}: keine Daten' : _label(tf),
+      child: Semantics(
+        button: true,
+        selected: selected,
+        enabled: !empty,
+        label: 'Zeitraum ${_label(tf)}${empty ? ', keine Daten' : ''}',
+        child: InkWell(
+          onTap: empty || selected ? null : () => _selectTimeframe(tf),
+          borderRadius: BorderRadius.circular(8),
+          child: Container(
+            constraints: const BoxConstraints(minWidth: 48, minHeight: 44),
+            alignment: Alignment.center,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            decoration: BoxDecoration(
+              color: selected
+                  ? AppColors.primary.withValues(alpha: 0.18)
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              tf == 'ALL' ? 'Max' : tf,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
+                color: color,
+                decoration: empty ? TextDecoration.lineThrough : null,
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -309,12 +419,12 @@ class _InteractiveBrokerChartState extends State<InteractiveBrokerChart> {
           enabled: true,
           touchTooltipData: LineTouchTooltipData(
             getTooltipColor: (_) => AppColors.surfaceElevated,
-            tooltipBorder: const BorderSide(color: AppColors.cardBorder),
+            tooltipBorder: BorderSide(color: AppColors.cardBorder),
             getTooltipItems: (touchedSpots) {
               return touchedSpots.map((spot) {
                 return LineTooltipItem(
                   CurrencyFormatter.format(spot.y),
-                  const TextStyle(
+                  TextStyle(
                     color: AppColors.textPrimary,
                     fontWeight: FontWeight.bold,
                     fontSize: 12,
@@ -345,7 +455,7 @@ class _InteractiveBrokerChartState extends State<InteractiveBrokerChart> {
           drawVerticalLine: false,
           horizontalInterval: diff > 0 ? diff / 3 : 1,
           getDrawingHorizontalLine: (value) =>
-              const FlLine(color: AppColors.cardBorder, strokeWidth: 0.8),
+              FlLine(color: AppColors.cardBorder, strokeWidth: 0.8),
         ),
         titlesData: FlTitlesData(
           leftTitles: const AxisTitles(
@@ -357,14 +467,16 @@ class _InteractiveBrokerChartState extends State<InteractiveBrokerChart> {
           rightTitles: AxisTitles(
             sideTitles: SideTitles(
               showTitles: true,
-              reservedSize: 55,
+              reservedSize: 64,
+              interval: diff > 0 ? diff / 3 : null,
               getTitlesWidget: (value, meta) {
+                // Edge labels collide with the regular ticks; skip them.
+                if (value == meta.min || value == meta.max) {
+                  return const SizedBox.shrink();
+                }
                 return Text(
-                  CurrencyFormatter.formatCompact(value),
-                  style: const TextStyle(
-                    color: AppColors.textMuted,
-                    fontSize: 10,
-                  ),
+                  _axisLabel(value, diff),
+                  style: TextStyle(color: AppColors.textMuted, fontSize: 10),
                 );
               },
             ),

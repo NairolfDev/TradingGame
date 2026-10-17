@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import '../widgets/appearance_picker.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../data/models/savings_plan.dart';
@@ -21,7 +22,7 @@ class SettingsScreen extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: AppColors.surface,
         elevation: 0,
-        title: const Text(
+        title: Text(
           'Einstellungen & Spielmodus',
           style: TextStyle(
             fontSize: 18,
@@ -34,8 +35,10 @@ class SettingsScreen extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
         children: [
           // 1. UI MODUS AUSWAHL
-          _buildSectionHeader('🎨 BENUTZEROBERFLÄCHE & DARSTELLUNG'),
+          _buildSectionHeader('BENUTZEROBERFLÄCHE & DARSTELLUNG'),
           const SizedBox(height: 10),
+          _buildCard(child: const AppearancePicker()),
+          const SizedBox(height: 12),
           _buildCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -43,7 +46,7 @@ class SettingsScreen extends StatelessWidget {
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
                   activeTrackColor: AppColors.primary,
-                  title: const Text(
+                  title: Text(
                     'Simplistic Modus (Minimalistisch)',
                     style: TextStyle(
                       fontSize: 15,
@@ -51,20 +54,27 @@ class SettingsScreen extends StatelessWidget {
                       color: AppColors.textPrimary,
                     ),
                   ),
-                  subtitle: const Text(
+                  subtitle: Text(
                     'Reduziert die Benutzeroberfläche auf die reinen Kernfunktionen: Depot, Märkte, Kaufen/Verkaufen und offene Orders. Schaltet alle bunten Popups, Quests und Prestige-Statussymbole stumm.',
-                    style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
                   ),
                   value: provider.isSimplisticMode,
                   onChanged: (val) => provider.setSimplisticMode(val),
                 ),
-                const Divider(color: AppColors.cardBorder, height: 20),
+                Divider(color: AppColors.cardBorder, height: 20),
                 Row(
                   children: [
                     Icon(
-                      provider.isSimplisticMode ? Icons.check_circle : Icons.dashboard_customize,
+                      provider.isSimplisticMode
+                          ? Icons.check_circle
+                          : Icons.dashboard_customize,
                       size: 16,
-                      color: provider.isSimplisticMode ? AppColors.primary : AppColors.gold,
+                      color: provider.isSimplisticMode
+                          ? AppColors.primary
+                          : AppColors.gold,
                     ),
                     const SizedBox(width: 8),
                     Text(
@@ -74,7 +84,9 @@ class SettingsScreen extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
-                        color: provider.isSimplisticMode ? AppColors.primary : AppColors.gold,
+                        color: provider.isSimplisticMode
+                            ? AppColors.primary
+                            : AppColors.gold,
                       ),
                     ),
                   ],
@@ -95,7 +107,7 @@ class SettingsScreen extends StatelessWidget {
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
                   activeTrackColor: AppColors.primary,
-                  title: const Text(
+                  title: Text(
                     'Realistische Orderlaufzeit (5–15 Min.)',
                     style: TextStyle(
                       fontSize: 15,
@@ -103,20 +115,27 @@ class SettingsScreen extends StatelessWidget {
                       color: AppColors.textPrimary,
                     ),
                   ),
-                  subtitle: const Text(
+                  subtitle: Text(
                     'Orders werden bei geöffneter Börse mit einer realistischen Routing- und Matching-Verzögerung von 5 bis 15 Minuten im Orderbuch abgewickelt, statt sofort gebucht zu werden.',
-                    style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
                   ),
                   value: provider.isRealisticOrderDelay,
                   onChanged: (val) => provider.setRealisticOrderDelay(val),
                 ),
-                const Divider(color: AppColors.cardBorder, height: 20),
+                Divider(color: AppColors.cardBorder, height: 20),
                 Row(
                   children: [
                     Icon(
-                      provider.isRealisticOrderDelay ? Icons.hourglass_top : Icons.bolt,
+                      provider.isRealisticOrderDelay
+                          ? Icons.hourglass_top
+                          : Icons.bolt,
                       size: 16,
-                      color: provider.isRealisticOrderDelay ? AppColors.gold : AppColors.textMuted,
+                      color: provider.isRealisticOrderDelay
+                          ? AppColors.gold
+                          : AppColors.textMuted,
                     ),
                     const SizedBox(width: 8),
                     Text(
@@ -126,7 +145,9 @@ class SettingsScreen extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
-                        color: provider.isRealisticOrderDelay ? AppColors.gold : AppColors.textMuted,
+                        color: provider.isRealisticOrderDelay
+                            ? AppColors.gold
+                            : AppColors.textMuted,
                       ),
                     ),
                   ],
@@ -147,7 +168,7 @@ class SettingsScreen extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
+                    Text(
                       'Regelmäßige Sparpläne',
                       style: TextStyle(
                         fontSize: 14,
@@ -156,28 +177,40 @@ class SettingsScreen extends StatelessWidget {
                       ),
                     ),
                     ElevatedButton.icon(
-                      onPressed: () => _showCreateSavingsPlanDialog(context, provider),
+                      onPressed: () =>
+                          _showCreateSavingsPlanDialog(context, provider),
                       icon: const Icon(Icons.add, size: 16),
-                      label: const Text('Neuer Sparplan', style: TextStyle(fontSize: 12)),
+                      label: const Text(
+                        'Neuer Sparplan',
+                        style: TextStyle(fontSize: 12),
+                      ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primary,
-                        foregroundColor: Colors.black,
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        foregroundColor: AppColors.onPrimary,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 10),
                 if (provider.savingsPlans.isEmpty)
-                  const Padding(
+                  Padding(
                     padding: EdgeInsets.symmetric(vertical: 8),
                     child: Text(
                       'Noch keine Sparpläne eingerichtet. Richte z.B. einen täglichen 50 € Sparplan auf Bitcoin oder Erste Group ein!',
-                      style: TextStyle(fontSize: 12, color: AppColors.textMuted),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textMuted,
+                      ),
                     ),
                   )
                 else
-                  ...provider.savingsPlans.map((plan) => _buildSavingsPlanTile(context, provider, plan)),
+                  ...provider.savingsPlans.map(
+                    (plan) => _buildSavingsPlanTile(context, provider, plan),
+                  ),
               ],
             ),
           ),
@@ -196,17 +229,21 @@ class SettingsScreen extends StatelessWidget {
                   color: AppColors.surfaceElevated,
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Icon(Icons.receipt_long, color: AppColors.primary),
+                child: Icon(Icons.receipt_long, color: AppColors.primary),
               ),
-              title: const Text(
+              title: Text(
                 'Offiziellen Depotauszug anzeigen',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
               ),
-              subtitle: const Text(
+              subtitle: Text(
                 'Erstellt eine strukturierte Abrechnung aller Depotwerte, Positionen, Transaktionen und Zinserträge.',
                 style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
               ),
-              trailing: const Icon(Icons.chevron_right, color: AppColors.textMuted),
+              trailing: Icon(Icons.chevron_right, color: AppColors.textMuted),
               onTap: () => _showStatementDialog(context, provider),
             ),
           ),
@@ -223,15 +260,21 @@ class SettingsScreen extends StatelessWidget {
                   contentPadding: EdgeInsets.zero,
                   leading: CircleAvatar(
                     backgroundColor: AppColors.surfaceElevated,
-                    child: const Icon(Icons.person, color: AppColors.textPrimary),
+                    child: Icon(Icons.person, color: AppColors.textPrimary),
                   ),
                   title: Text(
                     auth.currentUser?.displayName ?? 'Gast-Trader',
-                    style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                    ),
                   ),
                   subtitle: Text(
                     auth.currentUser?.email ?? 'Nicht angemeldet',
-                    style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
                   ),
                   trailing: TextButton(
                     onPressed: () {
@@ -245,26 +288,42 @@ class SettingsScreen extends StatelessWidget {
                       }
                     },
                     child: Text(
-                      auth.isAuthenticated && !auth.currentUser!.isGuest ? 'Abmelden' : 'Anmelden',
-                      style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold),
+                      auth.isAuthenticated && !auth.currentUser!.isGuest
+                          ? 'Abmelden'
+                          : 'Anmelden',
+                      style: TextStyle(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ),
-                const Divider(color: AppColors.cardBorder),
+                Divider(color: AppColors.cardBorder),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
+                    Text(
                       'Cloud Backend & DB',
-                      style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: AppColors.textSecondary,
+                      ),
                     ),
                     Row(
-                      children: const [
-                        Icon(Icons.cloud_done, size: 14, color: AppColors.profit),
+                      children: [
+                        Icon(
+                          Icons.cloud_done,
+                          size: 14,
+                          color: AppColors.profit,
+                        ),
                         SizedBox(width: 4),
                         Text(
                           'Firestore & Functions',
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.profit),
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.profit,
+                          ),
                         ),
                       ],
                     ),
@@ -274,17 +333,24 @@ class SettingsScreen extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
+                    Text(
                       'Börsen-Feed',
-                      style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: AppColors.textSecondary,
+                      ),
                     ),
                     Row(
-                      children: const [
+                      children: [
                         Icon(Icons.sensors, size: 14, color: AppColors.primary),
                         SizedBox(width: 4),
                         Text(
                           'Binance & Yahoo Live',
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.primary),
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.primary,
+                          ),
                         ),
                       ],
                     ),
@@ -294,13 +360,20 @@ class SettingsScreen extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
+                    Text(
                       'App Version',
-                      style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: AppColors.textSecondary,
+                      ),
                     ),
-                    const Text(
+                    Text(
                       'v1.5.0 (Build 7)',
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textPrimary,
+                      ),
                     ),
                   ],
                 ),
@@ -314,20 +387,28 @@ class SettingsScreen extends StatelessWidget {
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content: Text('Echte Live-Kurse & Cloud-Daten erfolgreich synchronisiert!'),
+                            content: Text(
+                              'Echte Live-Kurse & Cloud-Daten erfolgreich synchronisiert!',
+                            ),
                             duration: Duration(seconds: 2),
                           ),
                         );
                       }
                     },
-                    icon: const Icon(Icons.sync, size: 16, color: AppColors.primary),
-                    label: const Text(
+                    icon: Icon(Icons.sync, size: 16, color: AppColors.primary),
+                    label: Text(
                       'Jetzt Live-Kurse & Cloud synchronisieren',
-                      style: TextStyle(fontSize: 12, color: AppColors.primary, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: AppColors.cardBorder),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      side: BorderSide(color: AppColors.cardBorder),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
                     ),
                   ),
                 ),
@@ -343,7 +424,7 @@ class SettingsScreen extends StatelessWidget {
   Widget _buildSectionHeader(String title) {
     return Text(
       title,
-      style: const TextStyle(
+      style: TextStyle(
         fontSize: 11,
         fontWeight: FontWeight.bold,
         letterSpacing: 1.1,
@@ -364,7 +445,11 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildSavingsPlanTile(BuildContext context, PortfolioProvider provider, SavingsPlan plan) {
+  Widget _buildSavingsPlanTile(
+    BuildContext context,
+    PortfolioProvider provider,
+    SavingsPlan plan,
+  ) {
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 4),
       padding: const EdgeInsets.all(10),
@@ -380,11 +465,15 @@ class SettingsScreen extends StatelessWidget {
             children: [
               Text(
                 '${plan.assetSymbol} (${plan.assetName})',
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textPrimary),
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                  color: AppColors.textPrimary,
+                ),
               ),
               Text(
                 '${CurrencyFormatter.format(plan.amountEur)} • ${plan.frequency.displayName} • Investiert: ${CurrencyFormatter.format(plan.totalInvested)}',
-                style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
               ),
             ],
           ),
@@ -393,11 +482,17 @@ class SettingsScreen extends StatelessWidget {
               Switch(
                 value: plan.isActive,
                 activeTrackColor: AppColors.primary,
-                onChanged: (_) => provider.savingsPlanService.togglePlan(plan.id),
+                onChanged: (_) =>
+                    provider.savingsPlanService.togglePlan(plan.id),
               ),
               IconButton(
-                icon: const Icon(Icons.delete_outline, size: 18, color: AppColors.loss),
-                onPressed: () => provider.savingsPlanService.deletePlan(plan.id),
+                icon: Icon(
+                  Icons.delete_outline,
+                  size: 18,
+                  color: AppColors.loss,
+                ),
+                onPressed: () =>
+                    provider.savingsPlanService.deletePlan(plan.id),
               ),
             ],
           ),
@@ -406,7 +501,10 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
-  void _showCreateSavingsPlanDialog(BuildContext context, PortfolioProvider provider) {
+  void _showCreateSavingsPlanDialog(
+    BuildContext context,
+    PortfolioProvider provider,
+  ) {
     String selectedSymbol = provider.assets.first.symbol;
     double amount = 50.0;
     SavingsPlanFrequency frequency = SavingsPlanFrequency.daily;
@@ -415,17 +513,30 @@ class SettingsScreen extends StatelessWidget {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) {
-          final asset = provider.assets.firstWhere((a) => a.symbol == selectedSymbol);
+          final asset = provider.assets.firstWhere(
+            (a) => a.symbol == selectedSymbol,
+          );
 
           return AlertDialog(
             backgroundColor: AppColors.surface,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            title: const Text('Neuen Sparplan anlegen', style: TextStyle(color: AppColors.textPrimary)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            title: Text(
+              'Neuen Sparplan anlegen',
+              style: TextStyle(color: AppColors.textPrimary),
+            ),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Wertpapier / Krypto:', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                Text(
+                  'Wertpapier / Krypto:',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
                 const SizedBox(height: 4),
                 DropdownButton<String>(
                   value: selectedSymbol,
@@ -434,7 +545,13 @@ class SettingsScreen extends StatelessWidget {
                   items: provider.assets.take(15).map((a) {
                     return DropdownMenuItem(
                       value: a.symbol,
-                      child: Text('${a.symbol} (${a.name})', style: const TextStyle(color: AppColors.textPrimary, fontSize: 13)),
+                      child: Text(
+                        '${a.symbol} (${a.name})',
+                        style: TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 13,
+                        ),
+                      ),
                     );
                   }).toList(),
                   onChanged: (val) {
@@ -444,7 +561,13 @@ class SettingsScreen extends StatelessWidget {
                   },
                 ),
                 const SizedBox(height: 12),
-                const Text('Sparbetrag (EUR):', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                Text(
+                  'Sparbetrag (EUR):',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
                 Slider(
                   value: amount,
                   min: 10,
@@ -457,11 +580,20 @@ class SettingsScreen extends StatelessWidget {
                 Center(
                   child: Text(
                     '${amount.toInt()} € pro Ausführung',
-                    style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary),
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.primary,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 12),
-                const Text('Ausführungsintervall:', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                Text(
+                  'Ausführungsintervall:',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
                 DropdownButton<SavingsPlanFrequency>(
                   value: frequency,
                   isExpanded: true,
@@ -469,7 +601,13 @@ class SettingsScreen extends StatelessWidget {
                   items: SavingsPlanFrequency.values.map((f) {
                     return DropdownMenuItem(
                       value: f,
-                      child: Text(f.displayName, style: const TextStyle(color: AppColors.textPrimary, fontSize: 13)),
+                      child: Text(
+                        f.displayName,
+                        style: TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 13,
+                        ),
+                      ),
                     );
                   }).toList(),
                   onChanged: (val) {
@@ -483,7 +621,10 @@ class SettingsScreen extends StatelessWidget {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx),
-                child: const Text('Abbrechen', style: TextStyle(color: AppColors.textMuted)),
+                child: Text(
+                  'Abbrechen',
+                  style: TextStyle(color: AppColors.textMuted),
+                ),
               ),
               ElevatedButton(
                 onPressed: () async {
@@ -497,7 +638,10 @@ class SettingsScreen extends StatelessWidget {
                     Navigator.pop(ctx);
                   }
                 },
-                style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.black),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: AppColors.onPrimary,
+                ),
                 child: const Text('Sparplan starten'),
               ),
             ],
@@ -516,10 +660,13 @@ class SettingsScreen extends StatelessWidget {
         backgroundColor: AppColors.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
-          children: const [
+          children: [
             Icon(Icons.description, color: AppColors.primary),
             SizedBox(width: 8),
-            Text('Offizieller Depotauszug', style: TextStyle(fontSize: 16, color: AppColors.textPrimary)),
+            Text(
+              'Offizieller Depotauszug',
+              style: TextStyle(fontSize: 16, color: AppColors.textPrimary),
+            ),
           ],
         ),
         content: SizedBox(
@@ -528,7 +675,7 @@ class SettingsScreen extends StatelessWidget {
           child: SingleChildScrollView(
             child: SelectableText(
               statement,
-              style: const TextStyle(
+              style: TextStyle(
                 fontFamily: 'monospace',
                 fontSize: 11,
                 color: AppColors.textSecondary,
@@ -542,15 +689,19 @@ class SettingsScreen extends StatelessWidget {
             onPressed: () {
               Clipboard.setData(ClipboardData(text: statement));
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Depotauszug in die Zwischenablage kopiert!')),
+                const SnackBar(
+                  content: Text('Depotauszug in die Zwischenablage kopiert!'),
+                ),
               );
             },
-            icon: const Icon(Icons.copy, size: 16, color: AppColors.primary),
-            label: const Text('Kopieren', style: TextStyle(color: AppColors.primary)),
+            icon: Icon(Icons.copy, size: 16, color: AppColors.primary),
+            label: Text('Kopieren', style: TextStyle(color: AppColors.primary)),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx),
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.surfaceElevated),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.surfaceElevated,
+            ),
             child: const Text('Schließen'),
           ),
         ],

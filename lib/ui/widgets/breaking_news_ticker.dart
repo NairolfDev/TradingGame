@@ -33,12 +33,15 @@ class BreakingNewsTicker extends StatelessWidget {
           color: AppColors.surfaceElevated,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isBullish ? AppColors.bullish.withAlpha(120) : AppColors.bearish.withAlpha(120),
+            color: isBullish
+                ? AppColors.bullish.withAlpha(120)
+                : AppColors.bearish.withAlpha(120),
             width: 1.2,
           ),
           boxShadow: [
             BoxShadow(
-              color: (isBullish ? AppColors.bullish : AppColors.bearish).withAlpha(30),
+              color: (isBullish ? AppColors.bullish : AppColors.bearish)
+                  .withAlpha(30),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),
@@ -52,14 +55,14 @@ class BreakingNewsTicker extends StatelessWidget {
                 color: isBullish ? AppColors.bullish : AppColors.bearish,
                 borderRadius: BorderRadius.circular(6),
               ),
-              child: const Row(
+              child: Row(
                 children: [
-                  Icon(Icons.bolt, size: 12, color: Colors.black),
+                  Icon(Icons.bolt, size: 12, color: AppColors.onPrimary),
                   SizedBox(width: 2),
                   Text(
                     'NEWS',
                     style: TextStyle(
-                      color: Colors.black,
+                      color: AppColors.onPrimary,
                       fontWeight: FontWeight.bold,
                       fontSize: 10,
                     ),
@@ -73,7 +76,7 @@ class BreakingNewsTicker extends StatelessWidget {
                 news!.headline,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
+                style: TextStyle(
                   color: AppColors.textPrimary,
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
@@ -84,7 +87,8 @@ class BreakingNewsTicker extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
-                color: (isBullish ? AppColors.bullish : AppColors.bearish).withAlpha(40),
+                color: (isBullish ? AppColors.bullish : AppColors.bearish)
+                    .withAlpha(40),
                 borderRadius: BorderRadius.circular(6),
               ),
               child: Text(

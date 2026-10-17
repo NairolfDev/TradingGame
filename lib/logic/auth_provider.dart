@@ -8,6 +8,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import '../data/countries.dart';
 import '../data/models/user_model.dart';
 import '../data/repositories/player_profile_repository.dart';
+import 'desktop_google_sign_in.dart';
 
 class AuthProvider extends ChangeNotifier {
   static const _keyUser = 'tg_auth_user';
@@ -17,6 +18,7 @@ class AuthProvider extends ChangeNotifier {
   FirebaseAuth get _auth => _authOverride ?? FirebaseAuth.instance;
   UserModel? _currentUser;
   bool _isLoading = true;
+  bool _initializing = true;
   bool _profileLoading = false;
   bool _profileLoaded = false;
   bool _disposed = false;
@@ -33,6 +35,10 @@ class AuthProvider extends ChangeNotifier {
   UserModel? get currentUser => _currentUser;
   bool get isAuthenticated => _currentUser != null && !_currentUser!.isGuest;
   bool get isLoading => _isLoading;
+
+  /// Only true while restoring the session at app start. Sign-in actions must
+  /// not swap the app's home widget, or pushed routes lose their context.
+  bool get isInitializing => _initializing;
   bool get isProfileLoading => _profileLoading;
   String? get errorMessage => _errorMessage;
   String? get profileError => _profileError;
@@ -83,6 +89,7 @@ class AuthProvider extends ChangeNotifier {
       } catch (_) {}
     } finally {
       _isLoading = false;
+      _initializing = false;
       _notify();
     }
   }
@@ -309,7 +316,24 @@ class AuthProvider extends ChangeNotifier {
         final provider = GoogleAuthProvider()
           ..setCustomParameters({'prompt': 'select_account'});
         // Keep the popup directly attached to the user's click gesture.
-        credential = await _auth.signInWithPopup(provider);
+        // Never wait forever: a popup whose result is dropped would otherwise
+        // leave the login screen stuck on "Bitte warten".
+        credential = await _auth
+            .signInWithPopup(provider)
+            .timeout(const Duration(minutes: 2));
+      } else if (defaultTargetPlatform == TargetPlatform.windows ||
+          defaultTargetPlatform == TargetPlatform.linux) {
+        // google_sign_in has no Windows/Linux implementation.
+        if (desktopGoogleClientId.isEmpty) {
+          _errorMessage =
+              'Google-Anmeldung ist in diesem Desktop-Build nicht eingerichtet. Bitte E-Mail verwenden.';
+          return false;
+        }
+        final idToken = await desktopGoogleIdToken();
+        if (idToken == null) return false;
+        credential = await _auth.signInWithCredential(
+          GoogleAuthProvider.credential(idToken: idToken),
+        );
       } else {
         final account = await GoogleSignIn(scopes: ['email']).signIn();
         if (account == null) return false;
@@ -330,7 +354,12 @@ class AuthProvider extends ChangeNotifier {
         _errorMessage = _authError(e);
       }
       return false;
-    } catch (_) {
+    } on TimeoutException {
+      _errorMessage =
+          'Keine Antwort vom Google-Fenster. Bitte Pop-ups und Cookies für diese Seite erlauben und erneut versuchen.';
+      return false;
+    } catch (e) {
+      debugPrint('Google sign-in failed: $e');
       _errorMessage =
           'Google-Anmeldung fehlgeschlagen. Bitte erneut versuchen.';
       return false;

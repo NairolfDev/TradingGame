@@ -80,7 +80,7 @@ class _WatchlistMarqueeTickerState extends State<WatchlistMarqueeTicker> {
             color: AppColors.accentGold.withValues(alpha: 0.4),
             width: 1.0,
           ),
-          bottom: const BorderSide(color: AppColors.cardBorder, width: 0.5),
+          bottom: BorderSide(color: AppColors.cardBorder, width: 0.5),
         ),
         boxShadow: [
           BoxShadow(
@@ -103,7 +103,7 @@ class _WatchlistMarqueeTickerState extends State<WatchlistMarqueeTicker> {
                 Container(
                   width: 7,
                   height: 7,
-                  decoration: const BoxDecoration(
+                  decoration: BoxDecoration(
                     color: AppColors.profitGreen,
                     shape: BoxShape.circle,
                   ),
@@ -111,7 +111,7 @@ class _WatchlistMarqueeTickerState extends State<WatchlistMarqueeTicker> {
                 const SizedBox(width: 6),
                 Text(
                   watchlisted.isNotEmpty ? 'WATCHLIST' : 'KURSE',
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.accentGold,
                     fontSize: 10,
                     fontWeight: FontWeight.w900,
@@ -160,7 +160,7 @@ class _WatchlistMarqueeTickerState extends State<WatchlistMarqueeTicker> {
                         children: [
                           Text(
                             asset.symbol,
-                            style: const TextStyle(
+                            style: TextStyle(
                               color: AppColors.textPrimary,
                               fontSize: 11,
                               fontWeight: FontWeight.bold,
@@ -173,7 +173,7 @@ class _WatchlistMarqueeTickerState extends State<WatchlistMarqueeTicker> {
                                     asset.currentPrice,
                                   )
                                 : 'Kein Kurs',
-                            style: const TextStyle(
+                            style: TextStyle(
                               color: AppColors.textSecondary,
                               fontSize: 11,
                             ),
@@ -206,7 +206,7 @@ class _WatchlistMarqueeTickerState extends State<WatchlistMarqueeTicker> {
                             ),
                           ),
                           const SizedBox(width: 14),
-                          const Text(
+                          Text(
                             '•',
                             style: TextStyle(
                               color: AppColors.textMuted,

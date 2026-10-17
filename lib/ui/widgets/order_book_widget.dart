@@ -18,7 +18,7 @@ class OrderBookWidget extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.table_rows_outlined, color: AppColors.accent),
+          Icon(Icons.table_rows_outlined, color: AppColors.accent),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -33,10 +33,7 @@ class OrderBookWidget extends StatelessWidget {
                   'Für ${asset.symbol} liefert der Kursanbieter keine '
                   'Orderbuchdaten. Geld-/Briefkurse und Mengen können deshalb '
                   'nicht angezeigt werden.',
-                  style: const TextStyle(
-                    color: AppColors.textSecondary,
-                    height: 1.5,
-                  ),
+                  style: TextStyle(color: AppColors.textSecondary, height: 1.5),
                 ),
               ],
             ),

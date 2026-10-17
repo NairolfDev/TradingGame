@@ -13,7 +13,7 @@ class SocialTradingScreen extends StatelessWidget {
           padding: const EdgeInsets.all(32),
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 440),
-            child: const Column(
+            child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(Icons.people_outline, size: 56, color: AppColors.accent),

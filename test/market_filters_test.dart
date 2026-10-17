@@ -25,7 +25,13 @@ void main() {
     await tester.pumpWidget(
       ChangeNotifierProvider.value(
         value: portfolio,
-        child: const MaterialApp(home: MarketsScreen()),
+        child: MaterialApp(
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(context).copyWith(size: const Size(375, 812)),
+            child: child!,
+          ),
+          home: const MarketsScreen(),
+        ),
       ),
     );
     await tester.pump();
@@ -36,8 +42,15 @@ void main() {
     await tester.enterText(find.byType(TextField), 'Erste');
     await tester.pump(const Duration(milliseconds: 300));
     expect(find.textContaining('1 Treffer'), findsOneWidget);
+    await tester.ensureVisible(find.text('Zurücksetzen'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Zurücksetzen'));
     await tester.pump();
+    expect(
+      find.textContaining('${portfolio.assets.length} Treffer'),
+      findsOneWidget,
+    );
+    await tester.ensureVisible(find.text('Weitere Filter'));
     await tester.tap(find.text('Weitere Filter'));
     await tester.pump();
     expect(find.text('Branche'), findsOneWidget);
