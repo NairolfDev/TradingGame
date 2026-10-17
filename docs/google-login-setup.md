@@ -12,7 +12,14 @@ Stand: 17.10.2026. Firebase-Projekt: `tradinggame-austria-prod`.
 - **Windows/Linux:** `google_sign_in` unterstützt diese Plattformen nicht. Neu ist ein Browser-Login
   über die System-Loopback-Adresse (`lib/logic/desktop_google_sign_in.dart`), siehe Schritt 3.
 
-## 1. Android (Play Store) – SHA-Fingerprints eintragen
+## 1. Android (Play Store) – ERLEDIGT am 17.10.2026
+
+Erledigt: Firebase-Android-App mit Paket `com.nairolfdev.tradinggame` angelegt (die alte war auf
+`com.tradinggame.trading_game` registriert), 5 SHA-1-Fingerprints eingetragen (3× Play-Signatur,
+Upload-Key, Debug-Key), `google-services.json` samt `firebase_options.dart` erneuert. Offen: das Bundle
+`release/TradingGame-1.6.0+8.aab` in der Play Console hochladen (siehe unten, nur zur Referenz).
+
+### Referenz: Vorgehen
 
 Ohne diese Fingerprints ist `oauth_client` in `android/app/google-services.json` leer.
 Google bricht die Anmeldung dann nach der Kontoauswahl mit `DEVELOPER_ERROR (10)` ab.
@@ -65,7 +72,12 @@ die Anmeldung nach 2 Minuten mit einer verständlichen Meldung ab, statt ewig �
 `chrome://settings/cookies` → *Websites, die Drittanbieter-Cookies verwenden dürfen* →
 `http://localhost:8088` hinzufügen. Klappt der Login danach, ist die Diagnose bestätigt.
 
-## 3. Windows (Desktop)
+## 3. Windows (Desktop) – ERLEDIGT am 17.10.2026
+
+OAuth-Desktop-Client „Trading Game Windows" existiert; Zugangsdaten liegen in `dart_defines.local.json`
+(nicht im Git, `start_game_windows.bat` nutzt sie). Der Ablauf wurde bis Firebase-Login getestet.
+
+### Referenz
 
 1. **Google Cloud Console** → gleiches Projekt → *APIs & Dienste* → *Anmeldedaten* →
    *Anmeldedaten erstellen* → *OAuth-Client-ID* → Anwendungstyp **Desktop-App** → Name „Trading Game Windows".
