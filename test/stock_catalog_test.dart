@@ -9,6 +9,12 @@ void main() {
     'complete sourced stock universes have unique symbols and no seed quotes',
     () {
       final assets = StockCatalog.merge(InitialAssets.getAssets());
+      expect(
+        assets.map((asset) => asset.id).toSet().length,
+        assets.length,
+        reason:
+            'New symbols must not collide with legacy IDs such as CAI / CAI.VI',
+      );
       for (final entry in {
         'Nasdaq': 3540,
         'DAX': 40,

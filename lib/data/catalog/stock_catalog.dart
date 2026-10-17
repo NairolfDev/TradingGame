@@ -9,7 +9,9 @@ class StockCatalog {
     for (final row in stockCatalogRows) {
       final old = bySymbol[row[0]];
       bySymbol[row[0]] = Asset(
-        id: old?.id ?? 'stock_${row[0].toLowerCase().replaceAll('.', '_')}',
+        id:
+            old?.id ??
+            'catalog_stock_${row[0].toLowerCase().replaceAll('.', '_')}',
         symbol: row[0],
         name: row[1],
         type: AssetType.stock,
