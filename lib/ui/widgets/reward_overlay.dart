@@ -63,7 +63,7 @@ class _RewardOverlayState extends State<RewardOverlay>
       return;
     }
     final e = _queue.removeAt(0);
-    final celebrate = e.kind != RewardKind.loss && e.kind != RewardKind.buy;
+    final celebrate = _celebrates(e.kind);
     if (celebrate) HapticFeedback.mediumImpact();
     setState(() => _current = e);
     _anim.forward(from: 0);
@@ -128,7 +128,19 @@ class _RewardOverlayState extends State<RewardOverlay>
     color: AppColors.purple,
     icon: Icons.diamond_outlined,
   ),
+  RewardKind.orderExecuted => (color: AppColors.accent, icon: Icons.task_alt),
+  RewardKind.alert => (
+    color: AppColors.warning,
+    icon: Icons.notifications_active_outlined,
+  ),
 };
+
+/// Only real wins get confetti; trade/order/alert confirmations stay calm.
+bool _celebrates(RewardKind k) =>
+    k == RewardKind.profit ||
+    k == RewardKind.quest ||
+    k == RewardKind.achievement ||
+    k == RewardKind.purchase;
 
 String? _amountText(RewardEvent e) {
   final parts = <String>[
@@ -203,8 +215,7 @@ class _GamerCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final look = _look(event.kind);
     final amount = _amountText(event);
-    final celebrate =
-        event.kind != RewardKind.loss && event.kind != RewardKind.buy;
+    final celebrate = _celebrates(event.kind);
     return AnimatedBuilder(
       animation: anim,
       builder: (context, child) {

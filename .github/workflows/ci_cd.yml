@@ -45,7 +45,7 @@ jobs:
           node-version: '22'
 
       - name: Test quote normalization
-        run: node --test functions/market_quotes.test.js
+        run: node --test functions/market_quotes.test.js functions/price_alerts.test.js
 
   build_web:
     name: 🌐 Build & Deploy Web (Firebase)

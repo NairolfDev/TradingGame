@@ -176,6 +176,9 @@ class PortfolioProvider extends ChangeNotifier {
 
   final _rewards = StreamController<RewardEvent>.broadcast();
 
+  /// Lets other layers (e.g. a foreground push message) use the same overlay.
+  void announce(RewardEvent event) => _reward(event);
+
   /// Trades, quests and achievements for the celebration overlay.
   Stream<RewardEvent> get rewards => _rewards.stream;
   void _reward(RewardEvent e) {
@@ -1313,6 +1316,15 @@ class PortfolioProvider extends ChangeNotifier {
 
           _lastAlertMessage =
               '✅ KAUF AUSGEFÜHRT: ${order.amount.toStringAsFixed(2)}x ${matchingAsset.symbol} @ ${matchingAsset.currentPrice.toStringAsFixed(2)} € eingebucht!';
+          _reward(
+            RewardEvent(
+              kind: RewardKind.orderExecuted,
+              title: 'Kauf-Order ausgeführt',
+              detail:
+                  '${_qty(order.amount)} × ${matchingAsset.symbol} @ ${matchingAsset.currentPrice.toStringAsFixed(2)} €',
+              cash: -order.totalEstimatedCost,
+            ),
+          );
         } else {
           // Verkaufs-Order abwickeln
           double cashReturn = 0.0;
@@ -1373,6 +1385,15 @@ class PortfolioProvider extends ChangeNotifier {
 
           _lastAlertMessage =
               '✅ VERKAUF AUSGEFÜHRT: ${order.amount.toStringAsFixed(2)}x ${matchingAsset.symbol} für ${cashReturn.toStringAsFixed(2)} € abgerechnet!';
+          _reward(
+            RewardEvent(
+              kind: RewardKind.orderExecuted,
+              title: 'Verkaufs-Order ausgeführt',
+              detail:
+                  '${_qty(order.amount)} × ${matchingAsset.symbol} für ${cashReturn.toStringAsFixed(2)} €',
+              cash: realizedPnL,
+            ),
+          );
         }
       }
 
