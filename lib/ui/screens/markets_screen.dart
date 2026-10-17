@@ -18,6 +18,7 @@ class MarketsScreen extends StatefulWidget {
 class _MarketsScreenState extends State<MarketsScreen> {
   final _search = TextEditingController();
   final _scroll = ScrollController();
+  final _filtersKey = GlobalKey();
   Timer? _debounce;
   String _query = '';
   AssetType? _type;
@@ -423,6 +424,7 @@ class _MarketsScreenState extends State<MarketsScreen> {
       body: LayoutBuilder(
         builder: (context, bodyConstraints) {
           final filters = Padding(
+            key: _filtersKey,
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
             child: Column(
               children: [
@@ -765,7 +767,11 @@ class _MarketsScreenState extends State<MarketsScreen> {
           );
           // Short or zoomed-in screens: filters and results scroll together,
           // otherwise the fixed filter area leaves no room for the list.
-          if (bodyConstraints.maxHeight < 560 ||
+          // Judge by the window, not the body: the on-screen keyboard shrinks
+          // the body, and switching layouts then rebuilt the search field and
+          // closed the keyboard while typing.
+          final windowHeight = MediaQuery.sizeOf(context).height;
+          if (windowHeight < 560 ||
               (MediaQuery.textScalerOf(context).scale(1) >= 1.5 &&
                   bodyConstraints.maxWidth < 1000)) {
             return RefreshIndicator(
