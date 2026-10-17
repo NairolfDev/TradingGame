@@ -7,209 +7,108 @@ class PositionTile extends StatelessWidget {
   final Position position;
   final VoidCallback onSell;
 
-  const PositionTile({
-    super.key,
-    required this.position,
-    required this.onSell,
-  });
+  const PositionTile({super.key, required this.position, required this.onSell});
 
   @override
   Widget build(BuildContext context) {
-    final isPos = position.unrealizedPnL >= 0;
-    final pnlColor = isPos ? AppColors.profit : AppColors.loss;
-
-    return Container(
+    final profit = position.unrealizedPnL;
+    return Card(
       margin: const EdgeInsets.symmetric(vertical: 6),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: position.isLeveraged
-              ? AppColors.cfd.withValues(alpha: 0.3)
-              : AppColors.cardBorder,
-          width: 1,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              // Symbol & Badge
-              Text(
-                position.symbol,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              const SizedBox(width: 8),
-              if (position.isLeveraged) ...[
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: position.isShort
-                        ? AppColors.loss.withValues(alpha: 0.2)
-                        : AppColors.profit.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(
-                      color: position.isShort ? AppColors.loss : AppColors.profit,
-                      width: 0.8,
-                    ),
-                  ),
-                  child: Text(
-                    '${position.leverage}x ${position.isShort ? "SHORT" : "LONG"}',
-                    style: TextStyle(
-                      color: position.isShort ? AppColors.loss : AppColors.profit,
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                    ),
+      color: AppColors.surface,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Wrap(
+              spacing: 12,
+              runSpacing: 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                Text(
+                  position.symbol,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
                   ),
                 ),
-              ] else ...[
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: AppColors.surfaceElevated,
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: const Text(
-                    'SPOT',
-                    style: TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                    ),
+                Text(
+                  position.isLeveraged
+                      ? '${position.leverage}x ${position.isShort ? "SHORT" : "LONG"}'
+                      : 'SPOT',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: AppColors.textSecondary,
                   ),
                 ),
               ],
-              const Spacer(),
-              // Value & PnL
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    CurrencyFormatter.format(position.currentValue),
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  Row(
-                    children: [
-                      Text(
-                        '${isPos ? "+" : ""}${CurrencyFormatter.format(position.unrealizedPnL)}',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: pnlColor,
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        '(${CurrencyFormatter.formatPercent(position.unrealizedPnLPercent)})',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          color: pnlColor,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              position.name,
+              style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              CurrencyFormatter.format(position.currentValue),
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            Text(
+              '${profit >= 0 ? "+" : ""}${CurrencyFormatter.format(profit)} '
+              '(${CurrencyFormatter.formatPercent(position.unrealizedPnLPercent)}) '
+              'nicht realisiert',
+              style: TextStyle(
+                fontSize: 14,
+                color: profit >= 0 ? AppColors.profit : AppColors.loss,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 16,
+              runSpacing: 8,
+              children: [
+                Text(
+                  'Menge: ${CurrencyFormatter.formatAmount(position.amount)}',
+                ),
+                Text(
+                  'Ø Kauf: ${CurrencyFormatter.format(position.averageBuyPrice)}',
+                ),
+                Text(
+                  'Aktuell: ${CurrencyFormatter.format(position.currentPrice)}',
+                ),
+              ],
+            ),
+            if (position.isLeveraged) ...[
+              const SizedBox(height: 12),
+              Text(
+                'Liquidationspreis: '
+                '${CurrencyFormatter.format(position.liquidationPrice)}',
+                style: TextStyle(color: AppColors.loss),
               ),
             ],
-          ),
-
-          const SizedBox(height: 8),
-
-          // Details Row
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Menge: ${CurrencyFormatter.formatAmount(position.amount)}',
-                style: const TextStyle(
-                  fontSize: 11,
-                  color: AppColors.textSecondary,
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: onSell,
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(48, 48),
+                  foregroundColor: AppColors.loss,
+                  side: BorderSide(color: AppColors.loss),
+                  padding: const EdgeInsets.all(12),
                 ),
-              ),
-              Text(
-                'Ø Kauf: ${CurrencyFormatter.format(position.averageBuyPrice)}',
-                style: const TextStyle(
-                  fontSize: 11,
-                  color: AppColors.textSecondary,
+                child: Text(
+                  position.isLeveraged ? 'Position schließen' : 'Verkaufen',
                 ),
-              ),
-              Text(
-                'Aktuell: ${CurrencyFormatter.format(position.currentPrice)}',
-                style: const TextStyle(
-                  fontSize: 11,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-            ],
-          ),
-
-          // Liquidation Warning for leveraged CFDs
-          if (position.isLeveraged) ...[
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: AppColors.loss.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: AppColors.loss.withValues(alpha: 0.3),
-                  width: 0.8,
-                ),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.warning_amber_rounded,
-                      size: 14, color: AppColors.loss),
-                  const SizedBox(width: 6),
-                  Text(
-                    'Liquidationspreis: ${CurrencyFormatter.format(position.liquidationPrice)}',
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.loss,
-                    ),
-                  ),
-                ],
               ),
             ),
           ],
-
-          const SizedBox(height: 10),
-
-          // Action: Sell / Close
-          SizedBox(
-            width: double.infinity,
-            height: 34,
-            child: OutlinedButton(
-              onPressed: onSell,
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.loss,
-                side: const BorderSide(color: AppColors.loss, width: 1),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                padding: EdgeInsets.zero,
-              ),
-              child: const Text(
-                'Position Schließen / Verkaufen',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

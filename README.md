@@ -83,7 +83,7 @@ Wie in professionellen Trading- und Broker-Apps (TradingView, Bloomberg, Trade R
 ---
 
 ### 3. 🏦 Kredite, Bonitätsstufen (Schufa/Rating) & Echte Privatinsolvenz
-- **50.000 € Startkredit**: Verfügbar zu Beginn mit 60 Tagen Tilgungsfrist.
+- **25.000 € Startkredit**: Verfügbar zu Beginn mit 60 Tagen Tilgungsfrist.
 - **Bonitätssystem (Rating AAA bis D)**: Dein Zinssatz passt sich dynamisch deiner Trading-Performance an.
 - **Anti-Spam Cooldown**: Nach jeder Kreditaufnahme greift eine **24-stündige Abklingzeit**, bevor eine weitere Kreditanfrage gestellt werden kann.
 - 🚨 **Privatinsolvenz-Sperre (120 Stunden / 5 echte Tage)**:
@@ -186,7 +186,7 @@ flutter build apk --release
 ## 🚀 CI/CD Pipeline (GitHub Actions)
 
 Das Repository enthält eine vollautomatisierte Pipeline in `.github/workflows/ci_cd.yml`:
-- **Bei Push auf `main` oder Pull Requests:**
+- **Bei Push auf `main`/`dev` oder Pull Requests:**
   - Automatische Validierung mit `flutter analyze` und `flutter test`.
   - Paralleler Build von:
     - 📦 `android-aab` (Google Play App Bundle)
@@ -214,3 +214,9 @@ Contributions sind herzlich willkommen!
 
 Copyright (C) 2026 Florian Oberhauser & Contributoren.  
 Lizenziert unter der **GNU General Public License v3.0**.
+
+## Datenqualität und aktueller Prüfbericht
+
+Erfundene Marktdaten wurden aus der Anzeige entfernt. Unterstützte EUR-Werte nutzen die Kursfeeds; nicht aktualisierte Werte sind als Katalogkurse gekennzeichnet. Copy-Trading und Markttiefe zeigen ohne echten Feed einen Leerzustand. Historische Charts zeigen verfügbare Schlusskurse statt künstlicher OHLC-Kerzen. Details, Korrekturen und Grenzen: [Qualitätsprüfung 16.10.2026](docs/quality-review-2026-10-16.md).
+
+Ein Push auf `dev` deployt nach erfolgreichen Tests den Web-Build auf die bestehende Firebase-Live-Site. Android-/Desktop-Releases werden nur von `main` erstellt.

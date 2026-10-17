@@ -1,398 +1,423 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import '../data/countries.dart';
 import '../data/models/user_model.dart';
+import '../data/repositories/player_profile_repository.dart';
+import 'desktop_google_sign_in.dart';
 
 class AuthProvider extends ChangeNotifier {
-  static const String _keyUser = 'tg_auth_user';
-  final Uuid _uuid = const Uuid();
-
+  static const _keyUser = 'tg_auth_user';
+  final FirebaseAuth? _authOverride;
+  final PlayerProfileRepository _profiles;
+  StreamSubscription<User?>? _subscription;
+  FirebaseAuth get _auth => _authOverride ?? FirebaseAuth.instance;
   UserModel? _currentUser;
   bool _isLoading = true;
+  bool _initializing = true;
+  bool _profileLoading = false;
+  bool _profileLoaded = false;
+  bool _disposed = false;
+  int _sessionVersion = 0;
   String? _errorMessage;
+  String? _profileError;
+
+  AuthProvider({FirebaseAuth? firebaseAuth, PlayerProfileRepository? profiles})
+    : _authOverride = firebaseAuth,
+      _profiles = profiles ?? FirebasePlayerProfileRepository() {
+    _initialize();
+  }
 
   UserModel? get currentUser => _currentUser;
-  bool get isAuthenticated => _currentUser != null;
+  bool get isAuthenticated => _currentUser != null && !_currentUser!.isGuest;
   bool get isLoading => _isLoading;
+
+  /// Only true while restoring the session at app start. Sign-in actions must
+  /// not swap the app's home widget, or pushed routes lose their context.
+  bool get isInitializing => _initializing;
+  bool get isProfileLoading => _profileLoading;
   String? get errorMessage => _errorMessage;
+  String? get profileError => _profileError;
+  bool get needsProfile =>
+      isAuthenticated &&
+      (!_profileLoaded ||
+          _currentUser!.displayName.trim().runes.length < 2 ||
+          !countryNames.containsKey(_currentUser!.countryCode));
 
-  AuthProvider() {
-    _loadUserSession();
-    _initAuthListener();
+  void _notify() {
+    if (!_disposed) notifyListeners();
   }
 
-  void _initAuthListener() {
+  Future<void> _initialize() async {
     try {
-      FirebaseAuth.instance.authStateChanges().listen((fbUser) {
-        if (fbUser != null) {
-          if (_currentUser == null || _currentUser!.uid != fbUser.uid) {
-            _currentUser = UserModel(
-              uid: fbUser.uid,
-              email: fbUser.email ?? 'trader@tradinggame.at',
-              displayName: fbUser.displayName ??
-                  (fbUser.email?.isNotEmpty == true
-                      ? fbUser.email!.split('@').first
-                      : 'Trader ${fbUser.uid.substring(0, 5)}'),
-              photoUrl: fbUser.photoURL,
-              authProvider: fbUser.isAnonymous ? 'guest' : 'firebase',
-              isGuest: fbUser.isAnonymous,
-            );
-            notifyListeners();
-          }
-        }
-      });
-    } catch (_) {}
-  }
-
-  Future<void> _loadUserSession() async {
-    _isLoading = true;
-    notifyListeners();
-
-    try {
-      // 1. Check Web Redirect result (falls Google Redirect genutzt wurde)
       if (kIsWeb) {
         try {
-          final redirectResult = await FirebaseAuth.instance.getRedirectResult();
-          if (redirectResult.user != null) {
-            final u = redirectResult.user!;
-            _currentUser = UserModel(
-              uid: u.uid,
-              email: u.email ?? 'trader@tradinggame.at',
-              displayName: u.displayName ??
-                  (u.email?.isNotEmpty == true
-                      ? u.email!.split('@').first
-                      : 'Google Trader'),
-              photoUrl: u.photoURL,
-              authProvider: 'google',
-              isGuest: false,
-            );
-            final prefs = await SharedPreferences.getInstance();
-            await prefs.setString(_keyUser, jsonEncode(_currentUser!.toJson()));
-            _isLoading = false;
-            notifyListeners();
-            return;
-          }
-        } catch (e) {
-          debugPrint('Check redirect result error: $e');
+          await _auth.getRedirectResult();
+        } on FirebaseAuthException catch (e) {
+          _errorMessage = _authError(e);
         }
       }
-
-      // 2. Check lokale Sitzung
+      final user = await _auth.authStateChanges().first;
+      await _acceptUser(user);
+      if (_disposed) return;
+      _subscription = _auth.authStateChanges().listen(
+        (user) {
+          if (user?.uid != _currentUser?.uid ||
+              (user == null && _currentUser != null)) {
+            unawaited(_acceptUser(user));
+          }
+        },
+        onError: (Object error) {
+          _errorMessage =
+              'Die Anmeldung konnte nicht wiederhergestellt werden. Bitte erneut anmelden.';
+          _notify();
+        },
+      );
+    } catch (_) {
+      // Local guest mode is allowed; a local cache never proves a real login.
       final prefs = await SharedPreferences.getInstance();
       final raw = prefs.getString(_keyUser);
-      if (raw != null) {
-        _currentUser = UserModel.fromJson(jsonDecode(raw) as Map<String, dynamic>);
-      }
-
-      // 3. Check aktuellen Firebase Auth Nutzer
-      final fbUser = FirebaseAuth.instance.currentUser;
-      if (fbUser != null) {
-        _currentUser = UserModel(
-          uid: fbUser.uid,
-          email: fbUser.email ?? (_currentUser?.email ?? 'trader@tradinggame.at'),
-          displayName: fbUser.displayName ?? (_currentUser?.displayName ?? 'Trader'),
-          photoUrl: fbUser.photoURL ?? _currentUser?.photoUrl,
-          authProvider: fbUser.isAnonymous ? 'guest' : (_currentUser?.authProvider ?? 'firebase'),
-          isGuest: fbUser.isAnonymous,
-        );
-      } else {
-        // Starte echte anonyme Firebase-Sitzung, damit Firestore-Zugriff sofort autorisiert ist
-        try {
-          final anonCred = await FirebaseAuth.instance.signInAnonymously();
-          final u = anonCred.user;
-          if (u != null && _currentUser == null) {
-            _currentUser = UserModel(
-              uid: u.uid,
-              email: 'gast_${u.uid.substring(0, 6)}@tradinggame.at',
-              displayName: 'Trader ${u.uid.substring(0, 5)}',
-              authProvider: 'guest',
-              isGuest: true,
-            );
-            await prefs.setString(_keyUser, jsonEncode(_currentUser!.toJson()));
-          }
-        } catch (anonErr) {
-          debugPrint('Anonymous auth notice: $anonErr');
-        }
-      }
-    } catch (_) {
-      _currentUser = null;
+      try {
+        final cached = raw == null
+            ? null
+            : UserModel.fromJson(jsonDecode(raw) as Map<String, dynamic>);
+        if (cached?.isGuest == true) _currentUser = cached;
+      } catch (_) {}
     } finally {
       _isLoading = false;
-      notifyListeners();
+      _initializing = false;
+      _notify();
+    }
+  }
+
+  UserModel _fromFirebase(User user, {String? name, String? countryCode}) {
+    final shortId = user.uid.length > 6 ? user.uid.substring(0, 6) : user.uid;
+    return UserModel(
+      uid: user.uid,
+      email: user.email ?? '',
+      displayName: name ?? user.displayName ?? 'Trader $shortId',
+      photoUrl: user.photoURL,
+      authProvider: user.isAnonymous
+          ? 'guest'
+          : (user.providerData.any((p) => p.providerId == 'google.com')
+                ? 'google'
+                : 'password'),
+      isGuest: user.isAnonymous,
+      countryCode: countryCode,
+    );
+  }
+
+  Future<void> _acceptUser(User? user) async {
+    final version = ++_sessionVersion;
+    _profileError = null;
+    _profileLoaded = false;
+    _currentUser = user == null ? null : _fromFirebase(user);
+    if (user == null || user.isAnonymous) {
+      _profileLoading = false;
+      _notify();
+      return;
+    }
+    _profileLoading = true;
+    _notify();
+    try {
+      final profile = await _profiles
+          .load(user.uid)
+          .timeout(const Duration(seconds: 15));
+      if (_disposed || version != _sessionVersion) return;
+      _currentUser = _fromFirebase(
+        user,
+        name: profile?['displayName'] as String?,
+        countryCode: profile?['countryCode'] as String?,
+      );
+      final savedName = profile?['displayName'];
+      _profileLoaded =
+          savedName is String &&
+          savedName.trim().runes.length >= 2 &&
+          savedName.runes.length <= 24;
+    } catch (_) {
+      if (version == _sessionVersion) {
+        _profileError =
+            'Profil konnte nicht geladen werden. Bitte Verbindung prüfen und erneut versuchen.';
+      }
+    } finally {
+      if (version == _sessionVersion) {
+        _profileLoading = false;
+        _notify();
+      }
+    }
+  }
+
+  Future<void> reloadProfile() async {
+    final user = _auth.currentUser;
+    if (user != null) await _acceptUser(user);
+  }
+
+  Future<bool> completeProfile({
+    required String displayName,
+    required String countryCode,
+  }) async {
+    if (_profileLoading) return false;
+    final name = displayName.trim();
+    if (name.runes.length < 2 ||
+        name.runes.length > 24 ||
+        name.contains(RegExp(r'[\x00-\x1F\x7F]')) ||
+        !countryNames.containsKey(countryCode)) {
+      _profileError =
+          'Bitte einen Namen mit 2–24 Zeichen und ein gültiges Land wählen.';
+      _notify();
+      return false;
+    }
+    final user = _auth.currentUser;
+    if (user == null || user.isAnonymous || user.uid != _currentUser?.uid) {
+      return false;
+    }
+    final version = _sessionVersion;
+    _profileLoading = true;
+    _profileError = null;
+    _notify();
+    try {
+      await _profiles
+          .save(user.uid, displayName: name, countryCode: countryCode)
+          .timeout(const Duration(seconds: 15));
+      if (_disposed || version != _sessionVersion) return false;
+      _currentUser = _fromFirebase(user, name: name, countryCode: countryCode);
+      _profileLoaded = true;
+      try {
+        await user.updateDisplayName(name);
+      } catch (_) {}
+      return true;
+    } catch (_) {
+      _profileError =
+          'Profil konnte nicht gespeichert werden. Bitte erneut versuchen.';
+      return false;
+    } finally {
+      if (version == _sessionVersion) {
+        _profileLoading = false;
+        _notify();
+      }
     }
   }
 
   void clearError() {
     _errorMessage = null;
-    notifyListeners();
+    _notify();
   }
 
-  /// Login mit E-Mail / Benutzername und Passwort
+  String _authError(FirebaseAuthException error) {
+    switch (error.code) {
+      case 'invalid-credential':
+      case 'wrong-password':
+      case 'user-not-found':
+        return 'E-Mail oder Passwort stimmt nicht.';
+      case 'invalid-email':
+        return 'Bitte eine gültige E-Mail-Adresse eingeben.';
+      case 'email-already-in-use':
+        return 'Für diese E-Mail gibt es bereits ein Konto. Bitte anmelden.';
+      case 'weak-password':
+        return 'Das Passwort muss mindestens 6 Zeichen lang sein.';
+      case 'user-disabled':
+        return 'Dieses Konto ist deaktiviert.';
+      case 'too-many-requests':
+        return 'Zu viele Versuche. Bitte später erneut versuchen.';
+      case 'network-request-failed':
+        return 'Keine Verbindung. Bitte Internetverbindung prüfen.';
+      case 'unauthorized-domain':
+        return 'Diese Website ist für die Anmeldung noch nicht freigegeben.';
+      case 'operation-not-allowed':
+        return 'Diese Anmeldemethode ist derzeit nicht verfügbar.';
+      case 'popup-blocked':
+        return 'Bitte Pop-ups für diese Website erlauben und erneut versuchen.';
+      default:
+        return 'Anmeldung fehlgeschlagen. Bitte erneut versuchen.';
+    }
+  }
+
   Future<bool> signInWithEmailPassword({
     required String emailOrUsername,
     required String password,
   }) async {
+    if (_isLoading) return false;
+    final email = emailOrUsername.trim();
+    if (!email.contains('@') || password.isEmpty) {
+      _errorMessage = 'Bitte deine E-Mail-Adresse und dein Passwort eingeben.';
+      _notify();
+      return false;
+    }
     _isLoading = true;
     _errorMessage = null;
-    notifyListeners();
-
+    _notify();
     try {
-      if (emailOrUsername.trim().isEmpty || password.trim().isEmpty) {
-        _errorMessage = 'Bitte gib deinen Benutzernamen/E-Mail und Passwort ein.';
-        _isLoading = false;
-        notifyListeners();
-        return false;
-      }
-
-      final email = emailOrUsername.contains('@')
-          ? emailOrUsername.trim()
-          : '${emailOrUsername.trim().toLowerCase()}@tradinggame.at';
-      final displayName = emailOrUsername.contains('@')
-          ? emailOrUsername.split('@').first
-          : emailOrUsername.trim();
-
-      String uid = 'usr_${_uuid.v4().substring(0, 8)}';
-      try {
-        final cred = await FirebaseAuth.instance.signInWithEmailAndPassword(
-          email: email,
-          password: password,
-        );
-        if (cred.user != null) {
-          uid = cred.user!.uid;
-        }
-      } catch (fbErr) {
-        debugPrint('Firebase Email Sign-In notice: $fbErr');
-      }
-
-      _currentUser = UserModel(
-        uid: uid,
+      final credential = await _auth.signInWithEmailAndPassword(
         email: email,
-        displayName: displayName,
-        authProvider: 'password',
-        isGuest: false,
+        password: password,
       );
-
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_keyUser, jsonEncode(_currentUser!.toJson()));
-
-      _isLoading = false;
-      notifyListeners();
+      if (credential.user == null) throw StateError('Missing Firebase user');
+      await _acceptUser(credential.user);
       return true;
-    } catch (e) {
-      _errorMessage = 'Fehler beim Anmelden: $e';
-      _isLoading = false;
-      notifyListeners();
+    } on FirebaseAuthException catch (e) {
+      _errorMessage = _authError(e);
       return false;
+    } catch (_) {
+      _errorMessage = 'Anmeldung fehlgeschlagen. Bitte erneut versuchen.';
+      return false;
+    } finally {
+      _isLoading = false;
+      _notify();
     }
   }
 
-  /// Registrierung mit neuem Account
   Future<bool> registerWithEmailPassword({
-    required String username,
+    String username = '',
     required String email,
     required String password,
   }) async {
+    if (_isLoading) return false;
+    if (!email.trim().contains('@') || password.length < 6) {
+      _errorMessage =
+          'Bitte eine gültige E-Mail und ein Passwort mit mindestens 6 Zeichen eingeben.';
+      _notify();
+      return false;
+    }
     _isLoading = true;
     _errorMessage = null;
-    notifyListeners();
-
+    _notify();
     try {
-      if (username.trim().isEmpty || email.trim().isEmpty || password.trim().isEmpty) {
-        _errorMessage = 'Bitte fülle alle Pflichtfelder aus.';
-        _isLoading = false;
-        notifyListeners();
-        return false;
-      }
-
-      if (password.length < 6) {
-        _errorMessage = 'Das Passwort muss mindestens 6 Zeichen lang sein.';
-        _isLoading = false;
-        notifyListeners();
-        return false;
-      }
-
-      String uid = 'usr_${_uuid.v4().substring(0, 8)}';
-      try {
-        final cred = await FirebaseAuth.instance.createUserWithEmailAndPassword(
-          email: email.trim(),
-          password: password.trim(),
-        );
-        if (cred.user != null) {
-          uid = cred.user!.uid;
-          await cred.user!.updateDisplayName(username.trim());
-        }
-      } catch (fbErr) {
-        debugPrint('Firebase Register notice: $fbErr');
-      }
-
-      _currentUser = UserModel(
-        uid: uid,
+      final credential = await _auth.createUserWithEmailAndPassword(
         email: email.trim(),
-        displayName: username.trim(),
-        authProvider: 'password',
-        isGuest: false,
+        password: password,
       );
-
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_keyUser, jsonEncode(_currentUser!.toJson()));
-
-      _isLoading = false;
-      notifyListeners();
+      if (credential.user == null) throw StateError('Missing Firebase user');
+      await _acceptUser(credential.user);
       return true;
-    } catch (e) {
-      _errorMessage = 'Registrierung fehlgeschlagen: $e';
-      _isLoading = false;
-      notifyListeners();
+    } on FirebaseAuthException catch (e) {
+      _errorMessage = _authError(e);
       return false;
+    } catch (_) {
+      _errorMessage = 'Registrierung fehlgeschlagen. Bitte erneut versuchen.';
+      return false;
+    } finally {
+      _isLoading = false;
+      _notify();
     }
   }
 
-  /// Google Login über Firebase & GoogleSignIn (Web, Android, Desktop)
   Future<bool> signInWithGoogle() async {
+    if (_isLoading) return false;
     _isLoading = true;
     _errorMessage = null;
-    notifyListeners();
-
+    _notify();
     try {
-      UserModel? loggedInUser;
-
+      UserCredential credential;
       if (kIsWeb) {
-        final googleProvider = GoogleAuthProvider();
-        googleProvider.addScope('email');
-        googleProvider.addScope('profile');
-        googleProvider.setCustomParameters({'prompt': 'select_account'});
-
-        try {
-          final userCred = await FirebaseAuth.instance.signInWithPopup(googleProvider);
-          final u = userCred.user;
-          if (u != null) {
-            loggedInUser = UserModel(
-              uid: u.uid,
-              email: u.email ?? 'trader@tradinggame.at',
-              displayName: u.displayName ??
-                  (u.email?.isNotEmpty == true
-                      ? u.email!.split('@').first
-                      : 'Google Trader'),
-              photoUrl: u.photoURL,
-              authProvider: 'google',
-              isGuest: false,
-            );
-          }
-        } on FirebaseAuthException catch (e) {
-          debugPrint('Google Web signInWithPopup error: ${e.code} -> ${e.message}');
-          if (e.code == 'popup-blocked' || e.code == 'cancelled-popup-request') {
-            await FirebaseAuth.instance.signInWithRedirect(googleProvider);
-            return true;
-          }
-          if (e.code == 'popup-closed-by-user') {
-            _isLoading = false;
-            notifyListeners();
-            return false;
-          }
-          if (e.code == 'unauthorized-domain') {
-            _errorMessage = 'Domain nicht autorisiert. Bitte starte über http://localhost:8088 oder http://127.0.0.1:8088';
-            _isLoading = false;
-            notifyListeners();
-            return false;
-          }
-          _errorMessage = 'Google-Anmeldung fehlgeschlagen: ${e.message ?? e.code}';
-          _isLoading = false;
-          notifyListeners();
+        final provider = GoogleAuthProvider()
+          ..setCustomParameters({'prompt': 'select_account'});
+        // Keep the popup directly attached to the user's click gesture.
+        // Never wait forever: a popup whose result is dropped would otherwise
+        // leave the login screen stuck on "Bitte warten".
+        credential = await _auth
+            .signInWithPopup(provider)
+            .timeout(const Duration(minutes: 2));
+      } else if (defaultTargetPlatform == TargetPlatform.windows ||
+          defaultTargetPlatform == TargetPlatform.linux) {
+        // google_sign_in has no Windows/Linux implementation.
+        if (desktopGoogleClientId.isEmpty) {
+          _errorMessage =
+              'Google-Anmeldung ist in diesem Desktop-Build nicht eingerichtet. Bitte E-Mail verwenden.';
           return false;
         }
-      } else {
-        final GoogleSignIn googleSignIn = GoogleSignIn(
-          scopes: ['email', 'profile'],
+        final idToken = await desktopGoogleIdToken();
+        if (idToken == null) return false;
+        credential = await _auth.signInWithCredential(
+          GoogleAuthProvider.credential(idToken: idToken),
         );
-        final GoogleSignInAccount? account = await googleSignIn.signIn();
-        if (account != null) {
-          final GoogleSignInAuthentication auth = await account.authentication;
-          final OAuthCredential credential = GoogleAuthProvider.credential(
-            accessToken: auth.accessToken,
-            idToken: auth.idToken,
-          );
-          final userCred = await FirebaseAuth.instance.signInWithCredential(credential);
-          final u = userCred.user;
-          loggedInUser = UserModel(
-            uid: u?.uid ?? 'goog_${account.id}',
-            email: u?.email ?? account.email,
-            displayName: u?.displayName ?? account.displayName ?? 'Google Trader',
-            photoUrl: u?.photoURL ?? account.photoUrl,
-            authProvider: 'google',
-            isGuest: false,
-          );
-        } else {
-          // Auswahl abgebrochen
-          _isLoading = false;
-          notifyListeners();
-          return false;
-        }
-      }
-
-      if (loggedInUser != null) {
-        _currentUser = loggedInUser;
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString(_keyUser, jsonEncode(_currentUser!.toJson()));
-        _isLoading = false;
-        notifyListeners();
-        return true;
       } else {
-        _errorMessage = 'Kein Google-Account ausgewählt.';
-        _isLoading = false;
-        notifyListeners();
-        return false;
+        final account = await GoogleSignIn(scopes: ['email']).signIn();
+        if (account == null) return false;
+        final tokens = await account.authentication;
+        credential = await _auth.signInWithCredential(
+          GoogleAuthProvider.credential(
+            accessToken: tokens.accessToken,
+            idToken: tokens.idToken,
+          ),
+        );
       }
-    } catch (e) {
-      _errorMessage = 'Google Login fehlgeschlagen: $e';
-      _isLoading = false;
-      notifyListeners();
+      if (credential.user == null) return false;
+      await _acceptUser(credential.user);
+      return true;
+    } on FirebaseAuthException catch (e) {
+      if (e.code != 'popup-closed-by-user' &&
+          e.code != 'cancelled-popup-request') {
+        _errorMessage = _authError(e);
+      }
       return false;
+    } on TimeoutException {
+      _errorMessage =
+          'Keine Antwort vom Google-Fenster. Bitte Pop-ups und Cookies für diese Seite erlauben und erneut versuchen.';
+      return false;
+    } catch (e) {
+      debugPrint('Google sign-in failed: $e');
+      _errorMessage =
+          'Google-Anmeldung fehlgeschlagen. Bitte erneut versuchen.';
+      return false;
+    } finally {
+      _isLoading = false;
+      _notify();
     }
   }
 
-  /// Gast-Modus
   Future<void> signInAsGuest() async {
+    if (_isLoading) return;
     _isLoading = true;
     _errorMessage = null;
-    notifyListeners();
-
-    String uid = 'guest_${_uuid.v4().substring(0, 8)}';
+    _notify();
     try {
-      final anon = await FirebaseAuth.instance.signInAnonymously();
-      if (anon.user != null) {
-        uid = anon.user!.uid;
+      final credential = await _auth.signInAnonymously();
+      await _acceptUser(credential.user);
+    } catch (_) {
+      _currentUser = UserModel(
+        uid: 'guest_${const Uuid().v4()}',
+        email: '',
+        displayName: 'Gast Trader',
+        authProvider: 'guest',
+        isGuest: true,
+      );
+    } finally {
+      final prefs = await SharedPreferences.getInstance();
+      if (_currentUser != null) {
+        await prefs.setString(_keyUser, jsonEncode(_currentUser!.toJson()));
       }
-    } catch (_) {}
-
-    _currentUser = UserModel(
-      uid: uid,
-      email: 'gast_${uid.substring(0, 6)}@tradinggame.local',
-      displayName: 'Gast Trader',
-      authProvider: 'guest',
-      isGuest: true,
-    );
-
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_keyUser, jsonEncode(_currentUser!.toJson()));
-
-    _isLoading = false;
-    notifyListeners();
+      _isLoading = false;
+      _notify();
+    }
   }
 
-  /// Abmelden
   Future<void> signOut() async {
+    try {
+      await _auth.signOut();
+    } catch (_) {
+      if (isAuthenticated) {
+        _errorMessage = 'Abmelden fehlgeschlagen. Bitte erneut versuchen.';
+        _notify();
+        return;
+      }
+    }
+    ++_sessionVersion;
     _currentUser = null;
+    _profileLoaded = false;
+    _profileError = null;
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_keyUser);
-    try {
-      await FirebaseAuth.instance.signOut();
-      if (!kIsWeb) {
-        await GoogleSignIn().signOut();
-      }
-    } catch (_) {}
-    notifyListeners();
+    _notify();
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    _subscription?.cancel();
+    super.dispose();
   }
 }

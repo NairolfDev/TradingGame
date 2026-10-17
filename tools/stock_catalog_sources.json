@@ -1,0 +1,35 @@
+{
+  "generatedAt": "2026-10-16",
+  "counts": {
+    "Nasdaq": 3540,
+    "DAX": 40,
+    "ATX": 20,
+    "Nikkei 225": 225
+  },
+  "sources": {
+    "Nasdaq": {
+      "url": "https://www.nasdaqtrader.com/dynamic/SymDir/nasdaqlisted.txt",
+      "asOf": "2026-10-16",
+      "filters": "Test Issue N, ETF N, NextShares N; exclude warrants, units, rights, notes, debentures, bonds, ETF, ETN by instrument description"
+    },
+    "Nasdaq metadata": {
+      "url": "https://api.nasdaq.com/api/screener/stocks?download=true&exchange=nasdaq",
+      "asOf": "2026-10-16"
+    },
+    "DAX": {
+      "url": "https://www.stoxx.com/documents/stoxxnet/Documents/Reports/DAXSelectionList/2026/October/slpublic_daxk_20261005.csv",
+      "asOf": "2026-10-05",
+      "filters": "Index Membership DAXK, 40 members; explicit Yahoo symbol mappings"
+    },
+    "ATX": {
+      "url": "https://www.wienerborse.at/en/index/atx-AT0000999982/composition/",
+      "asOf": "2026-10-16",
+      "filters": "20 official composition members; explicit Yahoo symbol mappings"
+    },
+    "Nikkei 225": {
+      "url": "https://indexes.nikkei.co.jp/nkave/archives/file/nikkei_stock_average_weight_en.csv",
+      "asOf": "2026-09-30",
+      "filters": "225 member rows; official published snapshot; code + .T"
+    }
+  }
+}

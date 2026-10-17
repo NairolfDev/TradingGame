@@ -2,6 +2,7 @@ const { onRequest } = require("firebase-functions/v2/https");
 const express = require("express");
 const cors = require("cors");
 const admin = require("firebase-admin");
+const { normalizeQuote, fxSymbolFor } = require('./market_quotes');
 
 if (!admin.apps.length) {
   admin.initializeApp();
@@ -33,11 +34,33 @@ apiRouter.get("/time", (req, res) => {
 
 // In-Memory-Cache für Quotes (TTL: 15s)
 const quoteCache = new Map();
+const chartCache = new Map();
+const chartRequests = new Map();
+async function fetchQuoteChart(symbol) {
+  const cached = chartCache.get(symbol);
+  if (cached && Date.now() - cached.timestamp < 15000) return cached.chart;
+  if (chartRequests.has(symbol)) return chartRequests.get(symbol);
+  const request = (async () => {
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=5m&range=1d`;
+    const response = await fetch(url, {
+      headers: {'User-Agent': 'Mozilla/5.0', Accept: 'application/json'},
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!response.ok) throw new Error(`Quote provider HTTP ${response.status}`);
+    const chart = (await response.json())?.chart?.result?.[0];
+    if (!chart) throw new Error('Symbol unavailable');
+    if (chartCache.size >= 1000) chartCache.delete(chartCache.keys().next().value);
+    chartCache.set(symbol, {timestamp: Date.now(), chart});
+    return chart;
+  })();
+  chartRequests.set(symbol, request);
+  try { return await request; } finally { chartRequests.delete(symbol); }
+}
 
 // 2. Real Live Quote Proxy (CORS-frei für Flutter Web & Apps)
 apiRouter.get("/quote", async (req, res) => {
   const symbol = req.query.symbol;
-  if (!symbol) {
+  if (typeof symbol !== 'string' || !/^[A-Za-z0-9.^=\-]{1,32}$/.test(symbol)) {
     return res.status(400).json({ error: "Query-Parameter 'symbol' erforderlich" });
   }
 
@@ -47,47 +70,15 @@ apiRouter.get("/quote", async (req, res) => {
   }
 
   try {
-    const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=5m&range=1d`;
-    const resp = await fetch(yahooUrl, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept": "application/json",
-      },
-    });
-
-    if (!resp.ok) {
-      return res.status(resp.status).json({ error: `Yahoo returned HTTP ${resp.status}` });
-    }
-
-    const json = await resp.json();
-    const chart = json?.chart?.result?.[0];
-    if (!chart) {
-      return res.status(404).json({ error: "Symbol nicht gefunden" });
-    }
-
-    const meta = chart.meta || {};
-    const price = meta.regularMarketPrice ?? meta.chartPreviousClose ?? 0;
-    const previousClose = meta.chartPreviousClose ?? meta.previousClose ?? price;
-    const high = meta.regularMarketDayHigh ?? null;
-    const low = meta.regularMarketDayLow ?? null;
-    const indicators = chart.indicators?.quote?.[0];
-    const series = (indicators?.close || []).filter((v) => v !== null && typeof v === "number");
-
-    const payload = {
-      symbol,
-      currentPrice: price,
-      previousClose,
-      high,
-      low,
-      series,
-      timestamp: Date.now(),
-      isLive: true,
-    };
-
+    const chart = await fetchQuoteChart(symbol);
+    const fxSymbol = fxSymbolFor(chart.meta?.currency);
+    const fxChart = fxSymbol ? await fetchQuoteChart(fxSymbol) : null;
+    const payload = normalizeQuote(symbol, chart, fxChart);
+    if (quoteCache.size >= 1000) quoteCache.delete(quoteCache.keys().next().value);
     quoteCache.set(symbol, { timestamp: Date.now(), data: payload });
     res.json(payload);
   } catch (err) {
-    res.status(500).json({ error: err.message, symbol });
+    res.status(503).json({ error: err.message, symbol, quoteStatus: 'unavailable' });
   }
 });
 
@@ -126,6 +117,9 @@ apiRouter.get("/history", async (req, res) => {
 
     const json = await resp.json();
     const chart = json?.chart?.result?.[0];
+    if (chart?.meta?.currency !== 'EUR') {
+      return res.status(422).json({error: 'EUR history unavailable: timestamp-aligned FX history required', symbol});
+    }
     const indicators = chart?.indicators?.quote?.[0];
     const series = (indicators?.close || []).filter((v) => v !== null && typeof v === "number");
 

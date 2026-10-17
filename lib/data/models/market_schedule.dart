@@ -40,7 +40,10 @@ class MarketSchedule {
     // Europa (Wien .VI, DAX .DE, EU ETFs, Bundesanleihen)
     if (asset.symbol.contains('.VI') ||
         asset.symbol.contains('.DE') ||
+        asset.symbol.endsWith('.AS') ||
         asset.symbol == 'EUNL' ||
+        asset.symbol == 'VUSA' ||
+        asset.symbol == 'IS3N' ||
         asset.symbol == 'ATX.ETF' ||
         asset.symbol == 'EXS1' ||
         asset.symbol.startsWith('RAGB') ||
@@ -118,17 +121,23 @@ class MarketSchedule {
 
     switch (region) {
       case MarketRegion.viennaEurope:
-        if (isWeekend) return 'Öffnet Montag um 09:00 Uhr';
+        if (isWeekend || (now.weekday == DateTime.friday && currentMinutes >= 17 * 60 + 30)) {
+          return 'Öffnet Montag um 09:00 Uhr';
+        }
         if (currentMinutes < 9 * 60) return 'Öffnet heute um 09:00 Uhr';
         return 'Öffnet morgen um 09:00 Uhr';
 
       case MarketRegion.usWallStreet:
-        if (isWeekend) return 'Öffnet Montag um 15:30 Uhr';
+        if (isWeekend || (now.weekday == DateTime.friday && currentMinutes >= 22 * 60)) {
+          return 'Öffnet Montag um 15:30 Uhr';
+        }
         if (currentMinutes < 15 * 60 + 30) return 'Öffnet heute um 15:30 Uhr';
         return 'Öffnet morgen um 15:30 Uhr';
 
       case MarketRegion.asiaTokyoHongKong:
-        if (isWeekend) return 'Öffnet Montag um 02:00 Uhr';
+        if (isWeekend || (now.weekday == DateTime.friday && currentMinutes >= 8 * 60 + 30)) {
+          return 'Öffnet Montag um 02:00 Uhr';
+        }
         if (currentMinutes < 2 * 60) return 'Öffnet heute um 02:00 Uhr';
         return 'Öffnet morgen um 02:00 Uhr';
 

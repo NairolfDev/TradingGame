@@ -29,7 +29,12 @@ class _WatchlistMarqueeTickerState extends State<WatchlistMarqueeTicker> {
   void _startContinuousScroll() {
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(milliseconds: 35), (timer) {
-      if (!_scrollController.hasClients || _isHoveredOrTouching) return;
+      if (!mounted ||
+          MediaQuery.of(context).disableAnimations ||
+          !_scrollController.hasClients ||
+          _isHoveredOrTouching) {
+        return;
+      }
 
       final maxScroll = _scrollController.position.maxScrollExtent;
       final current = _scrollController.offset;
@@ -64,11 +69,7 @@ class _WatchlistMarqueeTickerState extends State<WatchlistMarqueeTicker> {
     if (displayAssets.isEmpty) return const SizedBox.shrink();
 
     // Wir wiederholen die Liste mehrfach, damit das Laufband endlos durchlaufen kann
-    final marqueeList = [
-      ...displayAssets,
-      ...displayAssets,
-      ...displayAssets,
-    ];
+    final marqueeList = [...displayAssets, ...displayAssets, ...displayAssets];
 
     return Container(
       height: 38,
@@ -79,10 +80,7 @@ class _WatchlistMarqueeTickerState extends State<WatchlistMarqueeTicker> {
             color: AppColors.accentGold.withValues(alpha: 0.4),
             width: 1.0,
           ),
-          bottom: const BorderSide(
-            color: AppColors.cardBorder,
-            width: 0.5,
-          ),
+          bottom: BorderSide(color: AppColors.cardBorder, width: 0.5),
         ),
         boxShadow: [
           BoxShadow(
@@ -105,15 +103,15 @@ class _WatchlistMarqueeTickerState extends State<WatchlistMarqueeTicker> {
                 Container(
                   width: 7,
                   height: 7,
-                  decoration: const BoxDecoration(
+                  decoration: BoxDecoration(
                     color: AppColors.profitGreen,
                     shape: BoxShape.circle,
                   ),
                 ),
                 const SizedBox(width: 6),
                 Text(
-                  watchlisted.isNotEmpty ? 'WATCHLIST' : 'LIVE TICKER',
-                  style: const TextStyle(
+                  watchlisted.isNotEmpty ? 'WATCHLIST' : 'KURSE',
+                  style: TextStyle(
                     color: AppColors.accentGold,
                     fontSize: 10,
                     fontWeight: FontWeight.w900,
@@ -129,17 +127,21 @@ class _WatchlistMarqueeTickerState extends State<WatchlistMarqueeTicker> {
             child: Listener(
               onPointerDown: (_) => setState(() => _isHoveredOrTouching = true),
               onPointerUp: (_) => setState(() => _isHoveredOrTouching = false),
-              onPointerCancel: (_) => setState(() => _isHoveredOrTouching = false),
+              onPointerCancel: (_) =>
+                  setState(() => _isHoveredOrTouching = false),
               child: ListView.builder(
                 controller: _scrollController,
                 scrollDirection: Axis.horizontal,
-                physics: const NeverScrollableScrollPhysics(),
+                physics: const BouncingScrollPhysics(),
                 itemCount: marqueeList.length,
                 itemBuilder: (context, index) {
                   final asset = marqueeList[index];
+                  final hasQuote =
+                      asset.currentPrice.isFinite && asset.currentPrice > 0;
                   final isPositive = asset.change24h >= 0;
                   final sign = isPositive ? '+' : '';
-                  final percentStr = '$sign${(asset.change24hPercent * 100).toStringAsFixed(1)}%';
+                  final percentStr =
+                      '$sign${(asset.change24hPercent * 100).toStringAsFixed(1)}%';
 
                   return InkWell(
                     onTap: () {
@@ -158,7 +160,7 @@ class _WatchlistMarqueeTickerState extends State<WatchlistMarqueeTicker> {
                         children: [
                           Text(
                             asset.symbol,
-                            style: const TextStyle(
+                            style: TextStyle(
                               color: AppColors.textPrimary,
                               fontSize: 11,
                               fontWeight: FontWeight.bold,
@@ -166,32 +168,45 @@ class _WatchlistMarqueeTickerState extends State<WatchlistMarqueeTicker> {
                           ),
                           const SizedBox(width: 5),
                           Text(
-                            CurrencyFormatter.formatPrice(asset.currentPrice),
-                            style: const TextStyle(
+                            hasQuote
+                                ? CurrencyFormatter.formatPrice(
+                                    asset.currentPrice,
+                                  )
+                                : 'Kein Kurs',
+                            style: TextStyle(
                               color: AppColors.textSecondary,
                               fontSize: 11,
                             ),
                           ),
                           const SizedBox(width: 4),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 4,
+                              vertical: 1.5,
+                            ),
                             decoration: BoxDecoration(
                               color: isPositive
-                                  ? AppColors.profitGreen.withValues(alpha: 0.15)
+                                  ? AppColors.profitGreen.withValues(
+                                      alpha: 0.15,
+                                    )
                                   : AppColors.lossRed.withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: Text(
-                              '${isPositive ? "▲" : "▼"} $percentStr',
+                              hasQuote
+                                  ? '${isPositive ? "▲" : "▼"} $percentStr'
+                                  : '—',
                               style: TextStyle(
-                                color: isPositive ? AppColors.profitGreen : AppColors.lossRed,
+                                color: isPositive
+                                    ? AppColors.profitGreen
+                                    : AppColors.lossRed,
                                 fontSize: 9.5,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
                           ),
                           const SizedBox(width: 14),
-                          const Text(
+                          Text(
                             '•',
                             style: TextStyle(
                               color: AppColors.textMuted,

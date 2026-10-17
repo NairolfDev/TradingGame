@@ -30,17 +30,7 @@ class _PrestigeShopScreenState extends State<PrestigeShopScreen> {
     }).toList();
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Prestige & Status-Shop'),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 16),
-            child: Center(
-              child: RankBadge(rank: rank, compact: true),
-            ),
-          ),
-        ],
-      ),
+      appBar: AppBar(title: const Text('Prestige & Status-Shop')),
       body: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         children: [
@@ -49,10 +39,7 @@ class _PrestigeShopScreenState extends State<PrestigeShopScreen> {
             padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
               gradient: const LinearGradient(
-                colors: [
-                  Color(0xFF26190B),
-                  Color(0xFF141923),
-                ],
+                colors: [Color(0xFF26190B), Color(0xFF141923)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -65,10 +52,12 @@ class _PrestigeShopScreenState extends State<PrestigeShopScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                Wrap(
+                  alignment: WrapAlignment.spaceBetween,
+                  spacing: 12,
+                  runSpacing: 8,
                   children: [
-                    const Text(
+                    Text(
                       'STATUS & COOLNESS',
                       style: TextStyle(
                         fontSize: 11,
@@ -79,18 +68,21 @@ class _PrestigeShopScreenState extends State<PrestigeShopScreen> {
                     ),
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: AppColors.gold.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
                           const Text('💎', style: TextStyle(fontSize: 12)),
                           const SizedBox(width: 4),
                           Text(
                             '${provider.totalPrestigePoints} Prestige',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.bold,
                               color: AppColors.gold,
@@ -102,37 +94,36 @@ class _PrestigeShopScreenState extends State<PrestigeShopScreen> {
                   ],
                 ),
                 const SizedBox(height: 8),
-                Text(
-                  '${rank.title} ${rank.badge}',
-                  style: const TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w900,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
+                RankBadge(rank: rank),
                 const SizedBox(height: 4),
                 Text(
                   'Verwende deine Börsengewinne, um dir Luxusgüter zu gönnen und in der High Society aufzusteigen!',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
                     color: AppColors.textSecondary,
                   ),
                 ),
                 const SizedBox(height: 14),
-                const Divider(color: AppColors.cardBorder),
+                Divider(color: AppColors.cardBorder),
                 const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                Wrap(
+                  alignment: WrapAlignment.spaceBetween,
+                  spacing: 16,
+                  runSpacing: 12,
                   children: [
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Gesamter Luxuswert:',
-                            style: TextStyle(
-                                fontSize: 11, color: AppColors.textSecondary)),
+                        Text(
+                          'Gesamter Luxuswert:',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
                         Text(
                           CurrencyFormatter.format(provider.totalLuxuryValue),
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.bold,
                             color: AppColors.gold,
@@ -143,12 +134,16 @@ class _PrestigeShopScreenState extends State<PrestigeShopScreen> {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        const Text('Verfügbares Cash:',
-                            style: TextStyle(
-                                fontSize: 11, color: AppColors.textSecondary)),
+                        Text(
+                          'Verfügbares Cash:',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
                         Text(
                           CurrencyFormatter.format(provider.cash),
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.bold,
                             color: AppColors.accent,
@@ -265,7 +260,7 @@ class _PrestigeShopScreenState extends State<PrestigeShopScreen> {
                     Flexible(
                       child: Text(
                         item.name,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.bold,
                           color: AppColors.textPrimary,
@@ -275,14 +270,16 @@ class _PrestigeShopScreenState extends State<PrestigeShopScreen> {
                     if (item.isOwned) ...[
                       Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
                           color: AppColors.gold.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
                           '${item.ownedCount}x im Besitz',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 10,
                             fontWeight: FontWeight.bold,
                             color: AppColors.gold,
@@ -295,7 +292,7 @@ class _PrestigeShopScreenState extends State<PrestigeShopScreen> {
                 const SizedBox(height: 3),
                 Text(
                   item.description,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 11,
                     color: AppColors.textSecondary,
                   ),
@@ -305,14 +302,16 @@ class _PrestigeShopScreenState extends State<PrestigeShopScreen> {
                   children: [
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 2),
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
                       decoration: BoxDecoration(
                         color: AppColors.accent.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
                         '+${item.prestigePoints} Prestige',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.bold,
                           color: AppColors.accent,
@@ -322,7 +321,7 @@ class _PrestigeShopScreenState extends State<PrestigeShopScreen> {
                     const Spacer(),
                     Text(
                       CurrencyFormatter.format(item.price),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w900,
                         color: AppColors.textPrimary,
@@ -338,7 +337,8 @@ class _PrestigeShopScreenState extends State<PrestigeShopScreen> {
                     onPressed: canAfford
                         ? () {
                             final auth = context.read<AuthProvider>();
-                            if (auth.currentUser == null || auth.currentUser!.isGuest) {
+                            if (auth.currentUser == null ||
+                                auth.currentUser!.isGuest) {
                               _showLoginRequiredDialog(context);
                             } else {
                               _confirmPurchase(item, provider);
@@ -346,9 +346,10 @@ class _PrestigeShopScreenState extends State<PrestigeShopScreen> {
                           }
                         : null,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor:
-                          canAfford ? AppColors.gold : AppColors.surfaceElevated,
-                      foregroundColor: Colors.black,
+                      backgroundColor: canAfford
+                          ? AppColors.gold
+                          : AppColors.surfaceElevated,
+                      foregroundColor: AppColors.onPrimary,
                       disabledForegroundColor: AppColors.textMuted,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10),
@@ -380,9 +381,9 @@ class _PrestigeShopScreenState extends State<PrestigeShopScreen> {
         backgroundColor: AppColors.surface,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
-          side: const BorderSide(color: AppColors.gold, width: 1.5),
+          side: BorderSide(color: AppColors.gold, width: 1.5),
         ),
-        title: const Row(
+        title: Row(
           children: [
             Icon(Icons.lock_outline, color: AppColors.gold, size: 26),
             SizedBox(width: 10),
@@ -396,7 +397,7 @@ class _PrestigeShopScreenState extends State<PrestigeShopScreen> {
             ),
           ],
         ),
-        content: const Column(
+        content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -418,24 +419,22 @@ class _PrestigeShopScreenState extends State<PrestigeShopScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Weiter nur zusehen',
-                style: TextStyle(color: AppColors.textMuted)),
+            child: Text(
+              'Weiter nur zusehen',
+              style: TextStyle(color: AppColors.textMuted),
+            ),
           ),
           ElevatedButton(
             onPressed: () {
               Navigator.pop(ctx);
               Navigator.push(
                 context,
-                MaterialPageRoute(
-                  builder: (_) => AuthScreen(
-                    onAuthenticated: () => Navigator.pop(context),
-                  ),
-                ),
+                MaterialPageRoute(builder: (_) => const AuthScreen()),
               );
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.gold,
-              foregroundColor: Colors.black,
+              foregroundColor: AppColors.onPrimary,
             ),
             child: const Text('Jetzt Anmelden / Registrieren'),
           ),
@@ -458,13 +457,15 @@ class _PrestigeShopScreenState extends State<PrestigeShopScreen> {
         ),
         content: Text(
           'Möchtest du dieses Statussymbol für ${CurrencyFormatter.format(item.price)} kaufen?\n\nDein Prestige steigt um +${item.prestigePoints} Punkte!',
-          style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+          style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Abbrechen',
-                style: TextStyle(color: AppColors.textMuted)),
+            child: Text(
+              'Abbrechen',
+              style: TextStyle(color: AppColors.textMuted),
+            ),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -473,7 +474,7 @@ class _PrestigeShopScreenState extends State<PrestigeShopScreen> {
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.gold,
-              foregroundColor: Colors.black,
+              foregroundColor: AppColors.onPrimary,
             ),
             child: const Text('Kauf bestätigen'),
           ),

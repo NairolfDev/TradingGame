@@ -15,6 +15,49 @@ class OrderFeeBreakdown {
 }
 
 class TradingFeeService {
+  /// Largest affordable quantity, including the same fees charged at execution.
+  static double maximumBuyAmount({
+    required Asset asset,
+    required double cash,
+    int leverage = 1,
+  }) {
+    if (!cash.isFinite ||
+        cash <= 0 ||
+        !asset.currentPrice.isFinite ||
+        asset.currentPrice <= 0 ||
+        leverage < 1 ||
+        leverage > asset.maxLeverage) {
+      return 0;
+    }
+    var lower = 0.0;
+    if (cash <=
+        calculateBuyFee(
+          asset: asset,
+          amount: 0,
+          leverage: leverage,
+        ).transactionFee) {
+      return 0;
+    }
+    var upper = cash / asset.currentPrice * leverage;
+    if (!upper.isFinite) return 0;
+    // Keep the affordable side of the boundary; decimal rounding can overspend.
+    for (var i = 0; i < 80; i++) {
+      final middle = lower + (upper - lower) / 2;
+      if (middle == lower || middle == upper) break;
+      final cost = calculateBuyFee(
+        asset: asset,
+        amount: middle,
+        leverage: leverage,
+      ).totalCashRequired;
+      if (cost.isFinite && cost <= cash) {
+        lower = middle;
+      } else {
+        upper = middle;
+      }
+    }
+    return lower;
+  }
+
   /// Berechnet realistische Transaktionskosten nach österreichischem Broker-Standard
   static OrderFeeBreakdown calculateBuyFee({
     required Asset asset,
@@ -30,7 +73,8 @@ class TradingFeeService {
       case AssetType.stock:
         // Klassische Banken / Wiener Börse Gebühr: ca. 19,90 € Spesen
         fee = 19.90;
-        description = 'Bank- & Börsenspesen (Wiener Börse / XETRA Flat: 19,90 €)';
+        description =
+            'Bank- & Börsenspesen (Wiener Börse / XETRA Flat: 19,90 €)';
         break;
 
       case AssetType.bond:
@@ -48,7 +92,8 @@ class TradingFeeService {
       case AssetType.crypto:
         // Krypto Handelskommission (1,2% Spread)
         fee = (rawAssetCost * 0.012).clamp(1.50, 150.0);
-        description = 'Krypto Handelsgebühr (1,2% Spread): ${fee.toStringAsFixed(2)} €';
+        description =
+            'Krypto Handelsgebühr (1,2% Spread): ${fee.toStringAsFixed(2)} €';
         break;
 
       case AssetType.cfd:
@@ -60,7 +105,8 @@ class TradingFeeService {
       case AssetType.commodity:
         // Edelmetall- & Rohstoffspesen
         fee = 14.90;
-        description = 'Edelmetall- & Rohstoffspesen (Tresorverwahrung): 14,90 €';
+        description =
+            'Edelmetall- & Rohstoffspesen (Tresorverwahrung): 14,90 €';
         break;
     }
 

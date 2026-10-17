@@ -6,26 +6,6 @@ import '../../core/utils/currency_formatter.dart';
 import '../../data/models/asset.dart';
 import '../../logic/live_market_data_service.dart';
 
-enum ChartMode { line, candle }
-
-class CandleData {
-  final double open;
-  final double high;
-  final double low;
-  final double close;
-  final double volume;
-
-  const CandleData({
-    required this.open,
-    required this.high,
-    required this.low,
-    required this.close,
-    required this.volume,
-  });
-
-  bool get isBullish => close >= open;
-}
-
 class InteractiveBrokerChart extends StatefulWidget {
   final Asset asset;
   final bool isPositive;
@@ -44,7 +24,6 @@ class InteractiveBrokerChart extends StatefulWidget {
 
 class _InteractiveBrokerChartState extends State<InteractiveBrokerChart> {
   String _timeframe = '1D'; // 1D, 1W, 1M, 1Y, 3Y, ALL
-  ChartMode _chartMode = ChartMode.line;
   bool _showSMA = true;
   double? _touchedPrice;
   List<double>? _liveFetchedSeries;
@@ -57,75 +36,31 @@ class _InteractiveBrokerChartState extends State<InteractiveBrokerChart> {
     _loadLiveSeries();
   }
 
+  bool _isLoading = true;
+  int _requestId = 0;
+
+  @override
+  void didUpdateWidget(covariant InteractiveBrokerChart oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.asset.id != widget.asset.id) {
+      _liveFetchedSeries = null;
+      _touchedPrice = null;
+      _loadLiveSeries();
+    }
+  }
+
   Future<void> _loadLiveSeries() async {
-    final series = await LiveMarketDataService().fetchHistoricalSeries(widget.asset, _timeframe);
-    if (mounted && series != null && series.length >= 4) {
-      setState(() {
-        _liveFetchedSeries = series;
-      });
-    }
-  }
-
-  List<double> _generateSeriesForTimeframe() {
-    final basePrice = widget.asset.currentPrice;
-    final history = widget.asset.priceHistory;
-    final vol = widget.asset.volatility.clamp(0.005, 0.05);
-
-    switch (_timeframe) {
-      case '1D':
-        if (history.length >= 10) return history;
-        return _simulatePath(basePrice, 15, vol * 0.4);
-      case '1W':
-        return _simulatePath(basePrice * 0.98, 20, vol * 0.6);
-      case '1M':
-        return _simulatePath(basePrice * 0.94, 30, vol * 0.9);
-      case '1Y':
-        return _simulatePath(basePrice * 0.82, 40, vol * 1.4);
-      case '3Y':
-        return _simulatePath(basePrice * 0.70, 48, vol * 1.6);
-      case 'ALL':
-        return _simulatePath(basePrice * 0.55, 60, vol * 2.0);
-      default:
-        return history;
-    }
-  }
-
-  List<double> _simulatePath(double startPrice, int count, double spread) {
-    final rand = Random(widget.asset.id.hashCode + _timeframe.hashCode);
-    final points = <double>[startPrice];
-    double current = startPrice;
-
-    for (int i = 1; i < count - 1; i++) {
-      final change = (rand.nextDouble() - 0.48) * spread * current;
-      current = (current + change).clamp(startPrice * 0.3, startPrice * 3.0);
-      points.add(double.parse(current.toStringAsFixed(2)));
-    }
-    points.add(widget.asset.currentPrice);
-    return points;
-  }
-
-  List<CandleData> _generateCandles(List<double> series) {
-    final candles = <CandleData>[];
-    final rand = Random(widget.asset.id.hashCode + 99);
-
-    for (int i = 0; i < series.length; i++) {
-      final close = series[i];
-      final prev = i > 0 ? series[i - 1] : close * 0.99;
-      final open = prev;
-      final variance = (close * 0.008) * (rand.nextDouble() + 0.5);
-      final high = max(open, close) + variance;
-      final low = max(0.1, min(open, close) - variance);
-      final vol = (rand.nextDouble() * 50000 + 10000);
-
-      candles.add(CandleData(
-        open: open,
-        high: high,
-        low: low,
-        close: close,
-        volume: vol,
-      ));
-    }
-    return candles;
+    final requestId = ++_requestId;
+    setState(() => _isLoading = true);
+    final series = await LiveMarketDataService().fetchHistoricalSeries(
+      widget.asset,
+      _timeframe,
+    );
+    if (!mounted || requestId != _requestId) return;
+    setState(() {
+      _liveFetchedSeries = series?.where((v) => v.isFinite && v > 0).toList();
+      _isLoading = false;
+    });
   }
 
   List<FlSpot> _computeSMA(List<double> series, int period) {
@@ -144,178 +79,285 @@ class _InteractiveBrokerChartState extends State<InteractiveBrokerChart> {
     return spots;
   }
 
+  /// Timeframes that returned no data; shown disabled so nobody waits on them.
+  final Set<String> _emptyTimeframes = {};
+
+  void _selectTimeframe(String tf) {
+    setState(() {
+      _timeframe = tf;
+      _touchedPrice = null;
+      _liveFetchedSeries = null;
+    });
+    widget.onScrubPrice?.call(null);
+    _loadLiveSeries();
+  }
+
   @override
   Widget build(BuildContext context) {
-    final series = _liveFetchedSeries ?? _generateSeriesForTimeframe();
-    final candles = _generateCandles(series);
-    final minVal = series.reduce(min);
-    final maxVal = series.reduce(max);
+    final series = _liveFetchedSeries ?? const <double>[];
+    if (!_isLoading && series.length < 2) _emptyTimeframes.add(_timeframe);
+    final minVal = series.isEmpty ? 0.0 : series.reduce(min);
+    final maxVal = series.isEmpty ? 0.0 : series.reduce(max);
     final diff = maxVal - minVal;
-    final chartColor = widget.isPositive ? AppColors.profit : AppColors.loss;
+    final periodChange = series.length >= 2
+        ? (series.last - series.first) / series.first
+        : null;
+    final chartColor = periodChange == null
+        ? (widget.isPositive ? AppColors.profit : AppColors.loss)
+        : (periodChange >= 0 ? AppColors.profit : AppColors.loss);
+    final textScale = MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 2.0);
 
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        _boundedHeight = constraints.hasBoundedHeight;
+        return _buildBody(
+          series,
+          minVal,
+          maxVal,
+          diff,
+          periodChange,
+          chartColor,
+          textScale,
+        );
+      },
+    );
+  }
+
+  Widget _buildBody(
+    List<double> series,
+    double minVal,
+    double maxVal,
+    double diff,
+    double? periodChange,
+    Color chartColor,
+    double textScale,
+  ) {
     return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Top Toolbar: Chart Type & Indicators & Scrubber Display
+        // Scrubbed or latest price + change over the selected period.
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          padding: const EdgeInsets.fromLTRB(14, 8, 4, 0),
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              // Display touched price or latest price
-              Row(
-                children: [
-                  Text(
-                    _touchedPrice != null
-                        ? CurrencyFormatter.format(_touchedPrice!)
-                        : CurrencyFormatter.format(widget.asset.currentPrice),
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w900,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  if (_touchedPrice != null) ...[
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: AppColors.accent.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(4),
+              Expanded(
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Text(
+                      CurrencyFormatter.format(
+                        _touchedPrice ?? widget.asset.currentPrice,
                       ),
-                      child: const Text('FOKUS',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.accent,
-                          )),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.textPrimary,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
                     ),
+                    if (_touchedPrice != null)
+                      _pill('Ausgewählter Punkt', AppColors.accent)
+                    else if (periodChange != null)
+                      _pill(
+                        '${CurrencyFormatter.formatPercent(periodChange)} · ${_label(_timeframe)}',
+                        chartColor,
+                      ),
                   ],
-                ],
+                ),
               ),
-
-              // Toggle Chart Mode (Line vs Candlestick) & SMA
-              Row(
-                children: [
-                  IconButton(
-                    icon: Icon(
-                      _showSMA ? Icons.auto_graph : Icons.show_chart,
-                      size: 20,
-                      color: _showSMA ? AppColors.gold : AppColors.textMuted,
-                    ),
-                    tooltip: 'Gleitender Durchschnitt (SMA 5)',
-                    visualDensity: VisualDensity.compact,
-                    onPressed: () {
-                      setState(() {
-                        _showSMA = !_showSMA;
-                      });
-                    },
-                  ),
-                  const SizedBox(width: 4),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: AppColors.surfaceElevated,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: AppColors.cardBorder),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _buildModeButton(
-                          icon: Icons.trending_up,
-                          isSelected: _chartMode == ChartMode.line,
-                          onTap: () => setState(() => _chartMode = ChartMode.line),
-                        ),
-                        _buildModeButton(
-                          icon: Icons.candlestick_chart,
-                          isSelected: _chartMode == ChartMode.candle,
-                          onTap: () => setState(() => _chartMode = ChartMode.candle),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+              IconButton(
+                icon: Icon(
+                  _showSMA ? Icons.auto_graph : Icons.show_chart,
+                  color: _showSMA ? AppColors.gold : AppColors.textMuted,
+                ),
+                tooltip: _showSMA
+                    ? 'Gleitenden Durchschnitt ausblenden'
+                    : 'Gleitenden Durchschnitt (5 Punkte) einblenden',
+                onPressed: () => setState(() => _showSMA = !_showSMA),
               ),
             ],
           ),
         ),
 
-        // Main Chart Canvas
-        Expanded(
+        _canvasBox(
+          height: 200 * textScale,
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(10, 0, 16, 10),
-            child: _chartMode == ChartMode.line
-                ? _buildLineChart(series, minVal, maxVal, diff, chartColor)
-                : _buildCandlestickChart(candles, minVal, maxVal, diff),
+            padding: const EdgeInsets.fromLTRB(10, 4, 16, 8),
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : series.length < 2
+                ? Center(
+                    child: SingleChildScrollView(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.show_chart,
+                            color: AppColors.textSecondary,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Keine EUR-Kursdaten für ${_label(_timeframe)}',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: AppColors.textPrimary),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Verläufe gibt es nur ohne Währungsumrechnung – '
+                            'wir zeichnen keine erfundenen Kurven.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: () {
+                              _emptyTimeframes.remove(_timeframe);
+                              _loadLiveSeries();
+                            },
+                            child: const Text('Erneut laden'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                : Semantics(
+                    label:
+                        'Kursverlauf ${_label(_timeframe)}: von '
+                        '${CurrencyFormatter.format(series.first)} auf '
+                        '${CurrencyFormatter.format(series.last)}, '
+                        'Tief ${CurrencyFormatter.format(minVal)}, '
+                        'Hoch ${CurrencyFormatter.format(maxVal)}',
+                    child: ExcludeSemantics(
+                      child: _buildLineChart(
+                        series,
+                        minVal,
+                        maxVal,
+                        diff,
+                        chartColor,
+                      ),
+                    ),
+                  ),
           ),
         ),
 
-        // Bottom Timeframe Selector: 1D, 1W, 1M, 1Y, ALL
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-          decoration: const BoxDecoration(
-            border: Border(top: BorderSide(color: AppColors.cardBorder, width: 0.8)),
+        // Data transparency: where the curve comes from.
+        if (series.length >= 2)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 0, 14, 6),
+            child: Text(
+              'Quelle: Yahoo Finance · ${series.length} Kurspunkte in EUR · '
+              'Tief ${CurrencyFormatter.format(minVal)} · '
+              'Hoch ${CurrencyFormatter.format(maxVal)}',
+              style: TextStyle(fontSize: 11, color: AppColors.textMuted),
+            ),
           ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: _timeframes.map((tf) {
-              final isSelected = _timeframe == tf;
-              return InkWell(
-                onTap: () {
-                  setState(() {
-                    _timeframe = tf;
-                    _touchedPrice = null;
-                    _liveFetchedSeries = null;
-                  });
-                  widget.onScrubPrice?.call(null);
-                  _loadLiveSeries();
-                },
-                borderRadius: BorderRadius.circular(6),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: isSelected
-                        ? AppColors.primary.withValues(alpha: 0.2)
-                        : Colors.transparent,
-                    borderRadius: BorderRadius.circular(6),
-                    border: isSelected
-                        ? Border.all(color: AppColors.primary, width: 1.2)
-                        : null,
-                  ),
-                  child: Text(
+
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            border: Border(
+              top: BorderSide(color: AppColors.cardBorder, width: 0.8),
+            ),
+          ),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                for (final tf in _timeframes)
+                  _timeframeChip(
                     tf,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                      color: isSelected ? AppColors.primary : AppColors.textSecondary,
-                    ),
+                    selected: _timeframe == tf,
+                    empty: _emptyTimeframes.contains(tf) && _timeframe != tf,
                   ),
-                ),
-              );
-            }).toList(),
+              ],
+            ),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildModeButton({
-    required IconData icon,
-    required bool isSelected,
-    required VoidCallback onTap,
+  /// Fills the parent when it has a fixed height, otherwise a fixed canvas.
+  Widget _canvasBox({required double height, required Widget child}) =>
+      _boundedHeight
+      ? Expanded(child: child)
+      : SizedBox(height: height, child: child);
+
+  bool _boundedHeight = false;
+
+  /// Enough decimals that neighbouring ticks never show the same number.
+  static String _axisLabel(double value, double range) {
+    if (value.abs() >= 10000) return CurrencyFormatter.formatCompact(value);
+    final decimals = range >= 30 ? 0 : (range >= 0.3 ? 2 : 4);
+    return '€${value.toStringAsFixed(decimals)}';
+  }
+
+  static String _label(String tf) => switch (tf) {
+    '1D' => '1 Tag',
+    '1W' => '1 Woche',
+    '1M' => '1 Monat',
+    '1Y' => '1 Jahr',
+    '3Y' => '3 Jahre',
+    _ => 'Gesamt',
+  };
+
+  Widget _pill(String text, Color color) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+    decoration: BoxDecoration(
+      color: color.withValues(alpha: 0.15),
+      borderRadius: BorderRadius.circular(6),
+    ),
+    child: Text(
+      text,
+      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: color),
+    ),
+  );
+
+  Widget _timeframeChip(
+    String tf, {
+    required bool selected,
+    required bool empty,
   }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-        decoration: BoxDecoration(
-          color: isSelected ? AppColors.primary : Colors.transparent,
+    final color = selected
+        ? AppColors.primary
+        : empty
+        ? AppColors.textMuted.withValues(alpha: 0.5)
+        : AppColors.textSecondary;
+    return Tooltip(
+      message: empty ? '${_label(tf)}: keine Daten' : _label(tf),
+      child: Semantics(
+        button: true,
+        selected: selected,
+        enabled: !empty,
+        label: 'Zeitraum ${_label(tf)}${empty ? ', keine Daten' : ''}',
+        child: InkWell(
+          onTap: empty || selected ? null : () => _selectTimeframe(tf),
           borderRadius: BorderRadius.circular(8),
-        ),
-        child: Icon(
-          icon,
-          size: 16,
-          color: isSelected ? Colors.black : AppColors.textSecondary,
+          child: Container(
+            constraints: const BoxConstraints(minWidth: 48, minHeight: 44),
+            alignment: Alignment.center,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            decoration: BoxDecoration(
+              color: selected
+                  ? AppColors.primary.withValues(alpha: 0.18)
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              tf == 'ALL' ? 'Max' : tf,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
+                color: color,
+                decoration: empty ? TextDecoration.lineThrough : null,
+              ),
+            ),
+          ),
         ),
       ),
     );
@@ -336,7 +378,7 @@ class _InteractiveBrokerChartState extends State<InteractiveBrokerChart> {
     final lineBars = <LineChartBarData>[
       LineChartBarData(
         spots: spots,
-        isCurved: true,
+        isCurved: false,
         curveSmoothness: 0.22,
         color: color,
         barWidth: 2.8,
@@ -361,7 +403,7 @@ class _InteractiveBrokerChartState extends State<InteractiveBrokerChart> {
       lineBars.add(
         LineChartBarData(
           spots: smaSpots,
-          isCurved: true,
+          isCurved: false,
           curveSmoothness: 0.3,
           color: AppColors.gold,
           barWidth: 1.5,
@@ -377,12 +419,12 @@ class _InteractiveBrokerChartState extends State<InteractiveBrokerChart> {
           enabled: true,
           touchTooltipData: LineTouchTooltipData(
             getTooltipColor: (_) => AppColors.surfaceElevated,
-            tooltipBorder: const BorderSide(color: AppColors.cardBorder),
+            tooltipBorder: BorderSide(color: AppColors.cardBorder),
             getTooltipItems: (touchedSpots) {
               return touchedSpots.map((spot) {
                 return LineTooltipItem(
                   CurrencyFormatter.format(spot.y),
-                  const TextStyle(
+                  TextStyle(
                     color: AppColors.textPrimary,
                     fontWeight: FontWeight.bold,
                     fontSize: 12,
@@ -412,99 +454,42 @@ class _InteractiveBrokerChartState extends State<InteractiveBrokerChart> {
           show: true,
           drawVerticalLine: false,
           horizontalInterval: diff > 0 ? diff / 3 : 1,
-          getDrawingHorizontalLine: (value) => const FlLine(
-            color: AppColors.cardBorder,
-            strokeWidth: 0.8,
-          ),
+          getDrawingHorizontalLine: (value) =>
+              FlLine(color: AppColors.cardBorder, strokeWidth: 0.8),
         ),
         titlesData: FlTitlesData(
-          leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          leftTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
+          topTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
           rightTitles: AxisTitles(
             sideTitles: SideTitles(
               showTitles: true,
-              reservedSize: 55,
+              reservedSize: 64,
+              interval: diff > 0 ? diff / 3 : null,
               getTitlesWidget: (value, meta) {
+                // Edge labels collide with the regular ticks; skip them.
+                if (value == meta.min || value == meta.max) {
+                  return const SizedBox.shrink();
+                }
                 return Text(
-                  CurrencyFormatter.formatCompact(value),
-                  style: const TextStyle(color: AppColors.textMuted, fontSize: 10),
+                  _axisLabel(value, diff),
+                  style: TextStyle(color: AppColors.textMuted, fontSize: 10),
                 );
               },
             ),
           ),
-          bottomTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          bottomTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
         ),
         borderData: FlBorderData(show: false),
         minY: minVal - (diff * 0.08),
         maxY: maxVal + (diff * 0.08),
         lineBarsData: lineBars,
       ),
-    );
-  }
-
-  Widget _buildCandlestickChart(
-    List<CandleData> candles,
-    double minVal,
-    double maxVal,
-    double diff,
-  ) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final candleWidth = max(4.0, (constraints.maxWidth / candles.length) - 3.0);
-        final height = constraints.maxHeight;
-
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: candles.map((c) {
-            final isBull = c.isBullish;
-            final candleColor = isBull ? AppColors.profit : AppColors.loss;
-            final range = diff > 0 ? diff : 1.0;
-
-            final bodyTop = height - ((max(c.open, c.close) - minVal) / range) * height;
-            final bodyBottom = height - ((min(c.open, c.close) - minVal) / range) * height;
-            final wickTop = height - ((c.high - minVal) / range) * height;
-            final wickBottom = height - ((c.low - minVal) / range) * height;
-
-            final bodyHeight = max(2.0, (bodyBottom - bodyTop).abs());
-
-            return Tooltip(
-              message:
-                  'Open: ${CurrencyFormatter.format(c.open)}\nHigh: ${CurrencyFormatter.format(c.high)}\nLow: ${CurrencyFormatter.format(c.low)}\nClose: ${CurrencyFormatter.format(c.close)}',
-              child: SizedBox(
-                width: candleWidth,
-                height: height,
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    // Wick (Docht)
-                    Positioned(
-                      top: wickTop.clamp(0.0, height),
-                      bottom: (height - wickBottom).clamp(0.0, height),
-                      child: Container(
-                        width: 1.5,
-                        color: candleColor.withValues(alpha: 0.8),
-                      ),
-                    ),
-                    // Candle Body (Kerzenkörper)
-                    Positioned(
-                      top: bodyTop.clamp(0.0, height),
-                      height: bodyHeight,
-                      child: Container(
-                        width: candleWidth,
-                        decoration: BoxDecoration(
-                          color: candleColor,
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          }).toList(),
-        );
-      },
     );
   }
 }

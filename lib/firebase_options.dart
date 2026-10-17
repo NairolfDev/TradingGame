@@ -49,7 +49,7 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyDaTaYKZdRu1oO5LxCxe_9VLQQ_uQerMxM',
-    appId: '1:974968386258:android:7adfd1d5894f875f67f30b',
+    appId: '1:974968386258:android:8493086c8310112d67f30b',
     messagingSenderId: '974968386258',
     projectId: 'tradinggame-austria-prod',
     storageBucket: 'tradinggame-austria-prod.firebasestorage.app',

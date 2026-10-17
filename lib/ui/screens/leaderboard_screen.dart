@@ -14,7 +14,7 @@ class LeaderboardScreen extends StatefulWidget {
 }
 
 class _LeaderboardScreenState extends State<LeaderboardScreen> {
-  LeaderboardTimeframe _selectedTimeframe = LeaderboardTimeframe.allTime;
+  final LeaderboardTimeframe _selectedTimeframe = LeaderboardTimeframe.allTime;
 
   @override
   Widget build(BuildContext context) {
@@ -23,30 +23,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
 
     // Zeitfenster-spezifische ROI- und Rendite-Berechnung
     final entries = baseEntries.map((e) {
-      double factor = 1.0;
-      switch (_selectedTimeframe) {
-        case LeaderboardTimeframe.day:
-          factor = 0.08;
-          break;
-        case LeaderboardTimeframe.week:
-          factor = 0.25;
-          break;
-        case LeaderboardTimeframe.month:
-          factor = 0.55;
-          break;
-        case LeaderboardTimeframe.quarter:
-          factor = 0.75;
-          break;
-        case LeaderboardTimeframe.halfYear:
-          factor = 0.90;
-          break;
-        case LeaderboardTimeframe.year:
-        case LeaderboardTimeframe.allTime:
-          factor = 1.0;
-          break;
-      }
-
-      final adjustedRoi = e.roiPercent * factor;
+      final adjustedRoi = e.roiPercent;
       final adjustedNetWorth = e.isPlayer ? provider.netWorth : e.netWorth;
 
       return LeaderboardEntry(
@@ -76,7 +53,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
       orElse: () => LeaderboardEntry(
         id: 'player',
         name: 'Du',
-        city: 'Wien',
+        city: provider.playerCountry,
         title: provider.currentRank.title,
         badge: provider.currentRank.badge,
         avatarEmoji: '😎',
@@ -101,7 +78,9 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
                     duration: Duration(seconds: 1),
-                    content: Text('Rangliste live aus Firebase synchronisiert!'),
+                    content: Text(
+                      'Rangliste live aus Firebase synchronisiert!',
+                    ),
                   ),
                 );
               }
@@ -117,12 +96,12 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                 color: AppColors.profit.withValues(alpha: 0.4),
               ),
             ),
-            child: const Row(
+            child: Row(
               children: [
                 Icon(Icons.wifi, size: 13, color: AppColors.profit),
                 SizedBox(width: 4),
                 Text(
-                  'Cloud Live',
+                  'Rangliste',
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
@@ -137,45 +116,12 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
       body: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         children: [
-          // Filter Chips für Zeiträume: All Time, Day, Week, Month, Quarter, HalfYear, Year
-          SizedBox(
-            height: 38,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              children: LeaderboardTimeframe.values.map((tf) {
-                final isSelected = _selectedTimeframe == tf;
-                return Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: FilterChip(
-                    label: Text(tf.displayName),
-                    selected: isSelected,
-                    onSelected: (_) {
-                      setState(() {
-                        _selectedTimeframe = tf;
-                      });
-                    },
-                    backgroundColor: AppColors.surface,
-                    selectedColor: AppColors.primary.withValues(alpha: 0.25),
-                    checkmarkColor: AppColors.primary,
-                    side: BorderSide(
-                      color: isSelected ? AppColors.primary : AppColors.cardBorder,
-                    ),
-                    labelStyle: TextStyle(
-                      color: isSelected ? AppColors.primary : AppColors.textSecondary,
-                      fontSize: 12,
-                      fontWeight:
-                          isSelected ? FontWeight.bold : FontWeight.normal,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                );
-              }).toList(),
+          const Padding(
+            padding: EdgeInsets.only(bottom: 12),
+            child: Text(
+              'Gesamtrendite seit Spielstart. Für kürzere Zeiträume liegen noch keine historischen Ranglistendaten vor.',
             ),
           ),
-
-          const SizedBox(height: 12),
 
           // Podium für Top 3
           if (entries.length >= 3) ...[
@@ -194,25 +140,22 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                 ],
               ),
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: AppColors.primary,
-                width: 1.5,
-              ),
+              border: Border.all(color: AppColors.primary, width: 1.5),
             ),
             child: Row(
               children: [
                 Container(
                   width: 36,
                   height: 36,
-                  decoration: const BoxDecoration(
+                  decoration: BoxDecoration(
                     color: AppColors.primary,
                     shape: BoxShape.circle,
                   ),
                   alignment: Alignment.center,
                   child: Text(
                     '#${playerEntry.rank}',
-                    style: const TextStyle(
-                      color: Colors.black,
+                    style: TextStyle(
+                      color: AppColors.onPrimary,
                       fontWeight: FontWeight.w900,
                       fontSize: 14,
                     ),
@@ -227,7 +170,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                         children: [
                           Text(
                             playerEntry.name,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.bold,
                               color: AppColors.textPrimary,
@@ -239,7 +182,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                       ),
                       Text(
                         '${playerEntry.title} • ${playerEntry.city}',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 11,
                           color: AppColors.textSecondary,
                         ),
@@ -252,7 +195,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                   children: [
                     Text(
                       CurrencyFormatter.format(playerEntry.netWorth),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w900,
                         color: AppColors.textPrimary,
@@ -281,7 +224,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
             children: [
               Text(
                 'Rangliste • ${_selectedTimeframe.displayName}',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.bold,
                   color: AppColors.textPrimary,
@@ -289,10 +232,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
               ),
               Text(
                 '${entries.length} Teilnehmer',
-                style: const TextStyle(
-                  fontSize: 11,
-                  color: AppColors.textMuted,
-                ),
+                style: TextStyle(fontSize: 11, color: AppColors.textMuted),
               ),
             ],
           ),
@@ -308,10 +248,12 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
               decoration: BoxDecoration(
                 color: AppColors.surface,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+                border: Border.all(
+                  color: AppColors.primary.withValues(alpha: 0.3),
+                ),
               ),
               child: Row(
-                children: const [
+                children: [
                   Icon(Icons.public, color: AppColors.primary, size: 28),
                   SizedBox(width: 12),
                   Expanded(
@@ -368,7 +310,11 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
   }
 
   Widget _buildPodiumColumn(
-      LeaderboardEntry entry, int place, Color medalColor, double podiumHeight) {
+    LeaderboardEntry entry,
+    int place,
+    Color medalColor,
+    double podiumHeight,
+  ) {
     return SizedBox(
       width: 90,
       child: Column(
@@ -389,7 +335,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
           ),
           Text(
             CurrencyFormatter.formatCompact(entry.netWorth),
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 11,
               color: AppColors.textSecondary,
               fontWeight: FontWeight.w600,
@@ -408,7 +354,9 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                   AppColors.surfaceElevated,
                 ],
               ),
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(12),
+              ),
               border: Border.all(color: medalColor.withValues(alpha: 0.6)),
             ),
             alignment: Alignment.center,
@@ -426,7 +374,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                 const SizedBox(height: 2),
                 Text(
                   '${entry.roiPercent >= 0 ? "+" : ""}${entry.roiPercent.toStringAsFixed(1)}%',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 10,
                     color: AppColors.profit,
                     fontWeight: FontWeight.bold,
@@ -444,7 +392,9 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
     final isTop3 = entry.rank <= 3;
     final medal = entry.rank == 1
         ? '🥇'
-        : (entry.rank == 2 ? '🥈' : (entry.rank == 3 ? '🥉' : '#${entry.rank}'));
+        : (entry.rank == 2
+              ? '🥈'
+              : (entry.rank == 3 ? '🥉' : '#${entry.rank}'));
 
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 4),
@@ -486,8 +436,9 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                       entry.name,
                       style: TextStyle(
                         fontSize: 13,
-                        fontWeight:
-                            entry.isPlayer ? FontWeight.w900 : FontWeight.bold,
+                        fontWeight: entry.isPlayer
+                            ? FontWeight.w900
+                            : FontWeight.bold,
                         color: entry.isPlayer
                             ? AppColors.primary
                             : AppColors.textPrimary,
@@ -499,7 +450,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                 ),
                 Text(
                   '${entry.strategy} • ${entry.city}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 10,
                     color: AppColors.textSecondary,
                   ),
@@ -514,7 +465,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
             children: [
               Text(
                 CurrencyFormatter.format(entry.netWorth),
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.bold,
                   color: AppColors.textPrimary,

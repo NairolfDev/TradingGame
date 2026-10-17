@@ -14,112 +14,62 @@ class PendingOrderCard extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 5),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: AppColors.gold.withValues(alpha: 0.4),
-          width: 1,
-        ),
-      ),
-      child: Row(
+  Widget build(BuildContext context) => Card(
+    margin: const EdgeInsets.symmetric(vertical: 6),
+    color: AppColors.surface,
+    child: Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Icon
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: AppColors.gold.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: const Icon(
-              Icons.schedule,
-              color: AppColors.gold,
-              size: 20,
-            ),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Icon(Icons.schedule, color: AppColors.gold),
+              Text(
+                '${order.isBuy ? "Kauf" : "Verkauf"} ${order.symbol}',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              if (order.leverage > 1) Text('${order.leverage}x Hebel'),
+            ],
           ),
-          const SizedBox(width: 12),
-
-          // Order Info
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      '${order.isBuy ? "Kauf" : "Verkauf"} ${order.symbol}',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    if (order.leverage > 1) ...[
-                      const SizedBox(width: 6),
-                      Text(
-                        '(${order.leverage}x Hebel)',
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: AppColors.cfd,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  '${CurrencyFormatter.formatAmount(order.amount)} Stk. • Reserviert: ${CurrencyFormatter.format(order.totalEstimatedCost)}',
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: order.scheduledExecutionTime != null
-                        ? AppColors.primary.withValues(alpha: 0.15)
-                        : AppColors.gold.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    order.scheduledExecutionTime != null
-                        ? '📡 Im Orderbuch • Ausführung in ~${order.minutesRemaining == 0 ? "< 1" : "${order.minutesRemaining}"} Min. (${order.brokerVenue ?? "Börsenplatz"})'
-                        : '⏳ Wird bei nächster Börsenöffnung ausgeführt',
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: order.scheduledExecutionTime != null
-                          ? AppColors.primary
-                          : AppColors.gold,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ],
-            ),
+          const SizedBox(height: 8),
+          Text(
+            order.isBuy
+                ? 'Reserviertes Cash: ${CurrencyFormatter.format(order.totalEstimatedCost)}'
+                : 'Reservierte Menge: ${CurrencyFormatter.formatAmount(order.amount)} Stk.',
           ),
-
-          // Stornieren Button
+          if (order.isBuy)
+            Text(
+              'Geplante Menge: ${CurrencyFormatter.formatAmount(order.amount)} Stk.',
+            ),
+          const SizedBox(height: 8),
+          Text(
+            order.scheduledExecutionTime != null
+                ? 'Im Orderbuch · Ausführung in etwa '
+                      '${order.minutesRemaining == 0 ? "< 1" : order.minutesRemaining} Min. '
+                      '(${order.brokerVenue ?? "Börsenplatz"})'
+                : 'Wartet auf die nächste Börsenöffnung',
+            style: TextStyle(fontSize: 14, color: AppColors.gold),
+          ),
+          const SizedBox(height: 12),
           TextButton(
             onPressed: onCancel,
             style: TextButton.styleFrom(
               foregroundColor: AppColors.loss,
-              padding: const EdgeInsets.symmetric(horizontal: 8),
+              minimumSize: const Size(48, 48),
+              padding: const EdgeInsets.all(12),
             ),
-            child: const Text(
-              'Stornieren',
-              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
-            ),
+            child: const Text('Order stornieren'),
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
 }
