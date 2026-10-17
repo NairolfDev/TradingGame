@@ -74,7 +74,7 @@ die Anmeldung nach 2 Minuten mit einer verst√§ndlichen Meldung ab, statt ewig ‚Ä
 3. Bauen/Starten mit:
 
    ```bash
-   flutter run -d windows --dart-define=GOOGLE_DESKTOP_CLIENT_ID=DEINE_ID --dart-define=GOOGLE_DESKTOP_CLIENT_SECRET=DEIN_SECRET
+   flutter run -d windows --dart-define-from-file=dart_defines.local.json
    ```
 
    Ohne diese Werte zeigt der Button eine klare Meldung statt still zu scheitern.

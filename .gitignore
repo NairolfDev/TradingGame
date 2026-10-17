@@ -54,3 +54,6 @@ npm-debug.log*
 *.env
 *.env.*
 temp_*.json
+
+# local OAuth desktop credentials
+dart_defines.local.json
