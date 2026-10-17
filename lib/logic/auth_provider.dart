@@ -395,7 +395,13 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  /// Lets the notification layer unlink this device while still signed in.
+  Future<void> Function()? beforeSignOut;
+
   Future<void> signOut() async {
+    try {
+      await beforeSignOut?.call();
+    } catch (_) {}
     try {
       await _auth.signOut();
     } catch (_) {

@@ -1,4 +1,13 @@
-enum RewardKind { buy, profit, loss, quest, achievement, purchase }
+enum RewardKind {
+  buy,
+  profit,
+  loss,
+  quest,
+  achievement,
+  purchase,
+  orderExecuted,
+  alert,
+}
 
 /// A moment worth celebrating (or acknowledging) in the UI.
 class RewardEvent {

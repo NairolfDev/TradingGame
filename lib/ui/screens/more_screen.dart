@@ -7,6 +7,7 @@ import 'achievements_screen.dart';
 import 'bank_loan_screen.dart';
 import 'dividends_screen.dart';
 import 'leaderboard_screen.dart';
+import 'notifications_screen.dart';
 import 'prestige_shop_screen.dart';
 import 'quests_screen.dart';
 import 'settings_screen.dart';
@@ -72,6 +73,12 @@ class MoreScreen extends StatelessWidget {
             subtitle: 'Öffentliche Portfolios entdecken',
             icon: Icons.people_outline,
             screen: const SocialTradingScreen(),
+          ),
+          (
+            title: 'Benachrichtigungen',
+            subtitle: 'Kursalarme, Orders, Börsenzeiten',
+            icon: Icons.notifications_outlined,
+            screen: const NotificationsScreen(),
           ),
           (
             title: 'Einstellungen',
