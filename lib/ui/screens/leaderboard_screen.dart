@@ -96,7 +96,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                 color: AppColors.profit.withValues(alpha: 0.4),
               ),
             ),
-            child: const Row(
+            child: Row(
               children: [
                 Icon(Icons.wifi, size: 13, color: AppColors.profit),
                 SizedBox(width: 4),
@@ -147,15 +147,15 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                 Container(
                   width: 36,
                   height: 36,
-                  decoration: const BoxDecoration(
+                  decoration: BoxDecoration(
                     color: AppColors.primary,
                     shape: BoxShape.circle,
                   ),
                   alignment: Alignment.center,
                   child: Text(
                     '#${playerEntry.rank}',
-                    style: const TextStyle(
-                      color: Colors.black,
+                    style: TextStyle(
+                      color: AppColors.onPrimary,
                       fontWeight: FontWeight.w900,
                       fontSize: 14,
                     ),
@@ -170,7 +170,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                         children: [
                           Text(
                             playerEntry.name,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.bold,
                               color: AppColors.textPrimary,
@@ -182,7 +182,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                       ),
                       Text(
                         '${playerEntry.title} • ${playerEntry.city}',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 11,
                           color: AppColors.textSecondary,
                         ),
@@ -195,7 +195,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                   children: [
                     Text(
                       CurrencyFormatter.format(playerEntry.netWorth),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w900,
                         color: AppColors.textPrimary,
@@ -224,7 +224,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
             children: [
               Text(
                 'Rangliste • ${_selectedTimeframe.displayName}',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.bold,
                   color: AppColors.textPrimary,
@@ -232,10 +232,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
               ),
               Text(
                 '${entries.length} Teilnehmer',
-                style: const TextStyle(
-                  fontSize: 11,
-                  color: AppColors.textMuted,
-                ),
+                style: TextStyle(fontSize: 11, color: AppColors.textMuted),
               ),
             ],
           ),
@@ -256,7 +253,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                 ),
               ),
               child: Row(
-                children: const [
+                children: [
                   Icon(Icons.public, color: AppColors.primary, size: 28),
                   SizedBox(width: 12),
                   Expanded(
@@ -338,7 +335,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
           ),
           Text(
             CurrencyFormatter.formatCompact(entry.netWorth),
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 11,
               color: AppColors.textSecondary,
               fontWeight: FontWeight.w600,
@@ -377,7 +374,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                 const SizedBox(height: 2),
                 Text(
                   '${entry.roiPercent >= 0 ? "+" : ""}${entry.roiPercent.toStringAsFixed(1)}%',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 10,
                     color: AppColors.profit,
                     fontWeight: FontWeight.bold,
@@ -453,7 +450,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                 ),
                 Text(
                   '${entry.strategy} • ${entry.city}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 10,
                     color: AppColors.textSecondary,
                   ),
@@ -468,7 +465,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
             children: [
               Text(
                 CurrencyFormatter.format(entry.netWorth),
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.bold,
                   color: AppColors.textPrimary,

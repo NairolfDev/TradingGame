@@ -30,13 +30,17 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
     } else if (grade.startsWith('BB')) {
       return AppColors.gold; // Amber
     } else if (grade.startsWith('CCC')) {
-      return Colors.deepOrangeAccent;
+      return AppColors.warning;
     } else {
       return AppColors.loss; // Crimson / Red Kredithai
     }
   }
 
-  void _showRepaymentDialog(BuildContext context, Loan loan, PortfolioProvider provider) {
+  void _showRepaymentDialog(
+    BuildContext context,
+    Loan loan,
+    PortfolioProvider provider,
+  ) {
     double payAmount = loan.remainingDebt.clamp(0.0, provider.cash);
 
     showModalBottomSheet(
@@ -49,7 +53,9 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
       builder: (ctx) {
         return StatefulBuilder(
           builder: (context, setSheetState) {
-            final maxPossible = provider.cash < loan.remainingDebt ? provider.cash : loan.remainingDebt;
+            final maxPossible = provider.cash < loan.remainingDebt
+                ? provider.cash
+                : loan.remainingDebt;
             final canPay = provider.cash > 0 && payAmount > 0;
 
             return Padding(
@@ -77,7 +83,7 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text(
+                      Text(
                         'Kredit tilgen / ablösen',
                         style: TextStyle(
                           fontSize: 18,
@@ -86,14 +92,18 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                         ),
                       ),
                       IconButton(
-                        icon: const Icon(Icons.close, size: 20, color: AppColors.textMuted),
+                        icon: Icon(
+                          Icons.close,
+                          size: 20,
+                          color: AppColors.textMuted,
+                        ),
                         onPressed: () => Navigator.pop(ctx),
                       ),
                     ],
                   ),
                   Text(
                     loan.title,
-                    style: const TextStyle(fontSize: 13, color: AppColors.primary),
+                    style: TextStyle(fontSize: 13, color: AppColors.primary),
                   ),
                   const SizedBox(height: 16),
 
@@ -110,11 +120,16 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text('Offene Restschuld:',
-                                style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+                            Text(
+                              'Offene Restschuld:',
+                              style: TextStyle(
+                                color: AppColors.textSecondary,
+                                fontSize: 13,
+                              ),
+                            ),
                             Text(
                               CurrencyFormatter.format(loan.remainingDebt),
-                              style: const TextStyle(
+                              style: TextStyle(
                                 color: AppColors.loss,
                                 fontWeight: FontWeight.bold,
                                 fontSize: 16,
@@ -126,11 +141,16 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text('Verfügbares Guthaben:',
-                                style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+                            Text(
+                              'Verfügbares Guthaben:',
+                              style: TextStyle(
+                                color: AppColors.textSecondary,
+                                fontSize: 13,
+                              ),
+                            ),
                             Text(
                               CurrencyFormatter.format(provider.cash),
-                              style: const TextStyle(
+                              style: TextStyle(
                                 color: AppColors.textPrimary,
                                 fontWeight: FontWeight.w600,
                                 fontSize: 13,
@@ -145,7 +165,7 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                   const SizedBox(height: 20),
                   Text(
                     'Tilgungsbetrag: ${CurrencyFormatter.format(payAmount)}',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.bold,
                       color: AppColors.accent,
@@ -168,7 +188,7 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                       },
                     ),
                   ] else ...[
-                    const Padding(
+                    Padding(
                       padding: EdgeInsets.symmetric(vertical: 8),
                       child: Text(
                         'Kein Guthaben verfügbar. Verkaufe Wertpapiere oder erwirtschafte Rendite.',
@@ -183,12 +203,18 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                     children: [
                       _buildQuickPayButton('25%', () {
                         setSheetState(() {
-                          payAmount = (loan.remainingDebt * 0.25).clamp(0.0, maxPossible);
+                          payAmount = (loan.remainingDebt * 0.25).clamp(
+                            0.0,
+                            maxPossible,
+                          );
                         });
                       }),
                       _buildQuickPayButton('50%', () {
                         setSheetState(() {
-                          payAmount = (loan.remainingDebt * 0.50).clamp(0.0, maxPossible);
+                          payAmount = (loan.remainingDebt * 0.50).clamp(
+                            0.0,
+                            maxPossible,
+                          );
                         });
                       }),
                       _buildQuickPayButton('Max. möglich', () {
@@ -198,7 +224,10 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                       }),
                       _buildQuickPayButton('Alles (Tilgen)', () {
                         setSheetState(() {
-                          payAmount = loan.remainingDebt.clamp(0.0, maxPossible);
+                          payAmount = loan.remainingDebt.clamp(
+                            0.0,
+                            maxPossible,
+                          );
                         });
                       }),
                     ],
@@ -211,7 +240,10 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                       onPressed: canPay
                           ? () async {
                               final nav = Navigator.of(ctx);
-                              final success = await provider.repayLoan(loan, payAmount);
+                              final success = await provider.repayLoan(
+                                loan,
+                                payAmount,
+                              );
                               nav.pop();
                               if (context.mounted && success) {
                                 ScaffoldMessenger.of(context).showSnackBar(
@@ -219,7 +251,7 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                                     backgroundColor: AppColors.surfaceElevated,
                                     content: Text(
                                       '✅ ${CurrencyFormatter.format(payAmount)} erfolgreich getilgt!',
-                                      style: const TextStyle(color: AppColors.profit),
+                                      style: TextStyle(color: AppColors.profit),
                                     ),
                                   ),
                                 );
@@ -228,7 +260,7 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                           : null,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.profit,
-                        foregroundColor: Colors.black,
+                        foregroundColor: AppColors.onPrimary,
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -236,7 +268,10 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                       ),
                       child: Text(
                         'Jetzt ${CurrencyFormatter.format(payAmount)} zurückzahlen',
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
                       ),
                     ),
                   ),
@@ -254,7 +289,7 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
       onPressed: onTap,
       style: OutlinedButton.styleFrom(
         foregroundColor: AppColors.textPrimary,
-        side: const BorderSide(color: AppColors.cardBorder),
+        side: BorderSide(color: AppColors.cardBorder),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         minimumSize: Size.zero,
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -263,7 +298,11 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
     );
   }
 
-  void _confirmTakeLoan(BuildContext context, PortfolioProvider provider, AuthProvider auth) {
+  void _confirmTakeLoan(
+    BuildContext context,
+    PortfolioProvider provider,
+    AuthProvider auth,
+  ) {
     if (auth.currentUser == null || auth.currentUser!.isGuest) {
       showDialog(
         context: context,
@@ -308,11 +347,11 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
         backgroundColor: AppColors.surface,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
-          side: const BorderSide(color: AppColors.cardBorder),
+          side: BorderSide(color: AppColors.cardBorder),
         ),
         title: Row(
           children: [
-            const Icon(Icons.account_balance, color: AppColors.primary),
+            Icon(Icons.account_balance, color: AppColors.primary),
             const SizedBox(width: 10),
             const Text(
               'Kreditvertrag bestätigen',
@@ -326,7 +365,7 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
           children: [
             Text(
               'Auszahlung auf Depot: +${CurrencyFormatter.format(_requestedAmount)}',
-              style: const TextStyle(
+              style: TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 16,
                 color: AppColors.profit,
@@ -335,9 +374,15 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
             const SizedBox(height: 12),
             _buildDetailRow('Laufzeit:', '$_selectedDurationDays Tage'),
             _buildDetailRow('Bonitätseinstufung:', rating.grade),
-            _buildDetailRow('Zinssatz (p.a.):', '${(rating.baseInterestRate * 100).toStringAsFixed(1)}%'),
-            _buildDetailRow('Errechnete Zinsen:', CurrencyFormatter.format(interest)),
-            const Divider(color: AppColors.cardBorder, height: 20),
+            _buildDetailRow(
+              'Zinssatz (p.a.):',
+              '${(rating.baseInterestRate * 100).toStringAsFixed(1)}%',
+            ),
+            _buildDetailRow(
+              'Errechnete Zinsen:',
+              CurrencyFormatter.format(interest),
+            ),
+            Divider(color: AppColors.cardBorder, height: 20),
             _buildDetailRow(
               'Fällige Gesamtrückzahlung:',
               CurrencyFormatter.format(totalRepay),
@@ -345,7 +390,7 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
               valueColor: AppColors.loss,
             ),
             const SizedBox(height: 12),
-            const Text(
+            Text(
               'Hinweis: Dieser Betrag erhöht deine Verbindlichkeiten und senkt dein Net Worth bis zur Tilgung.',
               style: TextStyle(fontSize: 11, color: AppColors.textMuted),
             ),
@@ -369,7 +414,7 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                     backgroundColor: AppColors.surfaceElevated,
                     content: Text(
                       '🎉 ${CurrencyFormatter.format(_requestedAmount)} wurden deinem Cash-Guthaben gutgeschrieben!',
-                      style: const TextStyle(color: AppColors.profit),
+                      style: TextStyle(color: AppColors.profit),
                     ),
                   ),
                 );
@@ -377,7 +422,7 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
+              foregroundColor: AppColors.onPrimary,
             ),
             child: const Text('Kredit verbindlich annehmen'),
           ),
@@ -386,13 +431,21 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
     );
   }
 
-  Widget _buildDetailRow(String label, String value, {bool isBold = false, Color? valueColor}) {
+  Widget _buildDetailRow(
+    String label,
+    String value, {
+    bool isBold = false,
+    Color? valueColor,
+  }) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 3),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+          Text(
+            label,
+            style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+          ),
           Text(
             value,
             style: TextStyle(
@@ -424,7 +477,7 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Row(
+        title: Row(
           children: [
             Icon(Icons.account_balance, color: AppColors.primary, size: 22),
             SizedBox(width: 8),
@@ -456,7 +509,10 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                 ],
               ),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: ratingColor.withValues(alpha: 0.4), width: 1.2),
+              border: Border.all(
+                color: ratingColor.withValues(alpha: 0.4),
+                width: 1.2,
+              ),
               boxShadow: [
                 BoxShadow(
                   color: ratingColor.withValues(alpha: 0.1),
@@ -471,7 +527,7 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
+                    Text(
                       'DEINE KREDITWÜRDIGKEIT (RATING)',
                       style: TextStyle(
                         fontSize: 11,
@@ -481,7 +537,10 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                       ),
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: ratingColor.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(12),
@@ -513,7 +572,7 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                     Expanded(
                       child: Text(
                         rating.description,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
                           color: AppColors.textSecondary,
                           height: 1.3,
@@ -523,7 +582,7 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                   ],
                 ),
                 const SizedBox(height: 14),
-                const Divider(color: AppColors.cardBorder, height: 1),
+                Divider(color: AppColors.cardBorder, height: 1),
                 const SizedBox(height: 12),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -531,8 +590,13 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Aktueller Kreditzins p.a.:',
-                            style: TextStyle(fontSize: 11, color: AppColors.textMuted)),
+                        Text(
+                          'Aktueller Kreditzins p.a.:',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: AppColors.textMuted,
+                          ),
+                        ),
                         Text(
                           '${(rating.baseInterestRate * 100).toStringAsFixed(1)}% p.a.',
                           style: TextStyle(
@@ -546,11 +610,16 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        const Text('Aktive Gesamtverbindlichkeiten:',
-                            style: TextStyle(fontSize: 11, color: AppColors.textMuted)),
+                        Text(
+                          'Aktive Gesamtverbindlichkeiten:',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: AppColors.textMuted,
+                          ),
+                        ),
                         Text(
                           CurrencyFormatter.format(provider.totalDebt),
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
                             color: AppColors.loss,
@@ -572,11 +641,11 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
             children: [
               Row(
                 children: [
-                  const Icon(Icons.credit_card, size: 18, color: AppColors.primary),
+                  Icon(Icons.credit_card, size: 18, color: AppColors.primary),
                   const SizedBox(width: 8),
                   Text(
                     'Laufende Kredite (${activeLoans.length})',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
                       color: AppColors.textPrimary,
@@ -587,7 +656,7 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
               if (activeLoans.isNotEmpty)
                 Text(
                   'Schulden: ${CurrencyFormatter.format(provider.totalDebt)}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                     color: AppColors.loss,
@@ -605,7 +674,7 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: AppColors.cardBorder),
               ),
-              child: const Center(
+              child: Center(
                 child: Text(
                   'Du hast aktuell keine offenen Kredite oder Schulden. Hervorragend!',
                   style: TextStyle(color: AppColors.profit, fontSize: 13),
@@ -617,8 +686,14 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
               final isStartLoan = loan.id.startsWith('initial_start_loan_');
               final daysLeft = loan.daysRemaining;
               final isOverdue = loan.isOverdue;
-              final total = loan.principal + (loan.principal * loan.interestRate * (loan.durationDays / 365));
-              final paidPercent = total > 0 ? (loan.paidAmount / total).clamp(0.0, 1.0) : 0.0;
+              final total =
+                  loan.principal +
+                  (loan.principal *
+                      loan.interestRate *
+                      (loan.durationDays / 365));
+              final paidPercent = total > 0
+                  ? (loan.paidAmount / total).clamp(0.0, 1.0)
+                  : 0.0;
 
               return Container(
                 margin: const EdgeInsets.only(bottom: 12),
@@ -630,8 +705,8 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                     color: isOverdue
                         ? AppColors.loss
                         : (isStartLoan
-                            ? AppColors.primary.withValues(alpha: 0.5)
-                            : AppColors.cardBorder),
+                              ? AppColors.primary.withValues(alpha: 0.5)
+                              : AppColors.cardBorder),
                     width: isStartLoan || isOverdue ? 1.5 : 1.0,
                   ),
                 ),
@@ -652,7 +727,7 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                               Expanded(
                                 child: Text(
                                   loan.title,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 14,
                                     fontWeight: FontWeight.bold,
                                     color: AppColors.textPrimary,
@@ -663,21 +738,31 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                           ),
                         ),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
                           decoration: BoxDecoration(
-                            color: (isOverdue ? AppColors.loss : AppColors.accent)
-                                .withValues(alpha: 0.15),
+                            color:
+                                (isOverdue ? AppColors.loss : AppColors.accent)
+                                    .withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(
-                              color: isOverdue ? AppColors.loss : AppColors.accent,
+                              color: isOverdue
+                                  ? AppColors.loss
+                                  : AppColors.accent,
                             ),
                           ),
                           child: Text(
-                            isOverdue ? '⚠️ ÜBERFÄLLIG' : '$daysLeft Tage übrig',
+                            isOverdue
+                                ? '⚠️ ÜBERFÄLLIG'
+                                : '$daysLeft Tage übrig',
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.bold,
-                              color: isOverdue ? AppColors.loss : AppColors.accent,
+                              color: isOverdue
+                                  ? AppColors.loss
+                                  : AppColors.accent,
                             ),
                           ),
                         ),
@@ -712,7 +797,9 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                       child: LinearProgressIndicator(
                         value: paidPercent,
                         backgroundColor: AppColors.surfaceElevated,
-                        valueColor: const AlwaysStoppedAnimation<Color>(AppColors.profit),
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          AppColors.profit,
+                        ),
                         minHeight: 6,
                       ),
                     ),
@@ -722,11 +809,17 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                       children: [
                         Text(
                           'Getilgt: ${CurrencyFormatter.format(loan.paidAmount)} (${(paidPercent * 100).toStringAsFixed(0)}%)',
-                          style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: AppColors.textMuted,
+                          ),
                         ),
                         Text(
                           'Frist: ${loan.dueDate.day}.${loan.dueDate.month}.${loan.dueDate.year}',
-                          style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: AppColors.textMuted,
+                          ),
                         ),
                       ],
                     ),
@@ -734,13 +827,14 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton.icon(
-                        onPressed: () => _showRepaymentDialog(context, loan, provider),
+                        onPressed: () =>
+                            _showRepaymentDialog(context, loan, provider),
                         icon: const Icon(Icons.payments_outlined, size: 16),
                         label: const Text('Kreditrate leisten / Tilgen'),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.surfaceElevated,
                           foregroundColor: AppColors.textPrimary,
-                          side: const BorderSide(color: AppColors.cardBorder),
+                          side: BorderSide(color: AppColors.cardBorder),
                           padding: const EdgeInsets.symmetric(vertical: 10),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10),
@@ -755,45 +849,69 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
           ],
 
           if (provider.isInsolvent || provider.isUnderCreditLockout) ...[
-            Card(child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                const Text('Privatinsolvenz & Neustart',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 12),
-                if (provider.isUnderCreditLockout)
-                  Text('Kreditsperre: noch ${provider.creditLockoutTimeRemaining.inDays} Tage, '
-                    '${provider.creditLockoutTimeRemaining.inHours % 24} Stunden und '
-                    '${provider.creditLockoutTimeRemaining.inMinutes % 60} Minuten. '
-                    'Der Sanierungskredit ist nach Ablauf der Sperre verfügbar.',
-                    style: const TextStyle(color: AppColors.textSecondary, height: 1.5))
-                else if (provider.canTakeRecoveryLoan) ...[
-                  const Text('Die Kreditsperre ist abgelaufen. Du kannst einen Sanierungskredit beantragen.'),
-                  const SizedBox(height: 16),
-                  FilledButton.icon(
-                    icon: const Icon(Icons.handshake_outlined),
-                    label: const Text('Sanierungskredit: 10.000 €'),
-                    onPressed: () async {
-                      final success = await provider.takeSanierungsKredit();
-                      if (success && context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                          content: Text('Sanierungskredit ausgezahlt.'),
-                        ));
-                      }
-                    },
-                  ),
-                ] else ...[
-                  const Text('Bei Zahlungsunfähigkeit kannst du Privatinsolvenz anmelden. Danach gilt eine Kreditsperre von fünf Tagen.',
-                    style: TextStyle(color: AppColors.textSecondary, height: 1.5)),
-                  const SizedBox(height: 16),
-                  OutlinedButton.icon(
-                    icon: const Icon(Icons.gavel_outlined),
-                    label: const Text('Privatinsolvenz anmelden'),
-                    onPressed: () => provider.declareInsolvency(),
-                  ),
-                ],
-              ]),
-            )),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Privatinsolvenz & Neustart',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    if (provider.isUnderCreditLockout)
+                      Text(
+                        'Kreditsperre: noch ${provider.creditLockoutTimeRemaining.inDays} Tage, '
+                        '${provider.creditLockoutTimeRemaining.inHours % 24} Stunden und '
+                        '${provider.creditLockoutTimeRemaining.inMinutes % 60} Minuten. '
+                        'Der Sanierungskredit ist nach Ablauf der Sperre verfügbar.',
+                        style: TextStyle(
+                          color: AppColors.textSecondary,
+                          height: 1.5,
+                        ),
+                      )
+                    else if (provider.canTakeRecoveryLoan) ...[
+                      const Text(
+                        'Die Kreditsperre ist abgelaufen. Du kannst einen Sanierungskredit beantragen.',
+                      ),
+                      const SizedBox(height: 16),
+                      FilledButton.icon(
+                        icon: const Icon(Icons.handshake_outlined),
+                        label: const Text('Sanierungskredit: 10.000 €'),
+                        onPressed: () async {
+                          final success = await provider.takeSanierungsKredit();
+                          if (success && context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Sanierungskredit ausgezahlt.'),
+                              ),
+                            );
+                          }
+                        },
+                      ),
+                    ] else ...[
+                      Text(
+                        'Bei Zahlungsunfähigkeit kannst du Privatinsolvenz anmelden. Danach gilt eine Kreditsperre von fünf Tagen.',
+                        style: TextStyle(
+                          color: AppColors.textSecondary,
+                          height: 1.5,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      OutlinedButton.icon(
+                        icon: const Icon(Icons.gavel_outlined),
+                        label: const Text('Privatinsolvenz anmelden'),
+                        onPressed: () => provider.declareInsolvency(),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
             const SizedBox(height: 20),
           ],
 
@@ -811,7 +929,7 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Row(
+                    Row(
                       children: [
                         Icon(Icons.add_card, color: AppColors.accent, size: 20),
                         SizedBox(width: 8),
@@ -825,25 +943,39 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                         ),
                       ],
                     ),
-                    if (provider.transactions.where((t) => t.type == TransactionType.loanPayout).isEmpty)
+                    if (provider.transactions
+                        .where((t) => t.type == TransactionType.loanPayout)
+                        .isEmpty)
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
                         decoration: BoxDecoration(
                           color: AppColors.accentGold.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: AppColors.accentGold.withValues(alpha: 0.5)),
+                          border: Border.all(
+                            color: AppColors.accentGold.withValues(alpha: 0.5),
+                          ),
                         ),
-                        child: const Text(
+                        child: Text(
                           '1. Kredit: Max. 25.000 €',
-                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.gold),
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.gold,
+                          ),
                         ),
                       ),
                   ],
                 ),
                 const SizedBox(height: 6),
-                const Text(
+                Text(
                   'Wähle deinen Wunschbetrag und die Rückzahlungsfrist. Das Geld wird sofort deinem Barkonto gutgeschrieben.',
-                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
                 ),
                 const SizedBox(height: 18),
 
@@ -851,11 +983,16 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('Kreditbetrag:',
-                        style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+                    Text(
+                      'Kreditbetrag:',
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 13,
+                      ),
+                    ),
                     Text(
                       CurrencyFormatter.format(_requestedAmount),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w900,
                         color: AppColors.accent,
@@ -865,16 +1002,25 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                 ),
                 Builder(
                   builder: (context) {
-                    final hasTakenLoan = provider.transactions.any((t) => t.type == TransactionType.loanPayout);
+                    final hasTakenLoan = provider.transactions.any(
+                      (t) => t.type == TransactionType.loanPayout,
+                    );
                     final double maxLimit = hasTakenLoan
                         ? rating.maxBorrowLimit
-                        : (rating.maxBorrowLimit < 25000.0 ? rating.maxBorrowLimit : 25000.0);
-                    final double effectiveAmount = _requestedAmount.clamp(5000.0, maxLimit);
+                        : (rating.maxBorrowLimit < 25000.0
+                              ? rating.maxBorrowLimit
+                              : 25000.0);
+                    final double effectiveAmount = _requestedAmount.clamp(
+                      5000.0,
+                      maxLimit,
+                    );
                     return Slider(
                       value: effectiveAmount,
                       min: 5000.0,
                       max: maxLimit > 5000.0 ? maxLimit : 5000.0,
-                      divisions: maxLimit > 5000.0 ? ((maxLimit - 5000.0) / 5000.0).round().clamp(1, 50) : 1,
+                      divisions: maxLimit > 5000.0
+                          ? ((maxLimit - 5000.0) / 5000.0).round().clamp(1, 50)
+                          : 1,
                       activeColor: AppColors.accent,
                       inactiveColor: AppColors.cardBorder,
                       onChanged: (val) {
@@ -889,9 +1035,12 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                 const SizedBox(height: 14),
 
                 // Duration Selector Chips
-                const Text(
+                Text(
                   'Laufzeit / Rückzahlungsfrist:',
-                  style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 13,
+                  ),
                 ),
                 const SizedBox(height: 8),
                 Wrap(
@@ -901,18 +1050,26 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                     final isSelected = _selectedDurationDays == days;
                     return ChoiceChip(
                       label: Text(
-                        days == 60 ? '$days Tage (2 Monate)' : (days == 30 ? '30 Tage (1 Monat)' : '$days Tage'),
+                        days == 60
+                            ? '$days Tage (2 Monate)'
+                            : (days == 30 ? '30 Tage (1 Monat)' : '$days Tage'),
                         style: TextStyle(
                           fontSize: 12,
-                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                          color: isSelected ? Colors.black : AppColors.textPrimary,
+                          fontWeight: isSelected
+                              ? FontWeight.bold
+                              : FontWeight.normal,
+                          color: isSelected
+                              ? AppColors.onPrimary
+                              : AppColors.textPrimary,
                         ),
                       ),
                       selected: isSelected,
                       selectedColor: AppColors.primary,
                       backgroundColor: AppColors.surfaceElevated,
                       side: BorderSide(
-                        color: isSelected ? AppColors.primary : AppColors.cardBorder,
+                        color: isSelected
+                            ? AppColors.primary
+                            : AppColors.cardBorder,
                       ),
                       onSelected: (selected) {
                         if (selected) {
@@ -953,7 +1110,7 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                         '+${CurrencyFormatter.format(calcInterest)}',
                         AppColors.loss,
                       ),
-                      const Divider(color: AppColors.cardBorder, height: 16),
+                      Divider(color: AppColors.cardBorder, height: 16),
                       _buildCalcRow(
                         'Gesamtrückzahlung am Fälligkeitstag:',
                         CurrencyFormatter.format(calcTotalRepay),
@@ -970,10 +1127,16 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: provider.canTakeLoan ? () => _confirmTakeLoan(context, provider, auth) : null,
+                    onPressed: provider.canTakeLoan
+                        ? () => _confirmTakeLoan(context, provider, auth)
+                        : null,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: provider.canTakeLoan ? AppColors.accent : AppColors.surfaceElevated,
-                      foregroundColor: provider.canTakeLoan ? Colors.black : AppColors.textMuted,
+                      backgroundColor: provider.canTakeLoan
+                          ? AppColors.accent
+                          : AppColors.surfaceElevated,
+                      foregroundColor: provider.canTakeLoan
+                          ? AppColors.onPrimary
+                          : AppColors.textMuted,
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -983,11 +1146,14 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                       provider.isUnderCreditLockout
                           ? '🔒 5-Tage Kreditsperre aktiv (${provider.creditLockoutTimeRemaining.inDays}T ${provider.creditLockoutTimeRemaining.inHours % 24}h)'
                           : (provider.isLoanOnCooldown
-                              ? '⏳ Abkühlphase: 24h Sperre (noch ${provider.loanCooldownRemaining.inHours}h)'
-                              : (!provider.canTakeLoan
-                                  ? '⚠️ Bereits 1 Bankkredit aktiv'
-                                  : 'Kredit über ${CurrencyFormatter.format(_requestedAmount)} jetzt beantragen')),
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                ? '⏳ Abkühlphase: 24h Sperre (noch ${provider.loanCooldownRemaining.inHours}h)'
+                                : (!provider.canTakeLoan
+                                      ? '⚠️ Bereits 1 Bankkredit aktiv'
+                                      : 'Kredit über ${CurrencyFormatter.format(_requestedAmount)} jetzt beantragen')),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
                     ),
                   ),
                 ),
@@ -1001,7 +1167,7 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
           if (paidLoans.isNotEmpty) ...[
             Text(
               'Erfolgreich abbezahlte Kredite (${paidLoans.length})',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.bold,
                 color: AppColors.textSecondary,
@@ -1011,7 +1177,10 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
             ...paidLoans.map((loan) {
               return Container(
                 margin: const EdgeInsets.only(bottom: 8),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
                 decoration: BoxDecoration(
                   color: AppColors.surface,
                   borderRadius: BorderRadius.circular(12),
@@ -1022,17 +1191,24 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                   children: [
                     Row(
                       children: [
-                        const Icon(Icons.check_circle, size: 18, color: AppColors.profit),
+                        Icon(
+                          Icons.check_circle,
+                          size: 18,
+                          color: AppColors.profit,
+                        ),
                         const SizedBox(width: 8),
                         Text(
                           loan.title,
-                          style: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: AppColors.textPrimary,
+                          ),
                         ),
                       ],
                     ),
                     Text(
                       '${CurrencyFormatter.format(loan.paidAmount)} voll getilgt',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
                         color: AppColors.profit,
@@ -1049,11 +1225,16 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
     );
   }
 
-  Widget _buildStatBox(String title, String value, Color color, {bool isHighlight = false}) {
+  Widget _buildStatBox(
+    String title,
+    String value,
+    Color color, {
+    bool isHighlight = false,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(title, style: const TextStyle(fontSize: 11, color: AppColors.textMuted)),
+        Text(title, style: TextStyle(fontSize: 11, color: AppColors.textMuted)),
         const SizedBox(height: 2),
         Text(
           value,
@@ -1067,14 +1248,22 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
     );
   }
 
-  Widget _buildCalcRow(String label, String value, Color color,
-      {bool isBold = false, double fontSize = 12}) {
+  Widget _buildCalcRow(
+    String label,
+    String value,
+    Color color, {
+    bool isBold = false,
+    double fontSize = 12,
+  }) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 3),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+          Text(
+            label,
+            style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+          ),
           Text(
             value,
             style: TextStyle(

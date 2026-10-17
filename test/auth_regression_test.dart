@@ -1,4 +1,8 @@
+import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:trading_game/ui/screens/auth_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -69,6 +73,7 @@ class FailedFirebaseAuth extends Fake implements FirebaseAuth {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   setUp(() => SharedPreferences.setMockInitialValues({}));
+  authScreenTests();
 
   Future<AuthProvider> provider() async {
     final auth = AuthProvider(firebaseAuth: FailedFirebaseAuth());
@@ -173,4 +178,85 @@ void main() {
     expect(auth.needsProfile, isTrue);
     expect(auth.profileError, isNotNull);
   });
+}
+
+class _Credential extends Fake implements UserCredential {
+  _Credential(this.user);
+  @override
+  final User? user;
+}
+
+/// Signs in on demand, emitting the user on authStateChanges like Firebase.
+class SlowSignInAuth extends FailedFirebaseAuth {
+  final _changes = StreamController<User?>.broadcast();
+  User? _user;
+  @override
+  User? get currentUser => _user;
+  @override
+  Stream<User?> authStateChanges() async* {
+    yield _user;
+    yield* _changes.stream;
+  }
+
+  @override
+  Future<UserCredential> signInWithEmailAndPassword({
+    required String email,
+    required String password,
+  }) async {
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+    _user = ProfileUser();
+    _changes.add(_user);
+    return _Credential(_user);
+  }
+}
+
+void authScreenTests() {
+  testWidgets(
+    'auth screen closes after login even when the app home is swapped',
+    (tester) async {
+      final auth = AuthProvider(
+        firebaseAuth: SlowSignInAuth(),
+        profiles: MemoryProfiles(),
+      );
+      addTearDown(auth.dispose);
+      await tester.pumpWidget(
+        ChangeNotifierProvider.value(
+          value: auth,
+          child: MaterialApp(
+            home: Consumer<AuthProvider>(
+              builder: (_, a, _) {
+                if (a.isInitializing) return const Text('boot');
+                if (a.needsProfile) return const Text('profile setup');
+                return Builder(
+                  builder: (context) => TextButton(
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const AuthScreen()),
+                    ),
+                    child: const Text('open login'),
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+      );
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 20)),
+      );
+      await tester.pump();
+      await tester.tap(find.text('open login'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField).first, 'a@b.at');
+      await tester.enterText(find.byType(TextField).last, 'secret1');
+      await tester.tap(find.widgetWithText(FilledButton, 'Anmelden'));
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 100)),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(AuthScreen), findsNothing);
+      expect(find.text('profile setup'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
 }

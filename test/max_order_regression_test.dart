@@ -217,11 +217,11 @@ void main() {
         child: MaterialApp(home: TradeDetailScreen(asset: asset)),
       ),
     );
-    await tester.ensureVisible(find.text('MAX'));
-    await tester.tap(find.text('MAX'));
+    await tester.ensureVisible(find.text('100%'));
+    await tester.tap(find.text('100%'));
     await tester.pump();
     final orderButton = find.ancestor(
-      of: find.textContaining('ORDER PRÜFEN & KAUFEN'),
+      of: find.textContaining('Kauf prüfen'),
       matching: find.byType(ElevatedButton),
     );
     expect(tester.widget<ElevatedButton>(orderButton).onPressed, isNotNull);

@@ -7,12 +7,57 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:974968386258:android:7adfd1d5894f875f67f30b",
+        "mobilesdk_app_id": "1:974968386258:android:8493086c8310112d67f30b",
         "android_client_info": {
           "package_name": "com.nairolfdev.tradinggame"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "974968386258-12jhhva45rmnoo3sektq1nh4v0n3h77i.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.nairolfdev.tradinggame",
+            "certificate_hash": "565167f1b54b0adb0685946ff9141e11576db365"
+          }
+        },
+        {
+          "client_id": "974968386258-pe9j19i3huqa32j920620t5ipd301rqu.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.nairolfdev.tradinggame",
+            "certificate_hash": "6b703f0904c9cb9e8fa2742003dafe52363f786c"
+          }
+        },
+        {
+          "client_id": "974968386258-q700ee8t5m4e2bfnjng3qaehsl0b40i8.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.nairolfdev.tradinggame",
+            "certificate_hash": "5fd3bf26859b54d0dc6e424cb68c5a285ea4fac0"
+          }
+        },
+        {
+          "client_id": "974968386258-r3f609lh1aoegtqgq7nbvkuhojusnggi.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.nairolfdev.tradinggame",
+            "certificate_hash": "b2035863381d037e7e4fc10fc5a30ab3bc7c481d"
+          }
+        },
+        {
+          "client_id": "974968386258-uvoj7ucg9lmto100r7vuhpgkm4oiisdq.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.nairolfdev.tradinggame",
+            "certificate_hash": "83c010b627f8672a8124ee73b01637f6d7e8b7cc"
+          }
+        },
+        {
+          "client_id": "974968386258-im5jt00q3i1mjj9vrarvnaqpdjri0fgu.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyDaTaYKZdRu1oO5LxCxe_9VLQQ_uQerMxM"
@@ -20,7 +65,41 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "974968386258-im5jt00q3i1mjj9vrarvnaqpdjri0fgu.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:974968386258:android:7adfd1d5894f875f67f30b",
+        "android_client_info": {
+          "package_name": "com.tradinggame.trading_game"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "974968386258-im5jt00q3i1mjj9vrarvnaqpdjri0fgu.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDaTaYKZdRu1oO5LxCxe_9VLQQ_uQerMxM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "974968386258-im5jt00q3i1mjj9vrarvnaqpdjri0fgu.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

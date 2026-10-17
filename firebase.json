@@ -40,7 +40,7 @@
       "android": {
         "default": {
           "projectId": "tradinggame-austria-prod",
-          "appId": "1:974968386258:android:7adfd1d5894f875f67f30b",
+          "appId": "1:974968386258:android:8493086c8310112d67f30b",
           "fileOutput": "android/app/google-services.json"
         }
       },
@@ -48,7 +48,7 @@
         "lib/firebase_options.dart": {
           "projectId": "tradinggame-austria-prod",
           "configurations": {
-            "android": "1:974968386258:android:7adfd1d5894f875f67f30b",
+            "android": "1:974968386258:android:8493086c8310112d67f30b",
             "web": "1:974968386258:web:526752f83901959567f30b",
             "windows": "1:974968386258:web:43c904a297205c0167f30b"
           }

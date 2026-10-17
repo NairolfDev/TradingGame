@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
+import '../widgets/game_fx.dart';
 import '../../logic/portfolio_provider.dart';
 
 class QuestsScreen extends StatelessWidget {
@@ -16,11 +17,14 @@ class QuestsScreen extends StatelessWidget {
       backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: AppColors.surface,
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.emoji_events, color: Colors.amber, size: 26),
+            Icon(Icons.emoji_events, color: AppColors.gold, size: 26),
             SizedBox(width: 8),
-            Text('Wall Street Pass & Quests', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+            Text(
+              'Wall Street Pass & Quests',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+            ),
           ],
         ),
       ),
@@ -34,12 +38,18 @@ class QuestsScreen extends StatelessWidget {
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [Colors.amber.shade900.withAlpha(120), AppColors.surfaceElevated],
+                  colors: [
+                    AppColors.goldDark.withAlpha(120),
+                    AppColors.surfaceElevated,
+                  ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.amber.withAlpha(100), width: 1.5),
+                border: Border.all(
+                  color: AppColors.gold.withAlpha(100),
+                  width: 1.5,
+                ),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -49,28 +59,49 @@ class QuestsScreen extends StatelessWidget {
                     children: [
                       Row(
                         children: [
-                          const Icon(Icons.local_fire_department, color: Colors.amber, size: 28),
+                          Icon(
+                            Icons.local_fire_department,
+                            color: AppColors.gold,
+                            size: 28,
+                          ),
                           const SizedBox(width: 8),
                           Text(
                             '$streakDays-Tage Trading-Streak!',
-                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.textPrimary,
+                            ),
                           ),
                         ],
                       ),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
-                          color: Colors.amber.withAlpha(40),
+                          color: AppColors.gold.withAlpha(40),
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: const Text('AKTIV', style: TextStyle(color: Colors.amber, fontWeight: FontWeight.bold, fontSize: 11)),
+                        child: Text(
+                          'AKTIV',
+                          style: TextStyle(
+                            color: AppColors.gold,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 11,
+                          ),
+                        ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 12),
-                  const Text(
+                  Text(
                     'Handele täglich, um Login-Boni und exklusive Wall Street Belohnungen freizuschalten.',
-                    style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 12,
+                    ),
                   ),
                   const SizedBox(height: 14),
                   Row(
@@ -84,14 +115,26 @@ class QuestsScreen extends StatelessWidget {
                             width: 36,
                             height: 36,
                             decoration: BoxDecoration(
-                              color: isUnlocked ? Colors.amber : AppColors.surface,
+                              color: isUnlocked
+                                  ? AppColors.gold
+                                  : AppColors.surface,
                               shape: BoxShape.circle,
-                              border: Border.all(color: isUnlocked ? Colors.amberAccent : Colors.white24),
+                              border: Border.all(
+                                color: isUnlocked
+                                    ? AppColors.gold
+                                    : AppColors.textPrimary.withValues(
+                                        alpha: 0.24,
+                                      ),
+                              ),
                             ),
                             child: Icon(
                               isUnlocked ? Icons.check : Icons.lock,
                               size: 18,
-                              color: isUnlocked ? Colors.black : Colors.white38,
+                              color: isUnlocked
+                                  ? AppColors.onPrimary
+                                  : AppColors.textPrimary.withValues(
+                                      alpha: 0.38,
+                                    ),
                             ),
                           ),
                           const SizedBox(height: 4),
@@ -99,8 +142,14 @@ class QuestsScreen extends StatelessWidget {
                             'Tag $day',
                             style: TextStyle(
                               fontSize: 10,
-                              color: isUnlocked ? Colors.amber : Colors.white38,
-                              fontWeight: isUnlocked ? FontWeight.bold : FontWeight.normal,
+                              color: isUnlocked
+                                  ? AppColors.gold
+                                  : AppColors.textPrimary.withValues(
+                                      alpha: 0.38,
+                                    ),
+                              fontWeight: isUnlocked
+                                  ? FontWeight.bold
+                                  : FontWeight.normal,
                             ),
                           ),
                         ],
@@ -114,16 +163,23 @@ class QuestsScreen extends StatelessWidget {
             const SizedBox(height: 24),
 
             // 2. Tägliche Missionen Header
-            const Row(
+            Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
                   'Tägliche Herausforderungen:',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
                 ),
                 Text(
                   'Reset: 24h',
-                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
                 ),
               ],
             ),
@@ -142,8 +198,10 @@ class QuestsScreen extends StatelessWidget {
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
                     color: isClaimed
-                        ? Colors.white12
-                        : (isDone ? AppColors.primary : Colors.white10),
+                        ? AppColors.textPrimary.withValues(alpha: 0.12)
+                        : (isDone
+                              ? AppColors.primary
+                              : AppColors.textPrimary.withValues(alpha: 0.1)),
                     width: isDone && !isClaimed ? 1.5 : 1,
                   ),
                 ),
@@ -155,12 +213,16 @@ class QuestsScreen extends StatelessWidget {
                         Container(
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
-                            color: isDone ? AppColors.primary.withAlpha(30) : Colors.white10,
+                            color: isDone
+                                ? AppColors.primary.withAlpha(30)
+                                : AppColors.textPrimary.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: Icon(
                             isDone ? Icons.verified : Icons.flag,
-                            color: isDone ? AppColors.primary : Colors.white70,
+                            color: isDone
+                                ? AppColors.primary
+                                : AppColors.textPrimary.withValues(alpha: 0.7),
                             size: 20,
                           ),
                         ),
@@ -174,13 +236,20 @@ class QuestsScreen extends StatelessWidget {
                                 style: TextStyle(
                                   fontWeight: FontWeight.bold,
                                   fontSize: 14,
-                                  color: isClaimed ? Colors.white54 : Colors.white,
+                                  color: isClaimed
+                                      ? AppColors.textPrimary.withValues(
+                                          alpha: 0.54,
+                                        )
+                                      : AppColors.textPrimary,
                                 ),
                               ),
                               const SizedBox(height: 2),
                               Text(
                                 quest.description,
-                                style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: AppColors.textSecondary,
+                                ),
                               ),
                             ],
                           ),
@@ -189,16 +258,10 @@ class QuestsScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 14),
                     // Progress Bar
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(6),
-                      child: LinearProgressIndicator(
-                        value: quest.progressRatio,
-                        minHeight: 6,
-                        backgroundColor: Colors.white10,
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          isDone ? AppColors.primary : Colors.amber,
-                        ),
-                      ),
+                    GameProgressBar(
+                      value: quest.progressRatio,
+                      color: isDone ? AppColors.primary : AppColors.gold,
+                      height: 6,
                     ),
                     const SizedBox(height: 12),
                     Row(
@@ -206,23 +269,45 @@ class QuestsScreen extends StatelessWidget {
                       children: [
                         Row(
                           children: [
-                            const Icon(Icons.attach_money, size: 16, color: Colors.amber),
+                            Icon(
+                              Icons.attach_money,
+                              size: 16,
+                              color: AppColors.gold,
+                            ),
                             Text(
                               '+${quest.rewardCash.toStringAsFixed(0)} €',
-                              style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.amber, fontSize: 13),
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.gold,
+                                fontSize: 13,
+                              ),
                             ),
                             const SizedBox(width: 10),
-                            const Icon(Icons.workspace_premium, size: 16, color: AppColors.primary),
+                            Icon(
+                              Icons.workspace_premium,
+                              size: 16,
+                              color: AppColors.primary,
+                            ),
                             Text(
                               '+${quest.rewardPrestige} Prestige',
-                              style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary, fontSize: 13),
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.primary,
+                                fontSize: 13,
+                              ),
                             ),
                           ],
                         ),
                         if (isClaimed)
-                          const Text(
+                          Text(
                             'Abgeholt ✓',
-                            style: TextStyle(color: Colors.white38, fontWeight: FontWeight.bold, fontSize: 12),
+                            style: TextStyle(
+                              color: AppColors.textPrimary.withValues(
+                                alpha: 0.38,
+                              ),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
                           )
                         else if (isDone)
                           ElevatedButton(
@@ -231,22 +316,41 @@ class QuestsScreen extends StatelessWidget {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
                                   backgroundColor: AppColors.primary,
-                                  content: Text('🎁 Belohnung für "${quest.title}" erhalten!'),
+                                  content: Text(
+                                    '🎁 Belohnung für "${quest.title}" erhalten!',
+                                  ),
                                 ),
                               );
                             },
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppColors.primary,
-                              foregroundColor: Colors.black,
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              foregroundColor: AppColors.onPrimary,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 8,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
                             ),
-                            child: const Text('Belohnung abholen', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                            child: const Text(
+                              'Belohnung abholen',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                              ),
+                            ),
                           )
                         else
                           Text(
                             '${quest.currentValue.toStringAsFixed(0)} / ${quest.targetValue.toStringAsFixed(0)}',
-                            style: const TextStyle(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.bold),
+                            style: TextStyle(
+                              color: AppColors.textPrimary.withValues(
+                                alpha: 0.54,
+                              ),
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                       ],
                     ),

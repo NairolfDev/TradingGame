@@ -44,7 +44,8 @@ class AppUpdateService {
       final response = await http
           .get(
             Uri.parse(
-                'https://api.github.com/repos/$githubRepoOwner/$githubRepoName/releases/latest'),
+              'https://api.github.com/repos/$githubRepoOwner/$githubRepoName/releases/latest',
+            ),
             headers: {'Accept': 'application/vnd.github.v3+json'},
           )
           .timeout(const Duration(seconds: 4));
@@ -54,7 +55,9 @@ class AppUpdateService {
         final tagName = (data['tag_name'] as String? ?? 'v1.2.0')
             .replaceAll('v', '')
             .trim();
-        final body = data['body'] as String? ?? 'Wichtige Sicherheits-, Kurs- und Stabilitätsupdates.';
+        final body =
+            data['body'] as String? ??
+            'Wichtige Sicherheits-, Kurs- und Stabilitätsupdates.';
         final htmlUrl = data['html_url'] as String? ?? defaultReleaseUrl;
 
         final hasUpdate = _isVersionHigher(tagName, currentVersion);
@@ -113,7 +116,11 @@ class AppUpdateService {
           ),
           title: const Row(
             children: [
-              Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 30),
+              Icon(
+                Icons.warning_amber_rounded,
+                color: Colors.redAccent,
+                size: 30,
+              ),
               SizedBox(width: 10),
               Expanded(
                 child: Text(
@@ -173,10 +180,14 @@ class AppUpdateService {
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    const Icon(Icons.arrow_forward, size: 14, color: AppColors.primary),
+                    Icon(
+                      Icons.arrow_forward,
+                      size: 14,
+                      color: AppColors.primary,
+                    ),
                     Text(
                       'Pflicht: v${info.latestVersion}',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
                         color: AppColors.primary,
@@ -186,7 +197,7 @@ class AppUpdateService {
                 ),
               ),
               const SizedBox(height: 14),
-              const Text(
+              Text(
                 'Was ist neu in diesem Pflicht-Update:',
                 style: TextStyle(
                   fontSize: 12,
@@ -202,7 +213,7 @@ class AppUpdateService {
                     kIsWeb
                         ? '✨ Neue Features & Synchronisation:\n• Neue Pro-Broker-Charts (Candlesticks & SMA)\n• Edelmetalle & Rohstoffe (Gold, Silber, Platin, Öl)\n• 5-Tage-Privatinsolvenzsperre & Kredit-Cooldown\n• Cyberpunk Neon Bull Branding'
                         : info.releaseNotes,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
                       color: AppColors.textSecondary,
                     ),
@@ -222,23 +233,39 @@ class AppUpdateService {
                     reloadWebApp();
                   } else if (defaultTargetPlatform == TargetPlatform.android) {
                     // Google Play Store öffnen
-                    final marketUri = Uri.parse('market://details?id=$androidPackageName');
-                    final webPlayStoreUri = Uri.parse('https://play.google.com/store/apps/details?id=$androidPackageName');
+                    final marketUri = Uri.parse(
+                      'market://details?id=$androidPackageName',
+                    );
+                    final webPlayStoreUri = Uri.parse(
+                      'https://play.google.com/store/apps/details?id=$androidPackageName',
+                    );
                     if (await canLaunchUrl(marketUri)) {
-                      await launchUrl(marketUri, mode: LaunchMode.externalApplication);
+                      await launchUrl(
+                        marketUri,
+                        mode: LaunchMode.externalApplication,
+                      );
                     } else if (await canLaunchUrl(webPlayStoreUri)) {
-                      await launchUrl(webPlayStoreUri, mode: LaunchMode.externalApplication);
+                      await launchUrl(
+                        webPlayStoreUri,
+                        mode: LaunchMode.externalApplication,
+                      );
                     } else {
                       final githubUri = Uri.parse(info.downloadUrl);
                       if (await canLaunchUrl(githubUri)) {
-                        await launchUrl(githubUri, mode: LaunchMode.externalApplication);
+                        await launchUrl(
+                          githubUri,
+                          mode: LaunchMode.externalApplication,
+                        );
                       }
                     }
                   } else {
                     // Windows Desktop: GitHub Release / Installer öffnen
                     final uri = Uri.parse(info.downloadUrl);
                     if (await canLaunchUrl(uri)) {
-                      await launchUrl(uri, mode: LaunchMode.externalApplication);
+                      await launchUrl(
+                        uri,
+                        mode: LaunchMode.externalApplication,
+                      );
                     }
                   }
                 },
@@ -246,17 +273,20 @@ class AppUpdateService {
                   kIsWeb
                       ? Icons.refresh
                       : (defaultTargetPlatform == TargetPlatform.android
-                          ? Icons.play_arrow
-                          : Icons.download),
+                            ? Icons.play_arrow
+                            : Icons.download),
                   size: 20,
                 ),
                 label: Text(
                   kIsWeb
                       ? 'Jetzt neu laden (Strg + Shift + R)'
                       : (defaultTargetPlatform == TargetPlatform.android
-                          ? 'Jetzt im Google Play Store updaten'
-                          : 'Jetzt Setup.exe herunterladen & updaten'),
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                            ? 'Jetzt im Google Play Store updaten'
+                            : 'Jetzt Setup.exe herunterladen & updaten'),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,

@@ -15,10 +15,11 @@ class HistoryNewsScreen extends StatelessWidget {
 
     return DefaultTabController(
       length: 2,
+      initialIndex: 1,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('News & Historie'),
-          bottom: const TabBar(
+          title: const Text('Aktivität'),
+          bottom: TabBar(
             indicatorColor: AppColors.primary,
             labelColor: AppColors.primary,
             unselectedLabelColor: AppColors.textSecondary,
@@ -44,9 +45,9 @@ class HistoryNewsScreen extends StatelessWidget {
     final newsList = provider.newsEvents;
 
     if (newsList.isEmpty) {
-      return const Center(
+      return Center(
         child: Text(
-          'Noch keine aktuellen Eilmeldungen.\nDie Börsen-Newsengine generiert laufend Nachrichten!',
+          'Noch keine aktuellen Eilmeldungen.\nNeue Meldungen erscheinen, sobald eine Nachrichtenquelle verfügbar ist.',
           textAlign: TextAlign.center,
           style: TextStyle(color: AppColors.textSecondary),
         ),
@@ -81,8 +82,10 @@ class HistoryNewsScreen extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
                     decoration: BoxDecoration(
                       color: (isBull ? AppColors.profit : AppColors.loss)
                           .withValues(alpha: 0.15),
@@ -99,17 +102,14 @@ class HistoryNewsScreen extends StatelessWidget {
                   ),
                   Text(
                     dateFormat.format(news.timestamp),
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: AppColors.textMuted,
-                    ),
+                    style: TextStyle(fontSize: 11, color: AppColors.textMuted),
                   ),
                 ],
               ),
               const SizedBox(height: 8),
               Text(
                 news.headline,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
                   color: AppColors.textPrimary,
@@ -118,10 +118,7 @@ class HistoryNewsScreen extends StatelessWidget {
               const SizedBox(height: 4),
               Text(
                 news.description,
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: AppColors.textSecondary,
-                ),
+                style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
               ),
             ],
           ),
@@ -134,7 +131,7 @@ class HistoryNewsScreen extends StatelessWidget {
     final transactions = provider.transactions;
 
     if (transactions.isEmpty) {
-      return const Center(
+      return Center(
         child: Text(
           'Noch keine Transaktionen vorhanden.\nKaufe Wertpapiere oder Prestige-Güter!',
           textAlign: TextAlign.center,
@@ -177,7 +174,7 @@ class HistoryNewsScreen extends StatelessWidget {
             badgeColor = AppColors.profit;
             break;
           case TransactionType.dividendPayout:
-            badgeColor = Colors.greenAccent;
+            badgeColor = AppColors.profit;
             break;
         }
 
@@ -214,7 +211,7 @@ class HistoryNewsScreen extends StatelessWidget {
                   children: [
                     Text(
                       '${tx.symbol} • ${tx.name}',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.bold,
                         color: AppColors.textPrimary,
@@ -224,7 +221,7 @@ class HistoryNewsScreen extends StatelessWidget {
                     ),
                     Text(
                       dateFormat.format(tx.timestamp),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 10,
                         color: AppColors.textMuted,
                       ),
@@ -237,7 +234,7 @@ class HistoryNewsScreen extends StatelessWidget {
                 children: [
                   Text(
                     CurrencyFormatter.format(tx.totalAmount),
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.bold,
                       color: AppColors.textPrimary,

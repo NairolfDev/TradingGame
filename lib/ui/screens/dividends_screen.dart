@@ -18,11 +18,14 @@ class DividendsScreen extends StatelessWidget {
       backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: AppColors.surface,
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.payments, color: Colors.greenAccent, size: 26),
+            Icon(Icons.payments, color: AppColors.profit, size: 26),
             SizedBox(width: 8),
-            Text('Dividenden & Cashflow', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+            Text(
+              'Dividenden & Cashflow',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+            ),
           ],
         ),
       ),
@@ -36,21 +39,34 @@ class DividendsScreen extends StatelessWidget {
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [Colors.green.shade900.withAlpha(120), AppColors.surfaceElevated],
+                  colors: [
+                    AppColors.profit.withAlpha(120),
+                    AppColors.surfaceElevated,
+                  ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.greenAccent.withAlpha(100), width: 1.5),
+                border: Border.all(
+                  color: AppColors.profit.withAlpha(100),
+                  width: 1.5,
+                ),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Row(
+                  Row(
                     children: [
-                      Icon(Icons.savings, color: Colors.greenAccent, size: 24),
+                      Icon(Icons.savings, color: AppColors.profit, size: 24),
                       SizedBox(width: 8),
-                      Text('Passiver Cashflow-Monitor', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
+                      Text(
+                        'Passiver Cashflow-Monitor',
+                        style: TextStyle(
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                        ),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 16),
@@ -60,24 +76,48 @@ class DividendsScreen extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text('Jährliche Ausschüttung:', style: TextStyle(color: AppColors.textSecondary, fontSize: 11)),
+                            Text(
+                              'Jährliche Ausschüttung:',
+                              style: TextStyle(
+                                color: AppColors.textSecondary,
+                                fontSize: 11,
+                              ),
+                            ),
                             Text(
                               '${annualDividends.toStringAsFixed(2)} €',
-                              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
+                              style: TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.textPrimary,
+                              ),
                             ),
                           ],
                         ),
                       ),
-                      Container(width: 1, height: 40, color: Colors.white24),
+                      Container(
+                        width: 1,
+                        height: 40,
+                        color: AppColors.textPrimary.withValues(alpha: 0.24),
+                      ),
                       const SizedBox(width: 16),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text('Monatlicher Cashflow:', style: TextStyle(color: AppColors.textSecondary, fontSize: 11)),
+                            Text(
+                              'Monatlicher Cashflow:',
+                              style: TextStyle(
+                                color: AppColors.textSecondary,
+                                fontSize: 11,
+                              ),
+                            ),
                             Text(
                               '${monthlyIncome.toStringAsFixed(2)} €',
-                              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.greenAccent),
+                              style: TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.profit,
+                              ),
                             ),
                           ],
                         ),
@@ -93,19 +133,28 @@ class DividendsScreen extends StatelessWidget {
                               portfolio.payoutSimulatedDividends();
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
-                                  backgroundColor: Colors.green,
-                                  content: Text('💵 Dividendenausschüttung über ${monthlyIncome.toStringAsFixed(2)} € verbucht!'),
+                                  backgroundColor: AppColors.profit,
+                                  content: Text(
+                                    '💵 Dividendenausschüttung über ${monthlyIncome.toStringAsFixed(2)} € verbucht!',
+                                  ),
                                 ),
                               );
                             }
                           : null,
                       icon: const Icon(Icons.currency_exchange, size: 18),
-                      label: Text(portfolio.canClaimMonthlyDividends ? 'Monats-Dividenden ausschütten' : 'Keine offene Ausschüttung', style: const TextStyle(fontWeight: FontWeight.bold)),
+                      label: Text(
+                        portfolio.canClaimMonthlyDividends
+                            ? 'Monats-Dividenden ausschütten'
+                            : 'Keine offene Ausschüttung',
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.greenAccent,
-                        foregroundColor: Colors.black,
+                        backgroundColor: AppColors.profit,
+                        foregroundColor: AppColors.onPrimary,
                         padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
                       ),
                     ),
                   ),
@@ -116,9 +165,13 @@ class DividendsScreen extends StatelessWidget {
             const SizedBox(height: 24),
 
             // 2. Anstehende Dividenden
-            const Text(
+            Text(
               'Ausschüttungs-Kalender:',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: AppColors.textPrimary,
+              ),
             ),
             const SizedBox(height: 12),
 
@@ -130,43 +183,59 @@ class DividendsScreen extends StatelessWidget {
                   color: AppColors.surfaceElevated,
                   borderRadius: BorderRadius.circular(16),
                 ),
-                child: const Column(
+                child: Column(
                   children: [
-                    Icon(Icons.inventory_2_outlined, color: AppColors.textSecondary, size: 40),
+                    Icon(
+                      Icons.inventory_2_outlined,
+                      color: AppColors.textSecondary,
+                      size: 40,
+                    ),
                     SizedBox(height: 10),
                     Text(
                       'Noch keine Dividendenwerte im Depot!',
-                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     SizedBox(height: 4),
                     Text(
                       'Kaufe dividendenstarke Aktien wie OMV Wien (7.2%), Erste Group (5.5%) oder ATX Prime ETF (3.8%) auf dem Marktplatz.',
                       textAlign: TextAlign.center,
-                      style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 12,
+                      ),
                     ),
                   ],
                 ),
               )
             else
               ...schedule.map((item) {
-                final dateStr = DateFormat('dd.MM.yyyy').format(item.nextExDate);
+                final dateStr = DateFormat(
+                  'dd.MM.yyyy',
+                ).format(item.nextExDate);
                 return Container(
                   margin: const EdgeInsets.only(bottom: 10),
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
                     color: AppColors.surfaceElevated,
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.greenAccent.withAlpha(50)),
+                    border: Border.all(color: AppColors.profit.withAlpha(50)),
                   ),
                   child: Row(
                     children: [
                       Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: Colors.greenAccent.withAlpha(25),
+                          color: AppColors.profit.withAlpha(25),
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: const Icon(Icons.calendar_month, color: Colors.greenAccent, size: 20),
+                        child: Icon(
+                          Icons.calendar_month,
+                          color: AppColors.profit,
+                          size: 20,
+                        ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -175,11 +244,18 @@ class DividendsScreen extends StatelessWidget {
                           children: [
                             Text(
                               item.assetName,
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.white),
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                                color: AppColors.textPrimary,
+                              ),
                             ),
                             Text(
                               '${item.assetSymbol} • Rendite: ${item.dividendYieldPercent.toStringAsFixed(1)}% p.a.',
-                              style: const TextStyle(color: AppColors.textSecondary, fontSize: 11),
+                              style: TextStyle(
+                                color: AppColors.textSecondary,
+                                fontSize: 11,
+                              ),
                             ),
                           ],
                         ),
@@ -189,11 +265,18 @@ class DividendsScreen extends StatelessWidget {
                         children: [
                           Text(
                             '+${item.projectedPayout.toStringAsFixed(2)} €',
-                            style: const TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold, fontSize: 14),
+                            style: TextStyle(
+                              color: AppColors.profit,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
                           ),
                           Text(
                             'Ex-Tag: $dateStr',
-                            style: const TextStyle(color: AppColors.textSecondary, fontSize: 10),
+                            style: TextStyle(
+                              color: AppColors.textSecondary,
+                              fontSize: 10,
+                            ),
                           ),
                         ],
                       ),

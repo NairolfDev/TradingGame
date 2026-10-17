@@ -3,8 +3,7 @@ import 'package:provider/provider.dart';
 import '../../logic/auth_provider.dart';
 
 class AuthScreen extends StatefulWidget {
-  final VoidCallback? onAuthenticated;
-  const AuthScreen({super.key, this.onAuthenticated});
+  const AuthScreen({super.key});
   @override
   State<AuthScreen> createState() => _AuthScreenState();
 }
@@ -22,13 +21,10 @@ class _AuthScreenState extends State<AuthScreen> {
     super.dispose();
   }
 
+  // Pop via this route's own context: the opener may have been rebuilt away
+  // (e.g. home switches to profile setup) while sign-in was in progress.
   void _success() {
-    if (!mounted) return;
-    if (widget.onAuthenticated != null) {
-      widget.onAuthenticated!();
-    } else if (Navigator.canPop(context)) {
-      Navigator.pop(context);
-    }
+    if (mounted) Navigator.of(context).maybePop();
   }
 
   @override

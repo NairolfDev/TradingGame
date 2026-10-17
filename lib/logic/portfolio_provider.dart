@@ -11,6 +11,7 @@ import '../data/models/news_event.dart';
 import '../data/models/leaderboard_entry.dart';
 import '../data/models/market_schedule.dart';
 import '../data/models/loan_model.dart';
+import '../data/models/reward_event.dart';
 import '../data/repositories/trading_repository.dart';
 import '../data/repositories/local_trading_repository.dart';
 import '../data/repositories/firebase_trading_repository.dart';
@@ -172,6 +173,14 @@ class PortfolioProvider extends ChangeNotifier {
 
   bool get isLoading => _isLoading;
   String? get lastAlertMessage => _lastAlertMessage;
+
+  final _rewards = StreamController<RewardEvent>.broadcast();
+
+  /// Trades, quests and achievements for the celebration overlay.
+  Stream<RewardEvent> get rewards => _rewards.stream;
+  void _reward(RewardEvent e) {
+    if (!_rewards.isClosed) _rewards.add(e);
+  }
 
   // Insolvenz & Kreditsperre (5 echte Kalendertage = 120h)
   bool get isInsolvent => _isInsolvent || (_cash <= 0 && netWorth <= -10000);
@@ -414,6 +423,15 @@ class PortfolioProvider extends ChangeNotifier {
       repository.saveCashBalance(_cash);
       _lastAlertMessage =
           '🏆 Trophäe freigeschaltet: "${ach.title}"! +${ach.cashReward.toStringAsFixed(0)} € & +${ach.prestigeReward} Prestige!';
+      _reward(
+        RewardEvent(
+          kind: RewardKind.achievement,
+          title: 'Erfolg freigeschaltet',
+          detail: ach.title,
+          cash: ach.cashReward,
+          prestige: ach.prestigeReward,
+        ),
+      );
       notifyListeners();
     };
 
@@ -941,6 +959,14 @@ class PortfolioProvider extends ChangeNotifier {
     _updateLeaderboard(forceCloud: true);
     _lastAlertMessage =
         'Erfolgreich gekauft: ${amount.toStringAsFixed(2)}x ${asset.symbol}';
+    _reward(
+      RewardEvent(
+        kind: RewardKind.buy,
+        title: 'Order ausgeführt',
+        detail: '${_qty(amount)} × ${asset.symbol} gekauft',
+        cash: -totalCost,
+      ),
+    );
     notifyListeners();
     return true;
   }
@@ -1150,6 +1176,14 @@ class PortfolioProvider extends ChangeNotifier {
     _updateLeaderboard(forceCloud: true);
     _lastAlertMessage =
         'Verkauft: ${sellAmount.toStringAsFixed(2)}x ${position.symbol} (Rendite: ${realizedPnL >= 0 ? "+" : ""}${realizedPnL.toStringAsFixed(2)} €)';
+    _reward(
+      RewardEvent(
+        kind: realizedPnL >= 0 ? RewardKind.profit : RewardKind.loss,
+        title: realizedPnL >= 0 ? 'Gewinn realisiert!' : 'Verlust realisiert',
+        detail: '${_qty(sellAmount)} × ${position.symbol} verkauft',
+        cash: realizedPnL,
+      ),
+    );
     notifyListeners();
     return true;
   }
@@ -1552,7 +1586,9 @@ class PortfolioProvider extends ChangeNotifier {
     final now = DateTime.now();
     double totalCouponPaid = 0;
     for (final pos in List<Position>.of(_positions)) {
-      if (pos.type != AssetType.bond || pos.isLeveraged || pos.isShort) continue;
+      if (pos.type != AssetType.bond || pos.isLeveraged || pos.isShort) {
+        continue;
+      }
       final asset = _assets.where((a) => a.id == pos.assetId).firstOrNull;
       if (asset == null) continue;
       final key =
@@ -1635,6 +1671,14 @@ class PortfolioProvider extends ChangeNotifier {
 
     _lastAlertMessage =
         '🎉 Glückwunsch! Du hast ${item.name} erworben. Dein Prestige steigt!';
+    _reward(
+      RewardEvent(
+        kind: RewardKind.purchase,
+        title: 'Neuer Besitz!',
+        detail: item.name,
+        prestige: item.prestigePoints,
+      ),
+    );
     _updateLeaderboard(forceCloud: true);
     notifyListeners();
     return true;
@@ -1986,6 +2030,15 @@ class PortfolioProvider extends ChangeNotifier {
       repository.saveCashBalance(_cash);
       _lastAlertMessage =
           '🎁 Belohnung abgeholt: +${cashReward.toStringAsFixed(0)} € & +$prestigeReward Prestige!';
+      _reward(
+        RewardEvent(
+          kind: RewardKind.quest,
+          title: 'Belohnung abgeholt',
+          detail: 'Tägliche Aufgabe erledigt',
+          cash: cashReward.toDouble(),
+          prestige: prestigeReward,
+        ),
+      );
       _updateLeaderboard(forceCloud: true);
       notifyListeners();
     });
@@ -2291,8 +2344,12 @@ class PortfolioProvider extends ChangeNotifier {
     await _init();
   }
 
+  static String _qty(double v) =>
+      v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(4);
+
   @override
   void dispose() {
+    _rewards.close();
     _authSubscription?.cancel();
     _leaderboardSubscription?.cancel();
     _liveMarketRefreshTimer?.cancel();

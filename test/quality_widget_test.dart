@@ -29,7 +29,7 @@ void main() {
       child: MaterialApp(home: DashboardScreen(onNavigateTab: (_) {})),
     ));
     await tester.pumpAndSettle();
-    expect(find.text('Cash'), findsOneWidget);
+    expect(find.text('Frei verfügbares Cash'), findsOneWidget);
     expect(find.text('Schulden'), findsOneWidget);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
@@ -72,10 +72,10 @@ void main() {
       ),
     );
     await tester.pump();
-    expect(find.text('Keine Kursdaten für diesen Zeitraum'), findsOneWidget);
+    expect(find.textContaining('Keine EUR-Kursdaten'), findsOneWidget);
     await tester.tap(find.text('1Y'));
     await tester.pump();
-    expect(find.text('Keine Kursdaten für diesen Zeitraum'), findsOneWidget);
+    expect(find.textContaining('Keine EUR-Kursdaten'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
