@@ -13,6 +13,8 @@ import '../widgets/interactive_broker_chart.dart';
 import '../widgets/order_routing_dialog.dart';
 import '../widgets/order_book_widget.dart';
 import '../widgets/order_entry.dart';
+import '../widgets/price_alert_sheet.dart';
+import '../../logic/live_market_data_service.dart';
 import '../widgets/sell_order_sheet.dart';
 import 'auth_screen.dart';
 
@@ -145,15 +147,47 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
           children: [
             Text(
               liveAsset.symbol,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
             Text(
               liveAsset.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
             ),
           ],
         ),
         actions: [
+          IconButton(
+            icon: Icon(
+              Icons.notifications_outlined,
+              color: AppColors.textMuted,
+            ),
+            tooltip: 'Kursalarm setzen',
+            onPressed: () {
+              final auth = context.read<AuthProvider>();
+              final yahoo = LiveMarketDataService.euroYahooSymbolFor(liveAsset);
+              if (auth.currentUser == null || auth.currentUser!.isGuest) {
+                _showLoginRequiredDialog(context);
+              } else if (yahoo == null || yahoo.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'Für dieses Instrument gibt es keine Live-Kurse, daher keinen Kursalarm.',
+                    ),
+                  ),
+                );
+              } else {
+                showPriceAlertSheet(
+                  context,
+                  asset: liveAsset,
+                  yahooSymbol: yahoo,
+                );
+              }
+            },
+          ),
           IconButton(
             icon: Icon(
               liveAsset.isWatchlisted ? Icons.star : Icons.star_border,
@@ -181,24 +215,31 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
                 width: 0.8,
               ),
             ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.circle,
-                  size: 8,
-                  color: isOpen ? AppColors.profit : AppColors.loss,
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  isOpen ? 'Börse Offen' : 'Geschlossen',
-                  style: TextStyle(
+            child: Semantics(
+              label: isOpen ? 'Börse offen' : 'Börse geschlossen',
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.circle,
+                    size: 8,
                     color: isOpen ? AppColors.profit : AppColors.loss,
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
                   ),
-                ),
-              ],
+                  // With large system text the label would not fit next to the
+                  // two action buttons; the dot alone keeps the state visible.
+                  if (MediaQuery.textScalerOf(context).scale(1) <= 1.3) ...[
+                    const SizedBox(width: 6),
+                    Text(
+                      isOpen ? 'Börse Offen' : 'Geschlossen',
+                      style: TextStyle(
+                        color: isOpen ? AppColors.profit : AppColors.loss,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
             ),
           ),
         ],

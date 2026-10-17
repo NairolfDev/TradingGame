@@ -6,11 +6,14 @@ import 'core/constants/app_theme.dart';
 import 'data/repositories/trading_repository.dart';
 import 'data/repositories/firebase_trading_repository.dart';
 import 'logic/auth_provider.dart';
+import 'logic/notification_service.dart';
 import 'logic/portfolio_provider.dart';
+import 'logic/price_alerts_controller.dart';
 import 'logic/theme_controller.dart';
 import 'firebase_options.dart';
 import 'ui/screens/main_screen.dart';
 import 'ui/screens/profile_setup_screen.dart';
+import 'ui/widgets/notification_host.dart';
 import 'ui/widgets/reward_overlay.dart';
 
 void main() async {
@@ -61,6 +64,8 @@ class _TradingGameAppState extends State<TradingGameApp> {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider.value(value: _theme),
+        ChangeNotifierProvider(create: (_) => NotificationService()),
+        ChangeNotifierProvider(create: (_) => PriceAlertsController()),
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProxyProvider<AuthProvider, PortfolioProvider>(
           create: (_) => PortfolioProvider(
@@ -77,7 +82,8 @@ class _TradingGameAppState extends State<TradingGameApp> {
             title: 'Trading Game – Börsenspiel Österreich',
             debugShowCheckedModeBanner: false,
             theme: AppTheme.current,
-            builder: (_, child) => RewardOverlay(child: child!),
+            builder: (_, child) =>
+                NotificationHost(child: RewardOverlay(child: child!)),
             home: Consumer<AuthProvider>(
               builder: (_, auth, _) {
                 if (auth.isInitializing) {

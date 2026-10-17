@@ -20,6 +20,15 @@ enum MarketRegion {
   }
 }
 
+extension MarketRegionShortName on MarketRegion {
+  String get shortName => switch (this) {
+    MarketRegion.crypto24_7 => 'Krypto',
+    MarketRegion.viennaEurope => 'Wiener Börse / Xetra',
+    MarketRegion.usWallStreet => 'Wall Street',
+    MarketRegion.asiaTokyoHongKong => 'Tokio / Hongkong',
+  };
+}
+
 class MarketSchedule {
   final MarketRegion region;
 
@@ -56,6 +65,15 @@ class MarketSchedule {
     // US Wall Street (NYSE, NASDAQ, S&P 500)
     return const MarketSchedule(MarketRegion.usWallStreet);
   }
+
+  /// Handelszeiten in Minuten seit Mitternacht (wie in [isMarketOpen]);
+  /// null für Krypto, das nie schließt.
+  ({int open, int close})? get tradingMinutes => switch (region) {
+    MarketRegion.crypto24_7 => null,
+    MarketRegion.viennaEurope => (open: 9 * 60, close: 17 * 60 + 30),
+    MarketRegion.usWallStreet => (open: 15 * 60 + 30, close: 22 * 60),
+    MarketRegion.asiaTokyoHongKong => (open: 2 * 60, close: 8 * 60 + 30),
+  };
 
   /// Prüft, ob der Markt zum angegebenen Zeitpunkt geöffnet ist
   bool isMarketOpen([DateTime? dateTime]) {
@@ -121,21 +139,25 @@ class MarketSchedule {
 
     switch (region) {
       case MarketRegion.viennaEurope:
-        if (isWeekend || (now.weekday == DateTime.friday && currentMinutes >= 17 * 60 + 30)) {
+        if (isWeekend ||
+            (now.weekday == DateTime.friday &&
+                currentMinutes >= 17 * 60 + 30)) {
           return 'Öffnet Montag um 09:00 Uhr';
         }
         if (currentMinutes < 9 * 60) return 'Öffnet heute um 09:00 Uhr';
         return 'Öffnet morgen um 09:00 Uhr';
 
       case MarketRegion.usWallStreet:
-        if (isWeekend || (now.weekday == DateTime.friday && currentMinutes >= 22 * 60)) {
+        if (isWeekend ||
+            (now.weekday == DateTime.friday && currentMinutes >= 22 * 60)) {
           return 'Öffnet Montag um 15:30 Uhr';
         }
         if (currentMinutes < 15 * 60 + 30) return 'Öffnet heute um 15:30 Uhr';
         return 'Öffnet morgen um 15:30 Uhr';
 
       case MarketRegion.asiaTokyoHongKong:
-        if (isWeekend || (now.weekday == DateTime.friday && currentMinutes >= 8 * 60 + 30)) {
+        if (isWeekend ||
+            (now.weekday == DateTime.friday && currentMinutes >= 8 * 60 + 30)) {
           return 'Öffnet Montag um 02:00 Uhr';
         }
         if (currentMinutes < 2 * 60) return 'Öffnet heute um 02:00 Uhr';

@@ -28,6 +28,36 @@ service cloud.firestore {
       allow read, write: if owner(userId);
     }
 
+    // 2b. Kursalarme: nur der Besitzer; der Server (Admin SDK) wertet sie aus.
+    match /priceAlerts/{alertId} {
+      function validAlert() {
+        let d = request.resource.data;
+        return d.keys().hasOnly(['uid', 'assetId', 'symbol', 'name', 'yahooSymbol',
+                                 'direction', 'price', 'recurring', 'active', 'armed',
+                                 'createdAt', 'lastTriggeredAt'])
+          && d.keys().hasAll(['uid', 'symbol', 'yahooSymbol', 'direction', 'price',
+                              'recurring', 'active'])
+          && d.uid == request.auth.uid
+          && d.symbol is string && d.symbol.size() <= 40
+          && d.yahooSymbol is string && d.yahooSymbol.size() <= 32
+          && d.direction in ['above', 'below']
+          && d.price is number && d.price > 0 && d.price < 1000000000
+          && d.recurring is bool && d.active is bool;
+      }
+      allow read, delete: if request.auth != null && resource.data.uid == request.auth.uid;
+      allow create: if request.auth != null && validAlert();
+      allow update: if request.auth != null && resource.data.uid == request.auth.uid && validAlert();
+    }
+
+    // 2c. Push-Token der Geräte (Dokument-ID = FCM-Token)
+    match /deviceTokens/{token} {
+      allow read, delete: if request.auth != null && resource.data.uid == request.auth.uid;
+      allow create, update: if request.auth != null
+        && request.resource.data.keys().hasOnly(['uid', 'platform', 'updatedAt'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.platform is string;
+    }
+
     // 3. Portfolios & Unterkollektionen für alle Online-Spieler
     match /portfolios/{userId} {
       allow read, write: if owner(userId);
