@@ -80,11 +80,20 @@ class _MainScreenState extends State<MainScreen> {
         ),
         title: Row(
           children: [
-            const Icon(Icons.account_circle, color: AppColors.primary, size: 28),
+            const Icon(
+              Icons.account_circle,
+              color: AppColors.primary,
+              size: 28,
+            ),
             const SizedBox(width: 10),
-            Text(
-              auth.currentUser?.displayName ?? 'Profil & Account',
-              style: const TextStyle(fontSize: 18, color: AppColors.textPrimary),
+            Expanded(
+              child: Text(
+                auth.currentUser?.displayName ?? 'Profil & Account',
+                style: const TextStyle(
+                  fontSize: 18,
+                  color: AppColors.textPrimary,
+                ),
+              ),
             ),
           ],
         ),
@@ -92,19 +101,26 @@ class _MainScreenState extends State<MainScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (auth.currentUser != null) ...[
+            if (auth.isAuthenticated) ...[
               Text(
                 'E-Mail: ${auth.currentUser!.email}',
-                style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: AppColors.textSecondary,
+                ),
               ),
               const SizedBox(height: 4),
               Row(
                 children: [
-                  const Text('Login-Typ: ',
-                      style: TextStyle(fontSize: 12, color: AppColors.textMuted)),
+                  const Text(
+                    'Login-Typ: ',
+                    style: TextStyle(fontSize: 12, color: AppColors.textMuted),
+                  ),
                   Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
                       color: AppColors.primary.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(6),
@@ -114,9 +130,10 @@ class _MainScreenState extends State<MainScreen> {
                           ? 'Gast-Modus'
                           : auth.currentUser!.authProvider.toUpperCase(),
                       style: const TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.primary),
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.primary,
+                      ),
                     ),
                   ),
                 ],
@@ -133,8 +150,15 @@ class _MainScreenState extends State<MainScreen> {
             ListTile(
               dense: true,
               contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.system_update_alt, color: AppColors.accent, size: 20),
-              title: const Text('Nach Updates suchen', style: TextStyle(fontSize: 13)),
+              leading: const Icon(
+                Icons.system_update_alt,
+                color: AppColors.accent,
+                size: 20,
+              ),
+              title: const Text(
+                'Nach Updates suchen',
+                style: TextStyle(fontSize: 13),
+              ),
               onTap: () {
                 Navigator.pop(ctx);
                 _checkVersionUpdate(isManual: true);
@@ -143,14 +167,19 @@ class _MainScreenState extends State<MainScreen> {
           ],
         ),
         actions: [
-          if (auth.currentUser != null) ...[
+          if (auth.isAuthenticated) ...[
             TextButton(
               onPressed: () async {
                 Navigator.pop(ctx);
                 await auth.signOut();
               },
-              child: const Text('Abmelden',
-                  style: TextStyle(color: AppColors.loss, fontWeight: FontWeight.bold)),
+              child: const Text(
+                'Abmelden',
+                style: TextStyle(
+                  color: AppColors.loss,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ),
           ] else ...[
             ElevatedButton(
@@ -159,13 +188,22 @@ class _MainScreenState extends State<MainScreen> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => AuthScreen(onAuthenticated: () => Navigator.pop(context)),
+                    builder: (_) => AuthScreen(
+                      onAuthenticated: () => Navigator.pop(context),
+                    ),
                   ),
                 );
               },
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
-              child: const Text('Anmelden / Registrieren',
-                  style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+              ),
+              child: const Text(
+                'Anmelden / Registrieren',
+                style: TextStyle(
+                  color: Colors.black,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ),
           ],
           TextButton(
@@ -229,8 +267,11 @@ class _MainScreenState extends State<MainScreen> {
                           children: [
                             const Row(
                               children: [
-                                Icon(Icons.candlestick_chart,
-                                    color: AppColors.primary, size: 26),
+                                Icon(
+                                  Icons.candlestick_chart,
+                                  color: AppColors.primary,
+                                  size: 26,
+                                ),
                                 SizedBox(width: 8),
                                 Text(
                                   'TRADING GAME',
@@ -258,30 +299,40 @@ class _MainScreenState extends State<MainScreen> {
                               borderRadius: BorderRadius.circular(10),
                               child: Container(
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 8, vertical: 6),
+                                  horizontal: 8,
+                                  vertical: 6,
+                                ),
                                 decoration: BoxDecoration(
                                   color: AppColors.surfaceElevated,
                                   borderRadius: BorderRadius.circular(10),
                                   border: Border.all(
-                                      color: AppColors.cardBorder),
+                                    color: AppColors.cardBorder,
+                                  ),
                                 ),
                                 child: Row(
                                   children: [
-                                    const Icon(Icons.person,
-                                        size: 16, color: AppColors.primary),
+                                    const Icon(
+                                      Icons.person,
+                                      size: 16,
+                                      color: AppColors.primary,
+                                    ),
                                     const SizedBox(width: 6),
                                     Expanded(
                                       child: Text(
                                         auth.currentUser?.displayName ??
                                             'Anmelden / Profil',
                                         style: const TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.bold),
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                        ),
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
-                                    const Icon(Icons.chevron_right,
-                                        size: 14, color: AppColors.textMuted),
+                                    const Icon(
+                                      Icons.chevron_right,
+                                      size: 14,
+                                      color: AppColors.textMuted,
+                                    ),
                                   ],
                                 ),
                               ),
@@ -307,22 +358,45 @@ class _MainScreenState extends State<MainScreen> {
                       Expanded(
                         child: ListView(
                           padding: const EdgeInsets.symmetric(
-                              vertical: 12, horizontal: 10),
+                            vertical: 12,
+                            horizontal: 10,
+                          ),
                           children: provider.isSimplisticMode
                               ? [
-                                  _buildNavTile(0, Icons.pie_chart, 'Depot & Positionen'),
-                                  _buildNavTile(1, Icons.trending_up, 'Märkte & Suche'),
+                                  _buildNavTile(
+                                    0,
+                                    Icons.pie_chart,
+                                    'Depot & Positionen',
+                                  ),
+                                  _buildNavTile(
+                                    1,
+                                    Icons.trending_up,
+                                    'Märkte & Suche',
+                                  ),
                                   _buildNavTile(
                                     2,
                                     Icons.history_edu,
                                     'Orders & Historie',
-                                    badgeText: pendingCount > 0 ? '$pendingCount' : null,
+                                    badgeText: pendingCount > 0
+                                        ? '$pendingCount'
+                                        : null,
                                   ),
-                                  _buildNavTile(3, Icons.settings, 'Einstellungen'),
-                                  const Divider(color: AppColors.cardBorder, height: 20),
+                                  _buildNavTile(
+                                    3,
+                                    Icons.settings,
+                                    'Einstellungen',
+                                  ),
+                                  const Divider(
+                                    color: AppColors.cardBorder,
+                                    height: 20,
+                                  ),
                                   ListTile(
                                     dense: true,
-                                    leading: const Icon(Icons.tune, color: AppColors.primary, size: 20),
+                                    leading: const Icon(
+                                      Icons.tune,
+                                      color: AppColors.primary,
+                                      size: 20,
+                                    ),
                                     title: const Text(
                                       'Profi-Modus aktivieren',
                                       style: TextStyle(
@@ -331,36 +405,71 @@ class _MainScreenState extends State<MainScreen> {
                                         fontWeight: FontWeight.bold,
                                       ),
                                     ),
-                                    onTap: () => provider.setSimplisticMode(false),
+                                    onTap: () =>
+                                        provider.setSimplisticMode(false),
                                   ),
                                 ]
                               : [
-                                  _buildNavTile(0, Icons.pie_chart, 'Depot & Übersicht'),
-                                  _buildNavTile(1, Icons.trending_up, 'Märkte & Trade'),
+                                  _buildNavTile(
+                                    0,
+                                    Icons.pie_chart,
+                                    'Depot & Übersicht',
+                                  ),
+                                  _buildNavTile(
+                                    1,
+                                    Icons.trending_up,
+                                    'Märkte & Trade',
+                                  ),
                                   _buildNavTile(
                                     2,
                                     Icons.account_balance,
                                     'Bank & Kredite',
-                                    badgeText: provider.totalDebt > 0 ? '${provider.activeLoans.length}' : null,
+                                    badgeText: provider.totalDebt > 0
+                                        ? '${provider.activeLoans.length}'
+                                        : null,
                                   ),
-                                  _buildNavTile(3, Icons.workspace_premium, 'Prestige-Shop'),
-                                  _buildNavTile(4, Icons.leaderboard, 'Leaderboard'),
+                                  _buildNavTile(
+                                    3,
+                                    Icons.workspace_premium,
+                                    'Prestige-Shop',
+                                  ),
+                                  _buildNavTile(
+                                    4,
+                                    Icons.leaderboard,
+                                    'Leaderboard',
+                                  ),
                                   _buildNavTile(
                                     5,
                                     Icons.history_edu,
                                     'News & Historie',
-                                    badgeText: pendingCount > 0 ? '$pendingCount' : null,
+                                    badgeText: pendingCount > 0
+                                        ? '$pendingCount'
+                                        : null,
                                   ),
-                                  const Divider(color: AppColors.cardBorder, height: 20),
+                                  const Divider(
+                                    color: AppColors.cardBorder,
+                                    height: 20,
+                                  ),
                                   _buildActionTile(
                                     Icons.settings,
                                     'Einstellungen',
                                     AppColors.primary,
-                                    () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen())),
+                                    () => Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => const SettingsScreen(),
+                                      ),
+                                    ),
                                   ),
-                                  const Divider(color: AppColors.cardBorder, height: 20),
+                                  const Divider(
+                                    color: AppColors.cardBorder,
+                                    height: 20,
+                                  ),
                                   const Padding(
-                                    padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 4,
+                                    ),
                                     child: Text(
                                       'SPECIALS & GAMING',
                                       style: TextStyle(
@@ -375,27 +484,58 @@ class _MainScreenState extends State<MainScreen> {
                                     Icons.military_tech,
                                     'Trophäen & Erfolge',
                                     AppColors.accentGold,
-                                    () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AchievementsScreen())),
-                                    badgeText: '${provider.achievementService.unlockedCount}/${provider.achievementService.totalCount}',
+                                    () => Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) =>
+                                            const AchievementsScreen(),
+                                      ),
+                                    ),
+                                    badgeText:
+                                        '${provider.achievementService.unlockedCount}/${provider.achievementService.totalCount}',
                                   ),
                                   _buildActionTile(
                                     Icons.emoji_events,
                                     'Wall Street Pass',
                                     Colors.amber,
-                                    () => Navigator.push(context, MaterialPageRoute(builder: (_) => const QuestsScreen())),
-                                    badgeText: provider.dailyQuests.where((q) => q.isCompleted && !q.isClaimed).isNotEmpty ? '🎁' : null,
+                                    () => Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => const QuestsScreen(),
+                                      ),
+                                    ),
+                                    badgeText:
+                                        provider.dailyQuests
+                                            .where(
+                                              (q) =>
+                                                  q.isCompleted && !q.isClaimed,
+                                            )
+                                            .isNotEmpty
+                                        ? '🎁'
+                                        : null,
                                   ),
                                   _buildActionTile(
                                     Icons.people_alt,
                                     'Social Trading',
                                     Colors.lightBlueAccent,
-                                    () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SocialTradingScreen())),
+                                    () => Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) =>
+                                            const SocialTradingScreen(),
+                                      ),
+                                    ),
                                   ),
                                   _buildActionTile(
                                     Icons.payments,
                                     'Dividenden',
                                     Colors.greenAccent,
-                                    () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DividendsScreen())),
+                                    () => Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => const DividendsScreen(),
+                                      ),
+                                    ),
                                   ),
                                 ],
                         ),
@@ -411,8 +551,11 @@ class _MainScreenState extends State<MainScreen> {
                               onTap: () => _checkVersionUpdate(isManual: true),
                               child: const Row(
                                 children: [
-                                  Icon(Icons.system_update_alt,
-                                      size: 14, color: AppColors.accent),
+                                  Icon(
+                                    Icons.system_update_alt,
+                                    size: 14,
+                                    color: AppColors.accent,
+                                  ),
                                   SizedBox(width: 6),
                                   Text(
                                     'Nach Updates suchen',
@@ -481,10 +624,20 @@ class _MainScreenState extends State<MainScreen> {
                       setState(() => _currentIndex = 0);
                       break;
                     case 'achievements':
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const AchievementsScreen()));
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const AchievementsScreen(),
+                        ),
+                      );
                       break;
                     case 'settings':
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen()));
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const SettingsScreen(),
+                        ),
+                      );
                       break;
                     case 'updates':
                       _checkVersionUpdate(isManual: true);
@@ -492,10 +645,26 @@ class _MainScreenState extends State<MainScreen> {
                   }
                 },
                 itemBuilder: (_) => [
-                  PopupMenuItem(value: 'mode', child: Text(provider.isSimplisticMode ? 'Profi-Modus' : 'Einfacher Modus')),
-                  const PopupMenuItem(value: 'achievements', child: Text('Erfolge & Trophäen')),
-                  const PopupMenuItem(value: 'settings', child: Text('Einstellungen')),
-                  const PopupMenuItem(value: 'updates', child: Text('Nach Updates suchen')),
+                  PopupMenuItem(
+                    value: 'mode',
+                    child: Text(
+                      provider.isSimplisticMode
+                          ? 'Profi-Modus'
+                          : 'Einfacher Modus',
+                    ),
+                  ),
+                  const PopupMenuItem(
+                    value: 'achievements',
+                    child: Text('Erfolge & Trophäen'),
+                  ),
+                  const PopupMenuItem(
+                    value: 'settings',
+                    child: Text('Einstellungen'),
+                  ),
+                  const PopupMenuItem(
+                    value: 'updates',
+                    child: Text('Nach Updates suchen'),
+                  ),
                 ],
               ),
             ],
@@ -503,10 +672,7 @@ class _MainScreenState extends State<MainScreen> {
           body: Column(
             children: [
               Expanded(
-                child: IndexedStack(
-                  index: activeIndex,
-                  children: screens,
-                ),
+                child: IndexedStack(index: activeIndex, children: screens),
               ),
               const WatchlistMarqueeTicker(),
             ],
@@ -648,8 +814,12 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
-  Widget _buildNavTile(int index, IconData icon, String title,
-      {String? badgeText}) {
+  Widget _buildNavTile(
+    int index,
+    IconData icon,
+    String title, {
+    String? badgeText,
+  }) {
     final isSelected = _currentIndex == index;
 
     return Container(

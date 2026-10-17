@@ -8,6 +8,7 @@ import 'logic/auth_provider.dart';
 import 'logic/portfolio_provider.dart';
 import 'firebase_options.dart';
 import 'ui/screens/main_screen.dart';
+import 'ui/screens/profile_setup_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -32,17 +33,30 @@ class TradingGameApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()),
-        ChangeNotifierProvider(
+        ChangeNotifierProxyProvider<AuthProvider, PortfolioProvider>(
           create: (_) => PortfolioProvider(
             repository: repository ?? FirebaseTradingRepository(),
           ),
+          update: (_, auth, portfolio) =>
+              portfolio!..updatePlayerProfile(auth.currentUser),
         ),
       ],
       child: MaterialApp(
         title: 'Trading Game – Börsenspiel Österreich',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.darkTheme,
-        home: const MainScreen(),
+        home: Consumer<AuthProvider>(
+          builder: (_, auth, _) {
+            if (auth.isLoading) {
+              return const Scaffold(
+                body: Center(child: CircularProgressIndicator()),
+              );
+            }
+            return auth.needsProfile
+                ? const ProfileSetupScreen()
+                : const MainScreen();
+          },
+        ),
       ),
     );
   }

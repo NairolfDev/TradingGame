@@ -39,6 +39,7 @@ class AssetCard extends StatelessWidget {
     final isOpen = provider.isAssetMarketOpen(asset);
     final statusString = provider.getMarketStatusString(asset);
     final isPos = asset.isPositive;
+    final hasQuote = provider.quoteUpdatedAt(asset) != null && asset.currentPrice > 0;
     final catColor = _getCategoryColor(asset.type);
 
     return InkWell(
@@ -175,7 +176,7 @@ class AssetCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
-                  CurrencyFormatter.format(asset.currentPrice),
+                  hasQuote ? CurrencyFormatter.format(asset.currentPrice) : '—',
                   style: const TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.bold,
@@ -192,7 +193,7 @@ class AssetCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
-                    CurrencyFormatter.formatPercent(asset.change24hPercent),
+                    hasQuote ? CurrencyFormatter.formatPercent(asset.change24hPercent) : 'Kein Kurs',
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.bold,

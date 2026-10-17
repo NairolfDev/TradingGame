@@ -793,6 +793,7 @@ class DashboardScreen extends StatelessWidget {
   void _showSellDialog(
       BuildContext context, dynamic position, PortfolioProvider provider) {
     double amountToSell = position.amount;
+    double sellFraction = 1;
 
     showModalBottomSheet(
       context: context,
@@ -846,14 +847,15 @@ class DashboardScreen extends StatelessWidget {
                         fontSize: 13, color: AppColors.textSecondary),
                   ),
                   Slider(
-                    value: amountToSell,
-                    min: 0.0001,
-                    max: position.amount,
+                    value: sellFraction,
+                    min: 0,
+                    max: 1,
                     divisions: 100,
                     activeColor: AppColors.loss,
                     onChanged: (val) {
                       setModalState(() {
-                        amountToSell = val;
+                        sellFraction = val;
+                        amountToSell = position.amount * val;
                       });
                     },
                   ),
@@ -862,7 +864,7 @@ class DashboardScreen extends StatelessWidget {
                     width: double.infinity,
                     height: 48,
                     child: ElevatedButton(
-                      onPressed: () async {
+                      onPressed: sellFraction > 0 ? () async {
                         Navigator.pop(ctx);
                         await OrderRoutingDialog.show(
                           context: context,
@@ -874,9 +876,10 @@ class DashboardScreen extends StatelessWidget {
                           onExecute: () => provider.executeSell(
                             position: position,
                             sellAmount: amountToSell,
+                            sellFraction: sellFraction,
                           ),
                         );
-                      },
+                      } : null,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.loss,
                         foregroundColor: Colors.white,

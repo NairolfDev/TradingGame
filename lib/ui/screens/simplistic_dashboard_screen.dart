@@ -24,6 +24,7 @@ class _SimplisticDashboardScreenState extends State<SimplisticDashboardScreen> {
   void _showSellDialog(
       BuildContext context, Position position, PortfolioProvider provider) {
     double amountToSell = position.amount;
+    double sellFraction = 1;
 
     showModalBottomSheet(
       context: context,
@@ -75,15 +76,16 @@ class _SimplisticDashboardScreenState extends State<SimplisticDashboardScreen> {
                     style: const TextStyle(fontSize: 13, color: Color(0xFF8B9CB2)),
                   ),
                   Slider(
-                    value: amountToSell,
-                    min: 0.0001,
-                    max: position.amount,
+                    value: sellFraction,
+                    min: 0,
+                    max: 1,
                     divisions: 100,
                     activeColor: AppColors.loss,
                     inactiveColor: const Color(0xFF243247),
                     onChanged: (val) {
                       setModalState(() {
-                        amountToSell = val;
+                        sellFraction = val;
+                        amountToSell = position.amount * val;
                       });
                     },
                   ),
@@ -92,7 +94,7 @@ class _SimplisticDashboardScreenState extends State<SimplisticDashboardScreen> {
                     width: double.infinity,
                     height: 48,
                     child: ElevatedButton(
-                      onPressed: () async {
+                      onPressed: sellFraction > 0 ? () async {
                         Navigator.pop(ctx);
                         await OrderRoutingDialog.show(
                           context: context,
@@ -104,9 +106,10 @@ class _SimplisticDashboardScreenState extends State<SimplisticDashboardScreen> {
                           onExecute: () => provider.executeSell(
                             position: position,
                             sellAmount: amountToSell,
+                            sellFraction: sellFraction,
                           ),
                         );
-                      },
+                      } : null,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.loss,
                         foregroundColor: Colors.white,

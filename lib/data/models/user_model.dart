@@ -5,6 +5,7 @@ class UserModel {
   final String? photoUrl;
   final bool isGuest;
   final String authProvider; // 'password', 'google', 'guest'
+  final String? countryCode;
 
   UserModel({
     required this.uid,
@@ -13,23 +14,26 @@ class UserModel {
     this.photoUrl,
     this.isGuest = false,
     this.authProvider = 'password',
+    this.countryCode,
   });
 
   Map<String, dynamic> toJson() => {
-        'uid': uid,
-        'email': email,
-        'displayName': displayName,
-        'photoUrl': photoUrl,
-        'isGuest': isGuest,
-        'authProvider': authProvider,
-      };
+    'uid': uid,
+    'email': email,
+    'displayName': displayName,
+    'photoUrl': photoUrl,
+    'isGuest': isGuest,
+    'authProvider': authProvider,
+    'countryCode': countryCode,
+  };
 
   factory UserModel.fromJson(Map<String, dynamic> json) => UserModel(
-        uid: json['uid'] as String,
-        email: json['email'] as String,
-        displayName: json['displayName'] as String,
-        photoUrl: json['photoUrl'] as String?,
-        isGuest: json['isGuest'] as bool? ?? false,
-        authProvider: json['authProvider'] as String? ?? 'password',
-      );
+    uid: json['uid'] as String,
+    email: json['email'] as String,
+    displayName: json['displayName'] as String,
+    photoUrl: json['photoUrl'] as String?,
+    isGuest: json['isGuest'] as bool? ?? false,
+    authProvider: json['authProvider'] as String? ?? 'password',
+    countryCode: json['countryCode'] as String?,
+  );
 }

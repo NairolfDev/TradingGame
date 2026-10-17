@@ -103,9 +103,12 @@ void main() {
   });
 
   test('dividends can only be claimed once per calendar month', () {
-    final asset = portfolio.assets.firstWhere(
-      (a) => (a.dividendYield ?? 0) > 0,
+    // Explicit simulation fixture: sourced stock catalogs do not invent yields.
+    final asset = portfolio.assets.first.copyWith(
+      dividendYield: 0.05,
+      currentPrice: 100,
     );
+    portfolio.assets[0] = asset;
     // Use an owned spot position so the payout exercises real dividend calculation.
     portfolio.positions.add(
       Position(

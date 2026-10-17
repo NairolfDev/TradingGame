@@ -28,6 +28,7 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
   int _leverage = 1;
   bool _isShort = false;
   double _amount = 1.0;
+  double? _cashFraction;
 
   @override
   void initState() {
@@ -51,8 +52,12 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
   }
 
   void _showSellDialog(
-      BuildContext context, Position position, PortfolioProvider provider) {
+    BuildContext context,
+    Position position,
+    PortfolioProvider provider,
+  ) {
     double amountToSell = position.amount;
+    double sellFraction = 1;
 
     showModalBottomSheet(
       context: context,
@@ -63,7 +68,8 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
       builder: (ctx) {
         return StatefulBuilder(
           builder: (context, setModalState) {
-            final portionPnL = (amountToSell / position.amount) * position.unrealizedPnL;
+            final portionPnL =
+                (amountToSell / position.amount) * position.unrealizedPnL;
             final isPnLPos = portionPnL >= 0;
 
             return Padding(
@@ -101,17 +107,21 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
                   const SizedBox(height: 16),
                   Text(
                     'Menge: ${CurrencyFormatter.formatAmount(amountToSell)} / ${CurrencyFormatter.formatAmount(position.amount)}',
-                    style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: AppColors.textSecondary,
+                    ),
                   ),
                   Slider(
-                    value: amountToSell,
-                    min: 0.0001,
-                    max: position.amount,
+                    value: sellFraction,
+                    min: 0,
+                    max: 1,
                     divisions: 100,
                     activeColor: AppColors.loss,
                     onChanged: (val) {
                       setModalState(() {
-                        amountToSell = val;
+                        sellFraction = val;
+                        amountToSell = position.amount * val;
                       });
                     },
                   ),
@@ -120,21 +130,24 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
                     width: double.infinity,
                     height: 48,
                     child: ElevatedButton(
-                      onPressed: () async {
-                        Navigator.pop(ctx);
-                        await OrderRoutingDialog.show(
-                          context: context,
-                          symbol: position.symbol,
-                          assetName: position.name,
-                          isBuy: false,
-                          amount: amountToSell,
-                          price: position.currentPrice,
-                          onExecute: () => provider.executeSell(
-                            position: position,
-                            sellAmount: amountToSell,
-                          ),
-                        );
-                      },
+                      onPressed: sellFraction > 0
+                          ? () async {
+                              Navigator.pop(ctx);
+                              await OrderRoutingDialog.show(
+                                context: context,
+                                symbol: position.symbol,
+                                assetName: position.name,
+                                isBuy: false,
+                                amount: amountToSell,
+                                price: position.currentPrice,
+                                onExecute: () => provider.executeSell(
+                                  position: position,
+                                  sellAmount: amountToSell,
+                                  sellFraction: sellFraction,
+                                ),
+                              );
+                            }
+                          : null,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.loss,
                         foregroundColor: Colors.white,
@@ -144,7 +157,10 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
                       ),
                       child: const Text(
                         'Verkauf Bestätigen',
-                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                   ),
@@ -158,21 +174,14 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
   }
 
   void _setPercentageOfCash(double fraction, PortfolioProvider provider) {
-    final availableCash = provider.cash * fraction;
-    if (availableCash <= 0) return;
-
-    final unitPrice = widget.asset.currentPrice / _leverage;
-    if (unitPrice <= 0) return;
-
-    double calculatedAmount = availableCash / unitPrice;
-    if (widget.asset.currentPrice > 1000) {
-      calculatedAmount = double.parse(calculatedAmount.toStringAsFixed(4));
-    } else {
-      calculatedAmount = double.parse(calculatedAmount.toStringAsFixed(2));
-    }
-
+    final asset = provider.assets.firstWhere((a) => a.id == widget.asset.id);
     setState(() {
-      _amount = calculatedAmount;
+      _cashFraction = fraction;
+      _amount = TradingFeeService.maximumBuyAmount(
+        asset: asset,
+        cash: provider.cash * fraction,
+        leverage: _leverage,
+      );
       _amountController.text = CurrencyFormatter.formatAmount(_amount);
     });
   }
@@ -187,8 +196,20 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
       orElse: () => widget.asset,
     );
 
+    if (_cashFraction != null) {
+      _amount = TradingFeeService.maximumBuyAmount(
+        asset: liveAsset,
+        cash: provider.cash * _cashFraction!,
+        leverage: _leverage,
+      );
+      final text = CurrencyFormatter.formatAmount(_amount);
+      if (_amountController.text != text) _amountController.text = text;
+    }
+
     final isOpen = provider.isAssetMarketOpen(liveAsset);
     final schedule = MarketSchedule.forAsset(liveAsset);
+    final hasQuote =
+        liveAsset.currentPrice.isFinite && liveAsset.currentPrice > 0;
     final isPos = liveAsset.isPositive;
     final feeBreakdown = TradingFeeService.calculateBuyFee(
       asset: liveAsset,
@@ -212,21 +233,30 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(liveAsset.symbol,
-                style:
-                    const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-            Text(liveAsset.name,
-                style: const TextStyle(
-                    fontSize: 11, color: AppColors.textSecondary)),
+            Text(
+              liveAsset.symbol,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            Text(
+              liveAsset.name,
+              style: const TextStyle(
+                fontSize: 11,
+                color: AppColors.textSecondary,
+              ),
+            ),
           ],
         ),
         actions: [
           IconButton(
             icon: Icon(
               liveAsset.isWatchlisted ? Icons.star : Icons.star_border,
-              color: liveAsset.isWatchlisted ? AppColors.accentGold : AppColors.textMuted,
+              color: liveAsset.isWatchlisted
+                  ? AppColors.accentGold
+                  : AppColors.textMuted,
             ),
-            tooltip: liveAsset.isWatchlisted ? 'Aus Watchlist entfernen' : 'Zu Watchlist hinzufügen',
+            tooltip: liveAsset.isWatchlisted
+                ? 'Aus Watchlist entfernen'
+                : 'Zu Watchlist hinzufügen',
             onPressed: () {
               provider.toggleWatchlist(liveAsset);
             },
@@ -235,8 +265,9 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
             margin: const EdgeInsets.only(right: 16),
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: (isOpen ? AppColors.profit : AppColors.loss)
-                  .withValues(alpha: 0.15),
+              color: (isOpen ? AppColors.profit : AppColors.loss).withValues(
+                alpha: 0.15,
+              ),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
                 color: isOpen ? AppColors.profit : AppColors.loss,
@@ -278,11 +309,15 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
                 children: [
                   Text(
                     provider.quoteStatus(liveAsset),
-                    style:
-                        TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: AppColors.textSecondary,
+                    ),
                   ),
                   Text(
-                    CurrencyFormatter.format(liveAsset.currentPrice),
+                    hasQuote
+                        ? CurrencyFormatter.format(liveAsset.currentPrice)
+                        : 'Kein Kurs',
                     style: const TextStyle(
                       fontSize: 28,
                       fontWeight: FontWeight.w900,
@@ -292,15 +327,20 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
                 ],
               ),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
                 decoration: BoxDecoration(
-                  color: (isPos ? AppColors.profit : AppColors.loss)
-                      .withValues(alpha: 0.15),
+                  color: (isPos ? AppColors.profit : AppColors.loss).withValues(
+                    alpha: 0.15,
+                  ),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  '${CurrencyFormatter.formatPercent(liveAsset.change24hPercent)} (24h)',
+                  hasQuote
+                      ? '${CurrencyFormatter.formatPercent(liveAsset.change24hPercent)} (24h)'
+                      : '—',
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.bold,
@@ -321,10 +361,7 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
               borderRadius: BorderRadius.circular(20),
               border: Border.all(color: AppColors.cardBorder),
             ),
-            child: InteractiveBrokerChart(
-              asset: liveAsset,
-              isPositive: isPos,
-            ),
+            child: InteractiveBrokerChart(asset: liveAsset, isPositive: isPos),
           ),
 
           const SizedBox(height: 16),
@@ -367,7 +404,9 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
                             : 'Markt aktuell geschlossen. Deine Kauforder wird als Vorab-Order gespeichert und bei Öffnung ausgeführt!',
                         style: TextStyle(
                           fontSize: 11,
-                          color: isOpen ? AppColors.textSecondary : AppColors.gold,
+                          color: isOpen
+                              ? AppColors.textSecondary
+                              : AppColors.gold,
                         ),
                       ),
                     ],
@@ -383,17 +422,25 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
           Row(
             children: [
               _buildStatTile(
-                  '24h Hoch', CurrencyFormatter.format(liveAsset.dailyHigh)),
+                '24h Hoch',
+                CurrencyFormatter.format(liveAsset.dailyHigh),
+              ),
               const SizedBox(width: 8),
               _buildStatTile(
-                  '24h Tief', CurrencyFormatter.format(liveAsset.dailyLow)),
+                '24h Tief',
+                CurrencyFormatter.format(liveAsset.dailyLow),
+              ),
               const SizedBox(width: 8),
               if (liveAsset.couponRate != null)
-                _buildStatTile('Zinskupon',
-                    '${(liveAsset.couponRate! * 100).toStringAsFixed(1)}% p.a.')
+                _buildStatTile(
+                  'Zinskupon',
+                  '${(liveAsset.couponRate! * 100).toStringAsFixed(1)}% p.a.',
+                )
               else
                 _buildStatTile(
-                    'Volatilität', '${(liveAsset.volatility * 100).toInt()}%'),
+                  'Volatilität',
+                  '${(liveAsset.volatility * 100).toInt()}%',
+                ),
             ],
           ),
 
@@ -403,7 +450,11 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
           Builder(
             builder: (context) {
               final existingPositions = provider.positions
-                  .where((p) => p.assetId == liveAsset.id || p.symbol == liveAsset.symbol)
+                  .where(
+                    (p) =>
+                        p.assetId == liveAsset.id ||
+                        p.symbol == liveAsset.symbol,
+                  )
                   .toList();
               if (existingPositions.isEmpty) return const SizedBox.shrink();
 
@@ -414,14 +465,20 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
                     decoration: BoxDecoration(
                       color: AppColors.surface,
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: AppColors.primary.withValues(alpha: 0.4)),
+                      border: Border.all(
+                        color: AppColors.primary.withValues(alpha: 0.4),
+                      ),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
                           children: [
-                            const Icon(Icons.pie_chart, size: 16, color: AppColors.primary),
+                            const Icon(
+                              Icons.pie_chart,
+                              size: 16,
+                              color: AppColors.primary,
+                            ),
                             const SizedBox(width: 8),
                             Text(
                               'DEIN DEPOTBESTAND (${existingPositions.length})',
@@ -453,11 +510,18 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
                                   children: [
                                     Text(
                                       '${CurrencyFormatter.formatAmount(p.amount)} Stk.${p.isLeveraged ? " (${p.leverage}x ${p.isShort ? "Short" : "Long"})" : ""}',
-                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textPrimary),
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 13,
+                                        color: AppColors.textPrimary,
+                                      ),
                                     ),
                                     Text(
                                       'Ø Kauf: ${CurrencyFormatter.formatPrice(p.averageBuyPrice)}',
-                                      style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        color: AppColors.textMuted,
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -466,30 +530,53 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
                                   children: [
                                     Text(
                                       CurrencyFormatter.format(p.currentValue),
-                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textPrimary),
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 13,
+                                        color: AppColors.textPrimary,
+                                      ),
                                     ),
                                     Text(
                                       '${isP ? "+" : ""}${CurrencyFormatter.format(p.unrealizedPnL)} (${CurrencyFormatter.formatPercent(p.unrealizedPnLPercent)})',
                                       style: TextStyle(
                                         fontSize: 11,
                                         fontWeight: FontWeight.bold,
-                                        color: isP ? AppColors.profit : AppColors.loss,
+                                        color: isP
+                                            ? AppColors.profit
+                                            : AppColors.loss,
                                       ),
                                     ),
                                   ],
                                 ),
                                 ElevatedButton(
-                                  onPressed: () => _showSellDialog(context, p, provider),
+                                  onPressed: () =>
+                                      _showSellDialog(context, p, provider),
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: AppColors.loss.withValues(alpha: 0.18),
+                                    backgroundColor: AppColors.loss.withValues(
+                                      alpha: 0.18,
+                                    ),
                                     foregroundColor: AppColors.loss,
-                                    side: const BorderSide(color: AppColors.loss),
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                    side: const BorderSide(
+                                      color: AppColors.loss,
+                                    ),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 6,
+                                    ),
                                     minimumSize: Size.zero,
-                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                    tapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
                                   ),
-                                  child: const Text('Verkaufen', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                  child: const Text(
+                                    'Verkaufen',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
                                 ),
                               ],
                             ),
@@ -609,7 +696,9 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
                       const Text(
                         'Hebelwirkung (Leverage):',
                         style: TextStyle(
-                            fontSize: 13, color: AppColors.textSecondary),
+                          fontSize: 13,
+                          color: AppColors.textSecondary,
+                        ),
                       ),
                       Text(
                         '${_leverage}x',
@@ -638,22 +727,28 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
                   if (_leverage > 1) ...[
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 6),
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
                         color: AppColors.loss.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.warning_amber,
-                              size: 14, color: AppColors.loss),
+                          const Icon(
+                            Icons.warning_amber,
+                            size: 14,
+                            color: AppColors.loss,
+                          ),
                           const SizedBox(width: 6),
                           Text(
                             'Geschätzter Liquidationspreis: ${CurrencyFormatter.format(estLiquidationPrice)}',
                             style: const TextStyle(
-                                fontSize: 11,
-                                color: AppColors.loss,
-                                fontWeight: FontWeight.bold),
+                              fontSize: 11,
+                              color: AppColors.loss,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ],
                       ),
@@ -665,17 +760,22 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
                 // Menge Eingabefeld
                 const Text(
                   'Menge / Anteile',
-                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
                 ),
                 const SizedBox(height: 6),
                 TextField(
                   controller: _amountController,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
                   style: const TextStyle(
-                      color: AppColors.textPrimary,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16),
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
                   decoration: InputDecoration(
                     filled: true,
                     fillColor: AppColors.surfaceElevated,
@@ -695,6 +795,7 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
                   onChanged: (val) {
                     final parsed = double.tryParse(val.replaceAll(',', '.'));
                     setState(() {
+                      _cashFraction = null;
                       _amount = (parsed != null && parsed > 0) ? parsed : 0.0;
                     });
                   },
@@ -705,13 +806,25 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
                 // Prozentuale Schnellbuttons (25%, 50%, 75%, 100% Cash)
                 Row(
                   children: [
-                    _buildPercentButton('25%', () => _setPercentageOfCash(0.25, provider)),
+                    _buildPercentButton(
+                      '25%',
+                      () => _setPercentageOfCash(0.25, provider),
+                    ),
                     const SizedBox(width: 6),
-                    _buildPercentButton('50%', () => _setPercentageOfCash(0.50, provider)),
+                    _buildPercentButton(
+                      '50%',
+                      () => _setPercentageOfCash(0.50, provider),
+                    ),
                     const SizedBox(width: 6),
-                    _buildPercentButton('75%', () => _setPercentageOfCash(0.75, provider)),
+                    _buildPercentButton(
+                      '75%',
+                      () => _setPercentageOfCash(0.75, provider),
+                    ),
                     const SizedBox(width: 6),
-                    _buildPercentButton('MAX', () => _setPercentageOfCash(1.0, provider)),
+                    _buildPercentButton(
+                      'MAX',
+                      () => _setPercentageOfCash(1.0, provider),
+                    ),
                   ],
                 ),
 
@@ -732,15 +845,22 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text('Positionswert (Kurswert):',
-                              style: TextStyle(
-                                  fontSize: 12, color: AppColors.textSecondary)),
+                          const Text(
+                            'Positionswert (Kurswert):',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
                           Text(
-                            CurrencyFormatter.format(_amount * liveAsset.currentPrice),
+                            CurrencyFormatter.format(
+                              _amount * liveAsset.currentPrice,
+                            ),
                             style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.textPrimary),
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.textPrimary,
+                            ),
                           ),
                         ],
                       ),
@@ -750,22 +870,30 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
                         children: [
                           Row(
                             children: [
-                              const Icon(Icons.receipt_outlined,
-                                  size: 14, color: AppColors.gold),
+                              const Icon(
+                                Icons.receipt_outlined,
+                                size: 14,
+                                color: AppColors.gold,
+                              ),
                               const SizedBox(width: 4),
                               Text(
                                 feeBreakdown.feeDescription,
                                 style: const TextStyle(
-                                    fontSize: 11, color: AppColors.gold),
+                                  fontSize: 11,
+                                  color: AppColors.gold,
+                                ),
                               ),
                             ],
                           ),
                           Text(
-                            CurrencyFormatter.format(feeBreakdown.transactionFee),
+                            CurrencyFormatter.format(
+                              feeBreakdown.transactionFee,
+                            ),
                             style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.gold),
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.gold,
+                            ),
                           ),
                         ],
                       ),
@@ -775,13 +903,18 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text('Gesamter Cash-Bedarf:',
-                              style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.textPrimary)),
+                          const Text(
+                            'Gesamter Cash-Bedarf:',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
                           Text(
-                            CurrencyFormatter.format(feeBreakdown.totalCashRequired),
+                            CurrencyFormatter.format(
+                              feeBreakdown.totalCashRequired,
+                            ),
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w900,
@@ -803,10 +936,11 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
                   width: double.infinity,
                   height: 52,
                   child: ElevatedButton(
-                    onPressed: hasEnoughCash && _amount > 0
+                    onPressed: hasQuote && hasEnoughCash && _amount > 0
                         ? () {
                             final auth = context.read<AuthProvider>();
-                            if (auth.currentUser == null || auth.currentUser!.isGuest) {
+                            if (auth.currentUser == null ||
+                                auth.currentUser!.isGuest) {
                               _showLoginRequiredDialog(context);
                             } else {
                               _showOrderConfirmationSheet(
@@ -820,7 +954,9 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
                           }
                         : null,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: isOpen ? AppColors.primary : AppColors.gold,
+                      backgroundColor: isOpen
+                          ? AppColors.primary
+                          : AppColors.gold,
                       foregroundColor: Colors.black,
                       elevation: 4,
                       shape: RoundedRectangleBorder(
@@ -830,7 +966,10 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(isOpen ? Icons.assignment_outlined : Icons.schedule, size: 20),
+                        Icon(
+                          isOpen ? Icons.assignment_outlined : Icons.schedule,
+                          size: 20,
+                        ),
                         const SizedBox(width: 8),
                         Text(
                           isOpen
@@ -915,10 +1054,7 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
           const SizedBox(height: 6),
           const Text(
             'Automatisiere deine Ein- und Ausstiege. Kaufe bei Marktrücksetzern (Buy-At) oder sichere Gewinne automatisch (Sell-At).',
-            style: TextStyle(
-              fontSize: 11.5,
-              color: AppColors.textSecondary,
-            ),
+            style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
           ),
           const SizedBox(height: 12),
 
@@ -937,7 +1073,10 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
               final isBuy = order.orderType == AutomationOrderType.buyLimit;
               return Container(
                 margin: const EdgeInsets.only(bottom: 6),
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
                   color: AppColors.surfaceElevated,
                   borderRadius: BorderRadius.circular(8),
@@ -951,7 +1090,9 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
                         Icon(
                           isBuy ? Icons.arrow_downward : Icons.arrow_upward,
                           size: 14,
-                          color: isBuy ? AppColors.profitGreen : AppColors.lossRed,
+                          color: isBuy
+                              ? AppColors.profitGreen
+                              : AppColors.lossRed,
                         ),
                         const SizedBox(width: 6),
                         Text(
@@ -981,7 +1122,10 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
                       onPressed: () {
                         provider.cancelAutomationOrder(order.id);
                       },
-                      child: const Text('Stornieren', style: TextStyle(fontSize: 11)),
+                      child: const Text(
+                        'Stornieren',
+                        style: TextStyle(fontSize: 11),
+                      ),
                     ),
                   ],
                 ),
@@ -1000,28 +1144,45 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.accentGold,
                     foregroundColor: Colors.black,
-                    textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    textStyle: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                   ),
-                  onPressed: () => _showCreateLimitOrderDialog(context, asset, provider),
+                  onPressed: () =>
+                      _showCreateLimitOrderDialog(context, asset, provider),
                 ),
               ),
               if (provider.nextAutomationSlotCost != null) ...[
                 const SizedBox(width: 8),
                 OutlinedButton.icon(
                   icon: const Icon(Icons.upgrade, size: 16),
-                  label: Text('+Slot (${CurrencyFormatter.format(provider.nextAutomationSlotCost!)})'),
+                  label: Text(
+                    '+Slot (${CurrencyFormatter.format(provider.nextAutomationSlotCost!)})',
+                  ),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppColors.accentGold,
                     side: const BorderSide(color: AppColors.accentGold),
-                    textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    textStyle: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                   ),
                   onPressed: () async {
                     final success = await provider.unlockAutomationSlot();
                     if (!success && context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Nicht genügend Barmittel für diesen Bot-Slot!')),
+                        const SnackBar(
+                          content: Text(
+                            'Nicht genügend Barmittel für diesen Bot-Slot!',
+                          ),
+                        ),
                       );
                     }
                   },
@@ -1039,12 +1200,15 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
     Asset asset,
     PortfolioProvider provider,
   ) {
-    if (provider.activeAutomationOrders.length >= provider.unlockedAutomationSlotsCount) {
+    if (provider.activeAutomationOrders.length >=
+        provider.unlockedAutomationSlotsCount) {
       showDialog(
         context: context,
         builder: (ctx) => AlertDialog(
           backgroundColor: AppColors.surface,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           title: const Text('Kein freier Bot-Slot'),
           content: Text(
             provider.nextAutomationSlotCost != null
@@ -1075,11 +1239,19 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
     }
 
     AutomationOrderType selectedType = AutomationOrderType.buyLimit;
-    double targetPrice = double.parse((asset.currentPrice * 0.96).toStringAsFixed(asset.currentPrice > 500 ? 2 : 4));
+    double targetPrice = double.parse(
+      (asset.currentPrice * 0.96).toStringAsFixed(
+        asset.currentPrice > 500 ? 2 : 4,
+      ),
+    );
     double orderAmount = _amount;
 
-    final targetPriceController = TextEditingController(text: targetPrice.toString());
-    final orderAmountController = TextEditingController(text: orderAmount.toString());
+    final targetPriceController = TextEditingController(
+      text: targetPrice.toString(),
+    );
+    final orderAmountController = TextEditingController(
+      text: orderAmount.toString(),
+    );
 
     showModalBottomSheet(
       context: context,
@@ -1127,7 +1299,10 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
                     ),
                     ButtonSegment(
                       value: AutomationOrderType.takeProfit,
-                      label: Text('Take-Profit', style: TextStyle(fontSize: 11)),
+                      label: Text(
+                        'Take-Profit',
+                        style: TextStyle(fontSize: 11),
+                      ),
                     ),
                     ButtonSegment(
                       value: AutomationOrderType.stopLoss,
@@ -1139,11 +1314,24 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
                     setModalState(() {
                       selectedType = val.first;
                       if (selectedType == AutomationOrderType.buyLimit) {
-                        targetPrice = double.parse((asset.currentPrice * 0.95).toStringAsFixed(asset.currentPrice > 500 ? 2 : 4));
-                      } else if (selectedType == AutomationOrderType.takeProfit) {
-                        targetPrice = double.parse((asset.currentPrice * 1.08).toStringAsFixed(asset.currentPrice > 500 ? 2 : 4));
+                        targetPrice = double.parse(
+                          (asset.currentPrice * 0.95).toStringAsFixed(
+                            asset.currentPrice > 500 ? 2 : 4,
+                          ),
+                        );
+                      } else if (selectedType ==
+                          AutomationOrderType.takeProfit) {
+                        targetPrice = double.parse(
+                          (asset.currentPrice * 1.08).toStringAsFixed(
+                            asset.currentPrice > 500 ? 2 : 4,
+                          ),
+                        );
                       } else {
-                        targetPrice = double.parse((asset.currentPrice * 0.92).toStringAsFixed(asset.currentPrice > 500 ? 2 : 4));
+                        targetPrice = double.parse(
+                          (asset.currentPrice * 0.92).toStringAsFixed(
+                            asset.currentPrice > 500 ? 2 : 4,
+                          ),
+                        );
                       }
                       targetPriceController.text = targetPrice.toString();
                     });
@@ -1152,11 +1340,14 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
                 const SizedBox(height: 16),
                 TextField(
                   controller: targetPriceController,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
                   decoration: InputDecoration(
                     labelText: 'Zielkurs / Auslösepreis (€)',
                     suffixText: '€',
-                    helperText: 'Aktueller Marktpreis: ${CurrencyFormatter.formatPrice(asset.currentPrice)}',
+                    helperText:
+                        'Aktueller Marktpreis: ${CurrencyFormatter.formatPrice(asset.currentPrice)}',
                     filled: true,
                     fillColor: AppColors.surfaceElevated,
                   ),
@@ -1167,7 +1358,9 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
                 const SizedBox(height: 12),
                 TextField(
                   controller: orderAmountController,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
                   decoration: const InputDecoration(
                     labelText: 'Menge (Stückzahl)',
                     filled: true,
@@ -1185,7 +1378,9 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
                       foregroundColor: Colors.black,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                     onPressed: () async {
                       if (targetPrice <= 0 || orderAmount <= 0) return;
@@ -1197,7 +1392,10 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
                         amount: orderAmount,
                       );
                     },
-                    child: const Text('Limit-Order scharf stellen', style: TextStyle(fontWeight: FontWeight.bold)),
+                    child: const Text(
+                      'Limit-Order scharf stellen',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
                   ),
                 ),
               ],
@@ -1220,16 +1418,21 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(label,
-                style: const TextStyle(
-                    fontSize: 10, color: AppColors.textSecondary)),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 10,
+                color: AppColors.textSecondary,
+              ),
+            ),
             const SizedBox(height: 2),
             Text(
               value,
               style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary),
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: AppColors.textPrimary,
+              ),
               overflow: TextOverflow.ellipsis,
             ),
           ],
@@ -1309,8 +1512,10 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Weiter nur zusehen',
-                style: TextStyle(color: AppColors.textMuted)),
+            child: const Text(
+              'Weiter nur zusehen',
+              style: TextStyle(color: AppColors.textMuted),
+            ),
           ),
           ElevatedButton(
             onPressed: () {
@@ -1318,9 +1523,8 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => AuthScreen(
-                    onAuthenticated: () => Navigator.pop(context),
-                  ),
+                  builder: (_) =>
+                      AuthScreen(onAuthenticated: () => Navigator.pop(context)),
                 ),
               );
             },
@@ -1348,6 +1552,10 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
     OrderFeeBreakdown feeBreakdown,
     bool isOpen,
   ) {
+    final cashFraction = _cashFraction;
+    final orderAmount = _amount;
+    final leverage = _leverage;
+    final isShort = _isShort;
     showModalBottomSheet(
       context: context,
       backgroundColor: AppColors.surface,
@@ -1399,8 +1607,9 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                color: (isOpen ? AppColors.profit : AppColors.gold)
-                    .withValues(alpha: 0.15),
+                color: (isOpen ? AppColors.profit : AppColors.gold).withValues(
+                  alpha: 0.15,
+                ),
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(
                   color: (isOpen ? AppColors.profit : AppColors.gold)
@@ -1409,8 +1618,11 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
               ),
               child: Row(
                 children: [
-                  Icon(isOpen ? Icons.bolt : Icons.schedule,
-                      size: 18, color: isOpen ? AppColors.profit : AppColors.gold),
+                  Icon(
+                    isOpen ? Icons.bolt : Icons.schedule,
+                    size: 18,
+                    color: isOpen ? AppColors.profit : AppColors.gold,
+                  ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -1441,21 +1653,31 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
               child: Column(
                 children: [
                   _buildSheetRow(
-                      'Ordertyp:', isOpen ? 'Market Kauforder' : 'Vorab-Kauforder'),
+                    'Ordertyp:',
+                    isOpen ? 'Market Kauforder' : 'Vorab-Kauforder',
+                  ),
                   const SizedBox(height: 8),
-                  _buildSheetRow('Order-Menge:',
-                      '${CurrencyFormatter.formatAmount(_amount)} Anteile'),
+                  _buildSheetRow(
+                    'Order-Menge:',
+                    '${CurrencyFormatter.formatAmount(orderAmount)} Anteile',
+                  ),
                   const SizedBox(height: 8),
-                  _buildSheetRow('Ausführungskurs (ca.):',
-                      CurrencyFormatter.format(asset.currentPrice)),
+                  _buildSheetRow(
+                    'Ausführungskurs (ca.):',
+                    CurrencyFormatter.format(asset.currentPrice),
+                  ),
                   const SizedBox(height: 8),
-                  if (_leverage > 1) ...[
-                    _buildSheetRow('Hebelwirkung:',
-                        '${_leverage}x ${_isShort ? "SHORT" : "LONG"}'),
+                  if (leverage > 1) ...[
+                    _buildSheetRow(
+                      'Hebelwirkung:',
+                      '${leverage}x ${isShort ? "SHORT" : "LONG"}',
+                    ),
                     const SizedBox(height: 8),
                   ],
-                  _buildSheetRow('Kurswert der Anteile:',
-                      CurrencyFormatter.format(_amount * asset.currentPrice)),
+                  _buildSheetRow(
+                    'Kurswert der Anteile:',
+                    CurrencyFormatter.format(orderAmount * asset.currentPrice),
+                  ),
                   const SizedBox(height: 8),
                   _buildSheetRow(
                     'Transaktions- & Börsenspesen:',
@@ -1475,7 +1697,8 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
                   _buildSheetRow(
                     'Verbleibendes Barmittel danach:',
                     CurrencyFormatter.format(
-                        provider.cash - feeBreakdown.totalCashRequired),
+                      provider.cash - feeBreakdown.totalCashRequired,
+                    ),
                     valueColor: AppColors.textSecondary,
                   ),
                 ],
@@ -1497,13 +1720,14 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
                     symbol: asset.symbol,
                     assetName: asset.name,
                     isBuy: true,
-                    amount: _amount,
+                    amount: orderAmount,
                     price: asset.currentPrice,
                     onExecute: () => provider.executeBuy(
                       asset: asset,
-                      amount: _amount,
-                      leverage: _leverage,
-                      isShort: _isShort,
+                      amount: orderAmount,
+                      cashFraction: cashFraction,
+                      leverage: leverage,
+                      isShort: isShort,
                     ),
                   );
                   if (success && mounted) {
@@ -1523,7 +1747,9 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
                     const Icon(Icons.check_circle_outline, size: 20),
                     const SizedBox(width: 8),
                     Text(
-                      isOpen ? 'KAUF JETZT VERBINDLICH BESTÄTIGEN' : 'VORAB-ORDER VERBINDLICH PLATZIEREN',
+                      isOpen
+                          ? 'KAUF JETZT VERBINDLICH BESTÄTIGEN'
+                          : 'VORAB-ORDER VERBINDLICH PLATZIEREN',
                       style: const TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w900,
@@ -1540,8 +1766,12 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
     );
   }
 
-  Widget _buildSheetRow(String label, String value,
-      {bool isBold = false, Color? valueColor}) {
+  Widget _buildSheetRow(
+    String label,
+    String value, {
+    bool isBold = false,
+    Color? valueColor,
+  }) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [

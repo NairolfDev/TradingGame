@@ -8,6 +8,7 @@ import '../models/pending_order.dart';
 import '../models/leaderboard_entry.dart';
 import '../models/loan_model.dart';
 import '../mock_data/initial_assets.dart';
+import '../catalog/stock_catalog.dart';
 import '../mock_data/initial_luxury_items.dart';
 import '../mock_data/initial_leaderboard.dart';
 import 'trading_repository.dart';
@@ -47,17 +48,17 @@ class LocalTradingRepository implements TradingRepository {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_keyAssets);
     if (raw == null) {
-      final initial = InitialAssets.getAssets();
+      final initial = StockCatalog.merge(InitialAssets.getAssets());
       await saveAssets(initial);
       return initial;
     }
     try {
       final list = jsonDecode(raw) as List<dynamic>;
-      return list
+      return StockCatalog.merge(list
           .map((e) => Asset.fromJson(e as Map<String, dynamic>))
-          .toList();
+          .toList());
     } catch (_) {
-      return InitialAssets.getAssets();
+      return StockCatalog.merge(InitialAssets.getAssets());
     }
   }
 

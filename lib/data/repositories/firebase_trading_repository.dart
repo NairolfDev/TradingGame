@@ -12,7 +12,19 @@ import 'trading_repository.dart';
 import 'local_trading_repository.dart';
 
 class FirebaseTradingRepository implements TradingRepository {
-  LocalTradingRepository get _fallbackLocal => LocalTradingRepository(_currentUserId);
+  final String userId;
+  FirebaseTradingRepository({String? userId})
+    : userId = userId ?? _sessionUid();
+  static String _sessionUid() {
+    try {
+      return FirebaseAuth.instance.currentUser?.uid ?? 'local_player';
+    } catch (_) {
+      return 'local_player';
+    }
+  }
+
+  LocalTradingRepository get _fallbackLocal =>
+      LocalTradingRepository(_currentUserId);
 
   bool get _isFirebaseConfigured {
     try {
@@ -22,15 +34,8 @@ class FirebaseTradingRepository implements TradingRepository {
     }
   }
 
-  String get _currentUserId {
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null && user.uid.isNotEmpty) {
-        return user.uid;
-      }
-    } catch (_) {}
-    return 'local_player';
-  }
+  // Bind every asynchronous operation to the account that started it.
+  String get _currentUserId => userId;
 
   // --- CASH BALANCE ---
   @override
@@ -63,10 +68,10 @@ class FirebaseTradingRepository implements TradingRepository {
             .collection('portfolios')
             .doc(_currentUserId)
             .set({
-          'cash': cash,
-          'uid': _currentUserId,
-          'updatedAt': FieldValue.serverTimestamp(),
-        }, SetOptions(merge: true));
+              'cash': cash,
+              'uid': _currentUserId,
+              'updatedAt': FieldValue.serverTimestamp(),
+            }, SetOptions(merge: true));
       } catch (_) {}
     }
   }
@@ -116,7 +121,10 @@ class FirebaseTradingRepository implements TradingRepository {
             .doc(_currentUserId)
             .collection('positions');
 
-        final activeIds = positions.where((p) => p.amount > 0).map((p) => p.id).toSet();
+        final activeIds = positions
+            .where((p) => p.amount > 0)
+            .map((p) => p.id)
+            .toSet();
         final existingSnap = await col.get();
         final batch = FirebaseFirestore.instance.batch();
 
@@ -196,7 +204,9 @@ class FirebaseTradingRepository implements TradingRepository {
         final cloudMap = {for (final item in cloudItems) item.id: item};
         final merged = catalog.map((catItem) {
           if (cloudMap.containsKey(catItem.id)) {
-            return catItem.copyWith(ownedCount: cloudMap[catItem.id]!.ownedCount);
+            return catItem.copyWith(
+              ownedCount: cloudMap[catItem.id]!.ownedCount,
+            );
           }
           return catItem;
         }).toList();
@@ -340,34 +350,34 @@ class FirebaseTradingRepository implements TradingRepository {
           .limit(100)
           .snapshots()
           .map((snap) {
-        final myUid = _currentUserId;
-        final entries = snap.docs.map((d) {
-          final data = d.data();
-          final isPlayer = (d.id == myUid || data['id'] == myUid);
-          final rawName = data['name'] as String? ?? 'Trader';
-          return LeaderboardEntry(
-            id: d.id,
-            name: isPlayer ? 'Du ($rawName)' : rawName,
-            city: data['city'] as String? ?? 'Österreich',
-            title: data['title'] as String? ?? 'Retail Trader',
-            badge: data['badge'] as String? ?? '📈',
-            avatarEmoji: data['avatarEmoji'] as String? ?? '👤',
-            strategy: data['strategy'] as String? ?? 'Multi-Asset',
-            netWorth: (data['netWorth'] as num?)?.toDouble() ?? 50000.0,
-            roiPercent: (data['roiPercent'] as num?)?.toDouble() ?? 0.0,
-            isPlayer: isPlayer,
-            luxuryCount: (data['luxuryCount'] as num?)?.toInt() ?? 0,
-            rank: 0,
-          );
-        }).toList();
+            final myUid = _currentUserId;
+            final entries = snap.docs.map((d) {
+              final data = d.data();
+              final isPlayer = (d.id == myUid || data['id'] == myUid);
+              final rawName = data['name'] as String? ?? 'Trader';
+              return LeaderboardEntry(
+                id: d.id,
+                name: isPlayer ? 'Du ($rawName)' : rawName,
+                city: data['city'] as String? ?? 'Österreich',
+                title: data['title'] as String? ?? 'Retail Trader',
+                badge: data['badge'] as String? ?? '📈',
+                avatarEmoji: data['avatarEmoji'] as String? ?? '👤',
+                strategy: data['strategy'] as String? ?? 'Multi-Asset',
+                netWorth: (data['netWorth'] as num?)?.toDouble() ?? 50000.0,
+                roiPercent: (data['roiPercent'] as num?)?.toDouble() ?? 0.0,
+                isPlayer: isPlayer,
+                luxuryCount: (data['luxuryCount'] as num?)?.toInt() ?? 0,
+                rank: 0,
+              );
+            }).toList();
 
-        entries.sort((a, b) => b.netWorth.compareTo(a.netWorth));
-        for (int i = 0; i < entries.length; i++) {
-          entries[i].rank = i + 1;
-        }
+            entries.sort((a, b) => b.netWorth.compareTo(a.netWorth));
+            for (int i = 0; i < entries.length; i++) {
+              entries[i].rank = i + 1;
+            }
 
-        return entries;
-      });
+            return entries;
+          });
     } catch (_) {
       return null;
     }
@@ -376,7 +386,10 @@ class FirebaseTradingRepository implements TradingRepository {
   DateTime? _lastLeaderboardCloudSave;
 
   @override
-  Future<void> saveLeaderboard(List<LeaderboardEntry> entries, {bool forceCloud = false}) async {
+  Future<void> saveLeaderboard(
+    List<LeaderboardEntry> entries, {
+    bool forceCloud = false,
+  }) async {
     await _fallbackLocal.saveLeaderboard(entries);
 
     if (_isFirebaseConfigured) {
@@ -410,24 +423,21 @@ class FirebaseTradingRepository implements TradingRepository {
             .collection('leaderboard')
             .doc(myUid)
             .set({
-          'id': myUid,
-          'name': cleanName,
-          'city': player.city,
-          'title': player.title,
-          'badge': player.badge,
-          'avatarEmoji': player.avatarEmoji,
-          'strategy': player.strategy,
-          'netWorth': player.netWorth,
-          'roiPercent': player.roiPercent,
-          'luxuryCount': player.luxuryCount,
-          'updatedAt': FieldValue.serverTimestamp(),
-        }, SetOptions(merge: true));
+              'id': myUid,
+              'name': cleanName,
+              'city': player.city,
+              'title': player.title,
+              'badge': player.badge,
+              'avatarEmoji': player.avatarEmoji,
+              'strategy': player.strategy,
+              'netWorth': player.netWorth,
+              'roiPercent': player.roiPercent,
+              'luxuryCount': player.luxuryCount,
+              'updatedAt': FieldValue.serverTimestamp(),
+            }, SetOptions(merge: true));
 
         // 2. Speichere Benutzerprofil in /users/{uid}
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc(myUid)
-            .set({
+        await FirebaseFirestore.instance.collection('users').doc(myUid).set({
           'uid': myUid,
           'displayName': cleanName,
           'currentRank': player.title,
@@ -440,12 +450,12 @@ class FirebaseTradingRepository implements TradingRepository {
             .collection('portfolios')
             .doc(myUid)
             .set({
-          'uid': myUid,
-          'netWorth': player.netWorth,
-          'roiPercent': player.roiPercent,
-          'rankTitle': player.title,
-          'updatedAt': FieldValue.serverTimestamp(),
-        }, SetOptions(merge: true));
+              'uid': myUid,
+              'netWorth': player.netWorth,
+              'roiPercent': player.roiPercent,
+              'rankTitle': player.title,
+              'updatedAt': FieldValue.serverTimestamp(),
+            }, SetOptions(merge: true));
       } catch (e) {
         // Fallback gracefully on network error
       }
@@ -463,7 +473,10 @@ class FirebaseTradingRepository implements TradingRepository {
   }) async {
     if (!_isFirebaseConfigured || _currentUserId == 'local_player') return;
     try {
-      final doc = await FirebaseFirestore.instance.collection('portfolios').doc(_currentUserId).get();
+      final doc = await FirebaseFirestore.instance
+          .collection('portfolios')
+          .doc(_currentUserId)
+          .get();
       if (!doc.exists) {
         await saveCashBalance(cash);
         await savePositions(positions);
@@ -561,12 +574,12 @@ class FirebaseTradingRepository implements TradingRepository {
             .collection('portfolios')
             .doc(_currentUserId)
             .set({
-          'insolvency': {
-            'isInsolvent': isInsolvent,
-            'lockoutUntil': lockoutUntil?.toIso8601String(),
-            'lastLoanTakenAt': lastLoanTakenAt?.toIso8601String(),
-          }
-        }, SetOptions(merge: true));
+              'insolvency': {
+                'isInsolvent': isInsolvent,
+                'lockoutUntil': lockoutUntil?.toIso8601String(),
+                'lastLoanTakenAt': lastLoanTakenAt?.toIso8601String(),
+              },
+            }, SetOptions(merge: true));
       } catch (_) {}
     }
   }
@@ -597,7 +610,11 @@ class FirebaseTradingRepository implements TradingRepository {
           batch.delete(d.reference);
         }
         batch.delete(portfolioDoc);
-        batch.delete(FirebaseFirestore.instance.collection('leaderboard').doc(_currentUserId));
+        batch.delete(
+          FirebaseFirestore.instance
+              .collection('leaderboard')
+              .doc(_currentUserId),
+        );
         await batch.commit();
       } catch (_) {}
     }

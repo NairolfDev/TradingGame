@@ -1,0 +1,8 @@
+{
+  "score": 4,
+  "summary": "Owner checks protect private profiles, users and portfolios; leaderboard remains publicly readable and owner-writable. 15 local emulator assertions pass.",
+  "findings": [
+    {"check": "Business Logic vs. Rules", "severity": "minor", "issue": "Portfolio and leaderboard balances are still calculated by the client. A modified client can falsify its own score.", "recommendation": "Move trade execution and leaderboard updates to authenticated server transactions."},
+    {"check": "Storage Abuse", "severity": "minor", "issue": "Legacy owner-only portfolio subcollections retain flexible payloads without detailed schema limits.", "recommendation": "Introduce per-document schemas alongside a versioned portfolio model."}
+  ]
+}

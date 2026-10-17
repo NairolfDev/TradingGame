@@ -24,7 +24,7 @@ void main() {
     },
   );
   test(
-    'crypto history uses the EUR pair and USD futures are not relabeled EUR',
+    'crypto uses EUR pairs, foreign stocks route to normalized proxy, futures stay unsupported',
     () {
       expect(
         LiveMarketDataService.euroYahooSymbolFor(
@@ -42,7 +42,13 @@ void main() {
         LiveMarketDataService.euroYahooSymbolFor(
           assets.firstWhere((a) => a.symbol == 'NVDA'),
         ),
-        isNull,
+        'NVDA',
+      );
+      expect(
+        LiveMarketDataService.euroYahooSymbolFor(
+          assets.firstWhere((a) => a.symbol == '7203.T'),
+        ),
+        '7203.T',
       );
     },
   );

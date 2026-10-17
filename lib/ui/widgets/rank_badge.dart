@@ -6,11 +6,7 @@ class RankBadge extends StatelessWidget {
   final RankInfo rank;
   final bool compact;
 
-  const RankBadge({
-    super.key,
-    required this.rank,
-    this.compact = false,
-  });
+  const RankBadge({super.key, required this.rank, this.compact = false});
 
   @override
   Widget build(BuildContext context) {
@@ -20,19 +16,24 @@ class RankBadge extends StatelessWidget {
         decoration: BoxDecoration(
           color: rank.color.withValues(alpha: 0.15),
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: rank.color.withValues(alpha: 0.4), width: 1),
+          border: Border.all(
+            color: rank.color.withValues(alpha: 0.4),
+            width: 1,
+          ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(rank.badge, style: const TextStyle(fontSize: 12)),
             const SizedBox(width: 4),
-            Text(
-              rank.title,
-              style: TextStyle(
-                color: rank.color,
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
+            Flexible(
+              child: Text(
+                rank.title,
+                style: TextStyle(
+                  color: rank.color,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ],
@@ -50,7 +51,10 @@ class RankBadge extends StatelessWidget {
           ],
         ),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: rank.color.withValues(alpha: 0.5), width: 1.5),
+        border: Border.all(
+          color: rank.color.withValues(alpha: 0.5),
+          width: 1.5,
+        ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -64,28 +68,30 @@ class RankBadge extends StatelessWidget {
             child: Text(rank.badge, style: const TextStyle(fontSize: 18)),
           ),
           const SizedBox(width: 8),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'Rang Lvl ${rank.level}',
-                style: TextStyle(
-                  color: AppColors.textMuted,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0.5,
+          Flexible(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Rang Lvl ${rank.level}',
+                  style: TextStyle(
+                    color: AppColors.textMuted,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.5,
+                  ),
                 ),
-              ),
-              Text(
-                rank.title,
-                style: TextStyle(
-                  color: rank.color,
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
+                Text(
+                  rank.title,
+                  style: TextStyle(
+                    color: rank.color,
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),

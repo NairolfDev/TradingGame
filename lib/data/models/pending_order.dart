@@ -24,7 +24,7 @@ class PendingOrder {
   final String name;
   final AssetType assetType;
   final bool isBuy; // true = Buy, false = Sell
-  final double amount;
+  double amount;
   final double estimatedPrice;
   final double totalEstimatedCost;
   final int leverage;

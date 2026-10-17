@@ -2,22 +2,38 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    function owner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+    match /profiles/{uid} {
+      allow read: if owner(uid);
+      allow create, update: if owner(uid)
+        && request.resource.data.keys().hasOnly(['displayName', 'countryCode'])
+        && request.resource.data.keys().hasAll(['displayName', 'countryCode'])
+        && request.resource.data.displayName is string
+        && request.resource.data.displayName.size() >= 2
+        && request.resource.data.displayName.size() <= 48
+        && request.resource.data.countryCode is string
+        && request.resource.data.countryCode in ['AF', 'AL', 'DZ', 'AS', 'VI', 'UM', 'AD', 'AO', 'AI', 'AQ', 'AG', 'AR', 'AM', 'AW', 'AZ', 'AU', 'BS', 'BH', 'BD', 'BB', 'BY', 'BE', 'BZ', 'BJ', 'BM', 'BT', 'BO', 'BA', 'BW', 'BV', 'BR', 'VG', 'IO', 'BN', 'BG', 'BF', 'BI', 'CV', 'CL', 'CN', 'CK', 'CR', 'CW', 'CI', 'DE', 'DM', 'DO', 'DJ', 'DK', 'EC', 'SV', 'ER', 'EE', 'SZ', 'FK', 'FJ', 'FI', 'FR', 'GF', 'PF', 'TF', 'FO', 'GA', 'GM', 'GE', 'GH', 'GI', 'GD', 'GR', 'GL', 'GP', 'GU', 'GT', 'GG', 'GN', 'GW', 'GY', 'HT', 'HM', 'HN', 'IN', 'ID', 'IQ', 'IR', 'IE', 'IS', 'IM', 'IL', 'IT', 'JM', 'JP', 'YE', 'JE', 'JO', 'KY', 'KH', 'CM', 'CA', 'BQ', 'KZ', 'QA', 'KE', 'KG', 'KI', 'CC', 'CO', 'KM', 'CG', 'CD', 'HR', 'CU', 'KW', 'LA', 'LS', 'LV', 'LB', 'LR', 'LY', 'LI', 'LT', 'LU', 'MG', 'MW', 'MY', 'MV', 'ML', 'MT', 'MA', 'MH', 'MQ', 'MR', 'MU', 'YT', 'MX', 'FM', 'MC', 'MN', 'ME', 'MS', 'MZ', 'MM', 'NA', 'NR', 'NP', 'NC', 'NZ', 'NI', 'NL', 'NE', 'NG', 'NU', 'KP', 'MK', 'NF', 'NO', 'MP', 'OM', 'PK', 'PW', 'PS', 'PA', 'PG', 'PY', 'PE', 'PH', 'PN', 'PL', 'PT', 'PR', 'MD', 'RW', 'RO', 'RU', 'RE', 'SB', 'ZM', 'WS', 'SM', 'SA', 'SE', 'CH', 'SN', 'RS', 'SC', 'SL', 'ZW', 'SG', 'SX', 'SK', 'SI', 'SO', 'HK', 'MO', 'ES', 'SJ', 'LK', 'BL', 'SH', 'KN', 'LC', 'MF', 'PM', 'VC', 'SD', 'SR', 'SY', 'ST', 'ZA', 'GS', 'KR', 'SS', 'TJ', 'TW', 'TZ', 'TH', 'TL', 'TG', 'TK', 'TO', 'TT', 'TD', 'CZ', 'TN', 'TM', 'TC', 'TV', 'TR', 'UG', 'UA', 'HU', 'UY', 'UZ', 'VU', 'VA', 'VE', 'AE', 'US', 'GB', 'VN', 'WF', 'CX', 'EH', 'CF', 'CY', 'EG', 'GQ', 'ET', 'AX', 'AT'];
+      allow delete: if owner(uid);
+    }
     // 1. Leaderboard: Live-Rangliste für alle Spieler (Echtzeit-Updates)
     match /leaderboard/{docId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if owner(docId);
     }
 
     // 2. Benutzerprofile
     match /users/{userId} {
-      allow read, write: if true;
+      allow read, write: if owner(userId);
     }
 
     // 3. Portfolios & Unterkollektionen für alle Online-Spieler
     match /portfolios/{userId} {
-      allow read, write: if true;
+      allow read, write: if owner(userId);
 
       match /{document=**} {
-        allow read, write: if true;
+        allow read, write: if owner(userId);
       }
     }
   }

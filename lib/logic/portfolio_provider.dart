@@ -17,6 +17,7 @@ import '../data/repositories/firebase_trading_repository.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'market_engine.dart';
 import 'trading_fee_service.dart';
+import 'bond_coupon_service.dart';
 import 'credit_rating_service.dart';
 import 'news_service.dart';
 import 'quest_service.dart';
@@ -32,9 +33,18 @@ import 'savings_plan_service.dart';
 import 'automation_service.dart';
 import 'achievement_service.dart';
 import 'live_market_data_service.dart';
+import '../data/models/user_model.dart';
+import '../data/countries.dart';
 
 class PortfolioProvider extends ChangeNotifier {
-  final TradingRepository repository;
+  UserModel? _playerProfile;
+  void updatePlayerProfile(UserModel? profile) {
+    _playerProfile = profile;
+  }
+
+  String get playerCountry =>
+      countryNames[_playerProfile?.countryCode] ?? 'Land nicht gewählt';
+  TradingRepository repository;
   final MarketEngine marketEngine = MarketEngine();
   final NewsService newsService = NewsService();
   final QuestService questService = QuestService();
@@ -64,6 +74,8 @@ class PortfolioProvider extends ChangeNotifier {
   Timer? _liveMarketRefreshTimer;
   bool _refreshingQuotes = false;
   final Map<String, DateTime> _quoteUpdatedAt = {};
+  final Map<String, LiveQuoteResult> _quoteDetails = {};
+  final Set<String> _visibleMarketAssetIds = {};
   String _activeUid = 'local_player';
 
   bool _isInsolvent = false;
@@ -74,6 +86,9 @@ class PortfolioProvider extends ChangeNotifier {
   String? _lastAlertMessage;
 
   PortfolioProvider({required this.repository}) {
+    if (repository is FirebaseTradingRepository) {
+      _activeUid = (repository as FirebaseTradingRepository).userId;
+    }
     _init();
   }
 
@@ -82,22 +97,40 @@ class PortfolioProvider extends ChangeNotifier {
   List<Asset> get assets => _assets;
   List<Position> get positions => _positions;
   List<TransactionRecord> get transactions => _transactions;
-  List<AutomationOrder> get activeAutomationOrders => automationService.activeOrders;
+  List<AutomationOrder> get activeAutomationOrders =>
+      automationService.activeOrders;
   List<AutomationOrder> get allAutomationOrders => automationService.allOrders;
   int get unlockedAutomationSlotsCount => automationService.unlockedSlotsCount;
   double? get nextAutomationSlotCost => automationService.nextSlotCost;
   List<Achievement> get achievements => achievementService.achievements;
   int get unlockedAchievementsCount => achievementService.unlockedCount;
-  List<Asset> get watchlistAssets => _assets.where((a) => a.isWatchlisted).toList();
+  List<Asset> get watchlistAssets =>
+      _assets.where((a) => a.isWatchlisted).toList();
   bool get isSimplisticMode => _isSimplisticMode;
   bool get isRealisticOrderDelay => _isRealisticOrderDelay;
   DateTime? quoteUpdatedAt(Asset asset) => _quoteUpdatedAt[asset.id];
   String quoteStatus(Asset asset) {
     final updated = quoteUpdatedAt(asset);
-    if (updated == null) return 'Katalogkurs · nicht aktualisiert';
-    final time = '${updated.hour.toString().padLeft(2, '0')}:${updated.minute.toString().padLeft(2, '0')}';
-    return 'Abgerufen $time';
+    if (updated == null) return 'Kurs nicht verfügbar';
+    final quote = _quoteDetails[asset.id];
+    final time =
+        '${updated.hour.toString().padLeft(2, '0')}:${updated.minute.toString().padLeft(2, '0')}';
+    final date = '${updated.day}.${updated.month}.';
+    final fx = quote?.usesSnapshotFx == true
+        ? ' · EUR zum aktuellen FX-Kurs'
+        : '';
+    return '${quote?.source ?? 'Anbieter'} · Stand $date $time · ggf. verzögert$fx';
   }
+
+  void setVisibleMarketAssets(Iterable<Asset> assets) {
+    final ids = assets.map((a) => a.id).take(50).toSet();
+    if (setEquals(ids, _visibleMarketAssetIds)) return;
+    _visibleMarketAssetIds
+      ..clear()
+      ..addAll(ids);
+    if (ids.isNotEmpty) fetchLiveMarketQuotes();
+  }
+
   List<SavingsPlan> get savingsPlans => savingsPlanService.plans;
   List<SavingsPlan> get activeSavingsPlans => savingsPlanService.activePlans;
 
@@ -114,22 +147,28 @@ class PortfolioProvider extends ChangeNotifier {
     await prefs.setBool(_keyRealisticOrderDelay, enabled);
     notifyListeners();
   }
+
   List<LuxuryItem> get luxuryItems => _luxuryItems;
-  List<PendingOrder> get pendingOrders =>
-      _pendingOrders.where((o) => o.status == PendingOrderStatus.pending).toList();
+  List<PendingOrder> get pendingOrders => _pendingOrders
+      .where((o) => o.status == PendingOrderStatus.pending)
+      .toList();
   List<PendingOrder> get allPendingOrders => _pendingOrders;
   List<LeaderboardEntry> get leaderboard => _leaderboard;
   List<Loan> get loans => _loans;
   List<Loan> get activeLoans => _loans.where((l) => !l.isPaid).toList();
   List<NewsEvent> get newsEvents => _newsEvents;
-  NewsEvent? get latestBreakingNews => _newsEvents.isNotEmpty ? _newsEvents.first : null;
+  NewsEvent? get latestBreakingNews =>
+      _newsEvents.isNotEmpty ? _newsEvents.first : null;
   List<DailyQuest> get dailyQuests => questService.quests;
   int get loginStreakDays => questService.loginStreakDays;
   // No public portfolio feed is available yet.
   List<CopyTrader> get copyTraders => const [];
-  double get totalAnnualDividends => DividendService.calculateAnnualDividendRunRate(_positions, _assets);
-  double get monthlyPassiveIncome => DividendService.calculateMonthlyPassiveIncome(_positions, _assets);
-  List<DividendScheduleItem> get dividendSchedule => DividendService.getDividendSchedule(_positions, _assets);
+  double get totalAnnualDividends =>
+      DividendService.calculateAnnualDividendRunRate(_positions, _assets);
+  double get monthlyPassiveIncome =>
+      DividendService.calculateMonthlyPassiveIncome(_positions, _assets);
+  List<DividendScheduleItem> get dividendSchedule =>
+      DividendService.getDividendSchedule(_positions, _assets);
 
   bool get isLoading => _isLoading;
   String? get lastAlertMessage => _lastAlertMessage;
@@ -145,7 +184,9 @@ class PortfolioProvider extends ChangeNotifier {
   }
 
   Duration get creditLockoutTimeRemaining {
-    if (!isUnderCreditLockout || _insolvencyLockoutUntil == null) return Duration.zero;
+    if (!isUnderCreditLockout || _insolvencyLockoutUntil == null) {
+      return Duration.zero;
+    }
     return _insolvencyLockoutUntil!.difference(DateTime.now());
   }
 
@@ -167,7 +208,9 @@ class PortfolioProvider extends ChangeNotifier {
     if (isUnderCreditLockout) return false;
     if (isLoanOnCooldown) return false;
     // Maximal 1 aktiver Bankkredit neben dem Startkredit
-    final bankLoans = activeLoans.where((l) => !l.id.startsWith('initial_start_loan_')).length;
+    final bankLoans = activeLoans
+        .where((l) => !l.id.startsWith('initial_start_loan_'))
+        .length;
     if (bankLoans >= 1) return false;
     return true;
   }
@@ -205,19 +248,39 @@ class PortfolioProvider extends ChangeNotifier {
   double get pendingOrderValue => pendingOrders.fold(0.0, (sum, order) {
     if (order.isBuy) return sum + order.totalEstimatedCost;
     final asset = _assets.where((a) => a.id == order.assetId).firstOrNull;
-    final price = asset?.currentPrice ?? order.estimatedPrice;
-    if (order.leverage == 1 && !order.isShort) return sum + order.amount * price;
+    final livePrice = asset?.currentPrice;
+    final price = livePrice != null && livePrice.isFinite && livePrice > 0
+        ? livePrice
+        : order.estimatedPrice;
+    if (order.leverage == 1 && !order.isShort) {
+      return sum + order.amount * price;
+    }
     final entryPrice = order.averageBuyPrice ?? order.estimatedPrice;
     final pnl = (price - entryPrice) * order.amount * (order.isShort ? -1 : 1);
-    return sum + max(0.0, (order.collateral ?? order.amount * entryPrice / order.leverage) + pnl);
+    return sum +
+        max(
+          0.0,
+          (order.collateral ?? order.amount * entryPrice / order.leverage) +
+              pnl,
+        );
   });
 
-  double get netWorth => _cash + totalPositionsValue + pendingOrderValue + totalLuxuryValue - totalDebt;
+  double get netWorth =>
+      _cash +
+      totalPositionsValue +
+      pendingOrderValue +
+      totalLuxuryValue -
+      totalDebt;
 
   CreditRating get creditRating {
     final lossRecords = _transactions.where((t) => (t.realizedPnL ?? 0) < 0);
-    final totalLosses = lossRecords.fold<double>(0.0, (sum, t) => sum + (t.realizedPnL?.abs() ?? 0));
-    final liquidations = _transactions.where((t) => t.type == TransactionType.liquidation).length;
+    final totalLosses = lossRecords.fold<double>(
+      0.0,
+      (sum, t) => sum + (t.realizedPnL?.abs() ?? 0),
+    );
+    final liquidations = _transactions
+        .where((t) => t.type == TransactionType.liquidation)
+        .length;
     return CreditRatingService.evaluateRating(
       netWorth: netWorth,
       totalDebt: totalDebt,
@@ -229,7 +292,9 @@ class PortfolioProvider extends ChangeNotifier {
   double get totalInvestedCost {
     double sum = 0.0;
     for (final pos in _positions) {
-      sum += pos.isLeveraged ? pos.collateral : (pos.amount * pos.averageBuyPrice);
+      sum += pos.isLeveraged
+          ? pos.collateral
+          : (pos.amount * pos.averageBuyPrice);
     }
     return sum;
   }
@@ -310,10 +375,14 @@ class PortfolioProvider extends ChangeNotifier {
     final insolvencyData = await repository.getInsolvencyStatus();
     _isInsolvent = insolvencyData['isInsolvent'] as bool? ?? false;
     if (insolvencyData['lockoutUntil'] != null) {
-      _insolvencyLockoutUntil = DateTime.tryParse(insolvencyData['lockoutUntil'] as String);
+      _insolvencyLockoutUntil = DateTime.tryParse(
+        insolvencyData['lockoutUntil'] as String,
+      );
     }
     if (insolvencyData['lastLoanTakenAt'] != null) {
-      _lastLoanTakenAt = DateTime.tryParse(insolvencyData['lastLoanTakenAt'] as String);
+      _lastLoanTakenAt = DateTime.tryParse(
+        insolvencyData['lastLoanTakenAt'] as String,
+      );
     }
 
     // Starte Market Engine
@@ -377,7 +446,9 @@ class PortfolioProvider extends ChangeNotifier {
   void _listenToAuthChanges() {
     _authSubscription?.cancel();
     try {
-      _authSubscription = FirebaseAuth.instance.authStateChanges().listen((fbUser) async {
+      _authSubscription = FirebaseAuth.instance.authStateChanges().listen((
+        fbUser,
+      ) async {
         final newUid = fbUser?.uid ?? 'local_player';
         if (_activeUid != newUid) {
           _activeUid = newUid;
@@ -387,48 +458,60 @@ class PortfolioProvider extends ChangeNotifier {
     } catch (_) {}
   }
 
+  int _accountVersion = 0;
   Future<void> _onUserSwitched(User? fbUser) async {
+    final version = ++_accountVersion;
     _isLoading = true;
     notifyListeners();
-
+    await _couponSettlement;
+    if (version != _accountVersion) return;
+    if (repository is FirebaseTradingRepository) {
+      repository = FirebaseTradingRepository(
+        userId: fbUser?.uid ?? 'local_player',
+      );
+    }
+    final account = repository;
     try {
-      if (repository is FirebaseTradingRepository) {
-        await (repository as FirebaseTradingRepository).syncUserToCloud(
-          cash: _cash,
-          positions: _positions,
-          transactions: _transactions,
-          luxuryItems: _luxuryItems,
-          loans: _loans,
-          pendingOrders: _pendingOrders,
-        );
-      }
-
-      _cash = await repository.getCashBalance();
-      _positions = await repository.getPositions();
-      _transactions = await repository.getTransactions();
-      _luxuryItems = await repository.getLuxuryItems();
-      _pendingOrders = await repository.getPendingOrders();
-      _loans = await repository.getLoans();
+      // A new account starts from its own saved state, never the previous wallet.
+      final cash = await account.getCashBalance();
+      final positions = await account.getPositions();
+      final transactions = await account.getTransactions();
+      final luxury = await account.getLuxuryItems();
+      final orders = await account.getPendingOrders();
+      final loans = await account.getLoans();
+      final insolvency = await account.getInsolvencyStatus();
+      if (version != _accountVersion) return;
+      _cash = cash;
+      _positions = positions;
+      _transactions = transactions;
+      _luxuryItems = luxury;
+      _pendingOrders = orders;
+      _loans = loans.isEmpty ? [Loan.createInitialStartLoan()] : loans;
+      if (loans.isEmpty) await account.saveLoans(_loans);
+      if (version != _accountVersion) return;
+      _isInsolvent = insolvency['isInsolvent'] as bool? ?? false;
+      _insolvencyLockoutUntil = DateTime.tryParse(
+        insolvency['lockoutUntil'] as String? ?? '',
+      );
+      _lastLoanTakenAt = _loans
+          .where((loan) => !loan.id.startsWith('initial_start_loan_'))
+          .map((loan) => loan.takenAt)
+          .fold<DateTime?>(
+            null,
+            (latest, date) =>
+                latest == null || date.isAfter(latest) ? date : latest,
+          );
       await _initializeQuests();
-
-      _leaderboardSubscription?.cancel();
-      final stream = repository.streamLeaderboard();
-      if (stream != null) {
-        _leaderboardSubscription = stream.listen((entries) {
-          if (entries.isNotEmpty) {
-            _leaderboard = entries;
-            notifyListeners();
-          }
-        });
-      }
-
+      if (version != _accountVersion) return;
       _updatePositionsWithCurrentAssetPrices();
-      _updateLeaderboard();
     } catch (e) {
       debugPrint('Error on user switched: $e');
     } finally {
-      _isLoading = false;
-      notifyListeners();
+      if (version == _accountVersion) {
+        _isLoading = false;
+        _updateLeaderboard();
+        notifyListeners();
+      }
     }
   }
 
@@ -445,22 +528,38 @@ class PortfolioProvider extends ChangeNotifier {
     if (_refreshingQuotes) return;
     _refreshingQuotes = true;
     try {
-      final quotes = await liveDataService.refreshQuotesForAssets(_assets);
+      final wanted = <String>{
+        ..._visibleMarketAssetIds,
+        ..._assets.where((a) => a.isWatchlisted).map((a) => a.id),
+        ..._positions.map((p) => p.assetId),
+        ...pendingOrders.map((p) => p.assetId),
+      };
+      // Dashboard starts with a small default page; never refresh the whole catalog.
+      if (wanted.isEmpty) wanted.addAll(_assets.take(20).map((a) => a.id));
+      final quotes = await liveDataService.refreshQuotesForAssets(
+        _assets.where((a) => wanted.contains(a.id)).toList(),
+      );
       if (quotes.isNotEmpty) {
         bool anyChanged = false;
         final updatedAssets = _assets.map((asset) {
           if (quotes.containsKey(asset.symbol)) {
             final q = quotes[asset.symbol]!;
-            if (q.currentPrice.isFinite && q.currentPrice > 0 &&
-                q.previousClose.isFinite && q.previousClose > 0) {
-              _quoteUpdatedAt[asset.id] = DateTime.now();
+            if (q.currentPrice.isFinite &&
+                q.currentPrice > 0 &&
+                q.previousClose.isFinite &&
+                q.previousClose > 0) {
+              if (q.sourceTimestamp == null) return asset;
+              _quoteUpdatedAt[asset.id] = q.sourceTimestamp!;
+              _quoteDetails[asset.id] = q;
               anyChanged = true;
               return asset.copyWith(
                 currentPrice: q.currentPrice,
                 previousClose: q.previousClose,
                 dailyHigh: q.high ?? asset.dailyHigh,
                 dailyLow: q.low ?? asset.dailyLow,
-                priceHistory: q.series?.where((v) => v.isFinite && v > 0).toList() ?? [q.currentPrice],
+                priceHistory:
+                    q.series?.where((v) => v.isFinite && v > 0).toList() ??
+                    [q.currentPrice],
               );
             }
           }
@@ -496,6 +595,7 @@ class PortfolioProvider extends ChangeNotifier {
 
   // Preisschwankungen aus Market Engine verarbeiten
   void _onPriceUpdate(List<Asset> updatedAssets) {
+    if (_isLoading) return;
     _assets = updatedAssets;
     marketEngine.updateAssetsReference(_assets);
 
@@ -520,8 +620,13 @@ class PortfolioProvider extends ChangeNotifier {
       final idx = _assets.indexWhere((a) => a.symbol == news.affectedSymbol);
       if (idx != -1) {
         final asset = _assets[idx];
-        final newPrice = (asset.currentPrice * (1 + news.priceImpact)).clamp(0.0001, 1000000.0);
-        final rounded = double.parse(newPrice.toStringAsFixed(newPrice > 500 ? 2 : 4));
+        final newPrice = (asset.currentPrice * (1 + news.priceImpact)).clamp(
+          0.0001,
+          1000000.0,
+        );
+        final rounded = double.parse(
+          newPrice.toStringAsFixed(newPrice > 500 ? 2 : 4),
+        );
         _assets[idx] = asset.copyWithPrice(rounded);
         _updatePositionsWithCurrentAssetPrices();
         repository.saveAssets(_assets);
@@ -557,7 +662,10 @@ class PortfolioProvider extends ChangeNotifier {
         ),
       );
 
-      final updatedPos = pos.copyWith(currentPrice: matchingAsset.currentPrice);
+      final price = matchingAsset.currentPrice;
+      final updatedPos = price.isFinite && price > 0
+          ? pos.copyWith(currentPrice: price)
+          : pos;
 
       // Prüfe auf Zwangsliquidation bei Hebelprodukten
       if (updatedPos.isLiquidated) {
@@ -604,15 +712,33 @@ class PortfolioProvider extends ChangeNotifier {
   Future<bool> executeBuy({
     required Asset asset,
     required double amount,
+    double? cashFraction,
     int leverage = 1,
     bool isShort = false,
   }) async {
+    if (_isLoading) return false;
+    if (asset.type == AssetType.bond) {
+      await _checkBondsCouponPayout(force: true);
+    }
     final currentAsset = _assets.where((a) => a.id == asset.id).firstOrNull;
     if (currentAsset == null) return false;
     asset = currentAsset;
-    if (!amount.isFinite || amount <= 0 ||
-        !asset.currentPrice.isFinite || asset.currentPrice <= 0 ||
-        leverage < 1 || leverage > asset.maxLeverage) {
+    if (cashFraction != null) {
+      if (!cashFraction.isFinite || cashFraction <= 0 || cashFraction > 1) {
+        return false;
+      }
+      amount = TradingFeeService.maximumBuyAmount(
+        asset: asset,
+        cash: _cash * cashFraction,
+        leverage: leverage,
+      );
+    }
+    if (!amount.isFinite ||
+        amount <= 0 ||
+        !asset.currentPrice.isFinite ||
+        asset.currentPrice <= 0 ||
+        leverage < 1 ||
+        leverage > asset.maxLeverage) {
       _lastAlertMessage = 'Ungültige Order: Menge, Kurs oder Hebel prüfen.';
       notifyListeners();
       return false;
@@ -671,11 +797,23 @@ class PortfolioProvider extends ChangeNotifier {
 
       String venue = 'Wiener Börse (WBAG)';
       final sym = asset.symbol.toUpperCase();
-      if (sym.endsWith('.VI') || sym == 'EBS' || sym == 'OMV' || sym == 'VOE' || sym == 'ANDR') {
+      if (sym.endsWith('.VI') ||
+          sym == 'EBS' ||
+          sym == 'OMV' ||
+          sym == 'VOE' ||
+          sym == 'ANDR') {
         venue = 'Wiener Börse (WBAG)';
-      } else if (sym.endsWith('.DE') || sym.endsWith('.AS') || sym == 'BMW' || sym == 'SAP' || sym == 'ASML') {
+      } else if (sym.endsWith('.DE') ||
+          sym.endsWith('.AS') ||
+          sym == 'BMW' ||
+          sym == 'SAP' ||
+          sym == 'ASML') {
         venue = 'Deutsche Börse XETRA';
-      } else if (sym.contains('BTC') || sym.contains('ETH') || sym.contains('SOL') || sym.contains('NEAR') || sym.contains('LINK')) {
+      } else if (sym.contains('BTC') ||
+          sym.contains('ETH') ||
+          sym.contains('SOL') ||
+          sym.contains('NEAR') ||
+          sym.contains('LINK')) {
         venue = 'Crypto Liquidity Pool';
       } else if (sym.contains('=F')) {
         venue = 'CME Globex';
@@ -727,7 +865,8 @@ class PortfolioProvider extends ChangeNotifier {
       if (existingIndex != -1) {
         final existing = _positions[existingIndex];
         final newTotalAmount = existing.amount + amount;
-        final newAvgPrice = ((existing.amount * existing.averageBuyPrice) +
+        final newAvgPrice =
+            ((existing.amount * existing.averageBuyPrice) +
                 (amount * asset.currentPrice)) /
             newTotalAmount;
 
@@ -783,7 +922,9 @@ class PortfolioProvider extends ChangeNotifier {
       price: asset.currentPrice,
       totalAmount: totalCost,
       timestamp: DateTime.now(),
-      note: leverage > 1 ? '${leverage}x Hebel ${isShort ? "Short" : "Long"}' : 'Spot Kauf',
+      note: leverage > 1
+          ? '${leverage}x Hebel ${isShort ? "Short" : "Long"}'
+          : 'Spot Kauf',
     );
 
     _transactions.insert(0, record);
@@ -798,7 +939,8 @@ class PortfolioProvider extends ChangeNotifier {
     );
 
     _updateLeaderboard(forceCloud: true);
-    _lastAlertMessage = 'Erfolgreich gekauft: ${amount.toStringAsFixed(2)}x ${asset.symbol}';
+    _lastAlertMessage =
+        'Erfolgreich gekauft: ${amount.toStringAsFixed(2)}x ${asset.symbol}';
     notifyListeners();
     return true;
   }
@@ -807,11 +949,26 @@ class PortfolioProvider extends ChangeNotifier {
   Future<bool> executeSell({
     required Position position,
     required double sellAmount,
+    double? sellFraction,
   }) async {
+    if (_isLoading) return false;
+    if (position.type == AssetType.bond) {
+      await _checkBondsCouponPayout(force: true);
+    }
     final owned = _positions.where((p) => p.id == position.id).firstOrNull;
-    if (owned == null || !sellAmount.isFinite || sellAmount <= 0 ||
+    if (sellFraction != null) {
+      if (!sellFraction.isFinite || sellFraction <= 0 || sellFraction > 1) {
+        return false;
+      }
+      sellAmount = (owned?.amount ?? 0) * sellFraction;
+    }
+    if (owned == null ||
+        !sellAmount.isFinite ||
+        sellAmount <= 0 ||
+        !owned.amount.isFinite ||
         sellAmount > owned.amount) {
-      _lastAlertMessage = 'Ungültige Verkaufsmenge oder Position nicht mehr verfügbar.';
+      _lastAlertMessage =
+          'Ungültige Verkaufsmenge oder Position nicht mehr verfügbar.';
       notifyListeners();
       return false;
     }
@@ -820,11 +977,19 @@ class PortfolioProvider extends ChangeNotifier {
       (a) => a.id == position.assetId || a.symbol == position.symbol,
     );
     if (matchingAssets.isEmpty) {
-      _lastAlertMessage = 'Asset ${position.symbol} nicht im Marktverzeichnis gefunden!';
+      _lastAlertMessage =
+          'Asset ${position.symbol} nicht im Marktverzeichnis gefunden!';
       notifyListeners();
       return false;
     }
     final asset = matchingAssets.first;
+
+    if (!asset.currentPrice.isFinite || asset.currentPrice <= 0) {
+      _lastAlertMessage = 'Ungültiger Verkaufskurs.';
+      notifyListeners();
+      return false;
+    }
+    position = position.copyWith(currentPrice: asset.currentPrice);
 
     final isOpen = isAssetMarketOpen(asset);
 
@@ -845,11 +1010,22 @@ class PortfolioProvider extends ChangeNotifier {
     if (_isRealisticOrderDelay) {
       String venue = 'Wiener Börse (WBAG)';
       final sym = asset.symbol.toUpperCase();
-      if (sym.endsWith('.VI') || sym == 'EBS' || sym == 'OMV' || sym == 'VOE' || sym == 'ANDR') {
+      if (sym.endsWith('.VI') ||
+          sym == 'EBS' ||
+          sym == 'OMV' ||
+          sym == 'VOE' ||
+          sym == 'ANDR') {
         venue = 'Wiener Börse (WBAG)';
-      } else if (sym.endsWith('.DE') || sym.endsWith('.AS') || sym == 'BMW' || sym == 'SAP' || sym == 'ASML') {
+      } else if (sym.endsWith('.DE') ||
+          sym.endsWith('.AS') ||
+          sym == 'BMW' ||
+          sym == 'SAP' ||
+          sym == 'ASML') {
         venue = 'Deutsche Börse XETRA';
-      } else if (sym.contains('BTC') || sym.contains('ETH') || sym.contains('SOL') || sym.contains('NEAR')) {
+      } else if (sym.contains('BTC') ||
+          sym.contains('ETH') ||
+          sym.contains('SOL') ||
+          sym.contains('NEAR')) {
         venue = 'Crypto Liquidity Pool';
       } else if (sym.contains('=F')) {
         venue = 'CME Globex';
@@ -870,7 +1046,9 @@ class PortfolioProvider extends ChangeNotifier {
           final remainingRatio = remainingAmount / position.amount;
           _positions[posIdx] = position.copyWith(
             amount: remainingAmount,
-            collateral: position.isLeveraged ? (position.collateral * remainingRatio) : null,
+            collateral: position.isLeveraged
+                ? (position.collateral * remainingRatio)
+                : null,
           );
         }
       }
@@ -912,7 +1090,8 @@ class PortfolioProvider extends ChangeNotifier {
 
     if (!position.isLeveraged) {
       cashReturn = sellAmount * asset.currentPrice;
-      realizedPnL = (asset.currentPrice - position.averageBuyPrice) * sellAmount;
+      realizedPnL =
+          (asset.currentPrice - position.averageBuyPrice) * sellAmount;
     } else {
       final portionCollateral = position.collateral * ratio;
       final portionPnL = position.unrealizedPnL * ratio;
@@ -933,7 +1112,9 @@ class PortfolioProvider extends ChangeNotifier {
         _positions[index] = position.copyWith(
           amount: remainingAmount,
           currentPrice: asset.currentPrice,
-          collateral: position.isLeveraged ? (position.collateral * remainingRatio) : null,
+          collateral: position.isLeveraged
+              ? (position.collateral * remainingRatio)
+              : null,
         );
       }
     }
@@ -951,7 +1132,8 @@ class PortfolioProvider extends ChangeNotifier {
       totalAmount: cashReturn,
       realizedPnL: realizedPnL,
       timestamp: DateTime.now(),
-      note: 'Verkauf Realisiert: ${realizedPnL >= 0 ? "+" : ""}${realizedPnL.toStringAsFixed(2)} €',
+      note:
+          'Verkauf Realisiert: ${realizedPnL >= 0 ? "+" : ""}${realizedPnL.toStringAsFixed(2)} €',
     );
 
     _transactions.insert(0, record);
@@ -973,52 +1155,96 @@ class PortfolioProvider extends ChangeNotifier {
   }
 
   /// Prüft bei Marktöffnung und Ablauf der Ausführungszeit (5-15 Min.), ob anstehende Orders ausgeführt werden
-  void _checkAndExecutePendingOrders() {
-    bool changes = false;
-    final now = DateTime.now();
+  bool _executingPendingOrders = false;
+  Future<void> _checkAndExecutePendingOrders() async {
+    if (_isLoading || _executingPendingOrders) return;
+    _executingPendingOrders = true;
+    try {
+      bool changes = false;
+      final now = DateTime.now();
 
-    for (final order in _pendingOrders) {
-      if (order.status != PendingOrderStatus.pending) continue;
+      for (final order in _pendingOrders) {
+        if (order.status != PendingOrderStatus.pending) continue;
 
-      final matchingAssets = _assets.where(
-        (a) => a.id == order.assetId || a.symbol == order.symbol,
-      );
-      if (matchingAssets.isEmpty) continue;
-      final matchingAsset = matchingAssets.first;
+        final matchingAssets = _assets.where(
+          (a) => a.id == order.assetId || a.symbol == order.symbol,
+        );
+        if (matchingAssets.isEmpty) continue;
+        final matchingAsset = matchingAssets.first;
 
-      // Börsenöffnungszeiten prüfen
-      if (!isAssetMarketOpen(matchingAsset)) continue;
+        if (!matchingAsset.currentPrice.isFinite ||
+            matchingAsset.currentPrice <= 0) {
+          continue;
+        }
 
-      // Realistische Verzögerung prüfen (5-15 Minuten)
-      if (order.scheduledExecutionTime != null && now.isBefore(order.scheduledExecutionTime!)) {
-        continue;
-      }
+        // Börsenöffnungszeiten prüfen
+        if (!isAssetMarketOpen(matchingAsset)) continue;
 
-      // Order ausführen
-      order.status = PendingOrderStatus.executed;
-      order.executedAt = now;
-      order.executedPrice = matchingAsset.currentPrice;
-      changes = true;
+        // Realistische Verzögerung prüfen (5-15 Minuten)
+        if (order.scheduledExecutionTime != null &&
+            now.isBefore(order.scheduledExecutionTime!)) {
+          continue;
+        }
 
-      if (order.isBuy) {
-        // Kauf-Order abwickeln
-        final buyPrice = order.averageBuyPrice ?? order.estimatedPrice;
-        if (order.leverage == 1 && !order.isShort) {
-          final existingIndex = _positions.indexWhere(
-            (p) => p.assetId == matchingAsset.id && !p.isLeveraged && !p.isShort,
-          );
-          if (existingIndex != -1) {
-            final existing = _positions[existingIndex];
-            final newTotalAmount = existing.amount + order.amount;
-            final newAvgPrice = ((existing.amount * existing.averageBuyPrice) +
-                    (order.amount * buyPrice)) /
-                newTotalAmount;
-            _positions[existingIndex] = existing.copyWith(
-              amount: newTotalAmount,
-              averageBuyPrice: newAvgPrice,
-              currentPrice: matchingAsset.currentPrice,
+        if (matchingAsset.type == AssetType.bond && order.isBuy) {
+          await _checkBondsCouponPayout(force: true);
+          if (order.status != PendingOrderStatus.pending) continue;
+        }
+        final fillAmount = order.isBuy
+            ? TradingFeeService.maximumBuyAmount(
+                asset: matchingAsset,
+                cash: order.totalEstimatedCost,
+                leverage: order.leverage,
+              )
+            : order.amount;
+        if (!fillAmount.isFinite || fillAmount <= 0) continue;
+        // Pending purchases execute the reserved budget at the execution quote.
+        order.amount = fillAmount;
+        // Order ausführen
+        order.status = PendingOrderStatus.executed;
+        order.executedAt = now;
+        order.executedPrice = matchingAsset.currentPrice;
+        changes = true;
+
+        if (order.isBuy) {
+          // Kauf-Order abwickeln
+          final buyPrice = matchingAsset.currentPrice;
+          if (order.leverage == 1 && !order.isShort) {
+            final existingIndex = _positions.indexWhere(
+              (p) =>
+                  p.assetId == matchingAsset.id && !p.isLeveraged && !p.isShort,
             );
+            if (existingIndex != -1) {
+              final existing = _positions[existingIndex];
+              final newTotalAmount = existing.amount + order.amount;
+              final newAvgPrice =
+                  ((existing.amount * existing.averageBuyPrice) +
+                      (order.amount * buyPrice)) /
+                  newTotalAmount;
+              _positions[existingIndex] = existing.copyWith(
+                amount: newTotalAmount,
+                averageBuyPrice: newAvgPrice,
+                currentPrice: matchingAsset.currentPrice,
+              );
+            } else {
+              _positions.add(
+                Position(
+                  id: _uuid.v4(),
+                  assetId: matchingAsset.id,
+                  symbol: matchingAsset.symbol,
+                  name: matchingAsset.name,
+                  type: matchingAsset.type,
+                  amount: order.amount,
+                  averageBuyPrice: buyPrice,
+                  currentPrice: matchingAsset.currentPrice,
+                  leverage: 1,
+                  isShort: false,
+                ),
+              );
+            }
           } else {
+            final effectiveCollateral =
+                (order.amount * buyPrice) / order.leverage;
             _positions.add(
               Position(
                 id: _uuid.v4(),
@@ -1029,116 +1255,117 @@ class PortfolioProvider extends ChangeNotifier {
                 amount: order.amount,
                 averageBuyPrice: buyPrice,
                 currentPrice: matchingAsset.currentPrice,
-                leverage: 1,
-                isShort: false,
+                leverage: order.leverage,
+                isShort: order.isShort,
+                collateral: effectiveCollateral,
               ),
             );
           }
-        } else {
-          final effectiveCollateral = order.collateral ?? ((order.amount * buyPrice) / order.leverage);
-          _positions.add(
-            Position(
-              id: _uuid.v4(),
-              assetId: matchingAsset.id,
-              symbol: matchingAsset.symbol,
-              name: matchingAsset.name,
-              type: matchingAsset.type,
-              amount: order.amount,
-              averageBuyPrice: buyPrice,
-              currentPrice: matchingAsset.currentPrice,
-              leverage: order.leverage,
-              isShort: order.isShort,
-              collateral: effectiveCollateral,
-            ),
+
+          final record = TransactionRecord(
+            id: _uuid.v4(),
+            symbol: matchingAsset.symbol,
+            name: matchingAsset.name,
+            type: TransactionType.buy,
+            amount: order.amount,
+            price: matchingAsset.currentPrice,
+            totalAmount: order.totalEstimatedCost,
+            timestamp: now,
+            note:
+                'Börsen-Kauf ausgeführt (${order.brokerVenue ?? "Orderbuch"})',
           );
-        }
+          _transactions.insert(0, record);
+          repository.saveTransaction(record);
 
-        final record = TransactionRecord(
-          id: _uuid.v4(),
-          symbol: matchingAsset.symbol,
-          name: matchingAsset.name,
-          type: TransactionType.buy,
-          amount: order.amount,
-          price: matchingAsset.currentPrice,
-          totalAmount: order.totalEstimatedCost,
-          timestamp: now,
-          note: 'Börsen-Kauf ausgeführt (${order.brokerVenue ?? "Orderbuch"})',
-        );
-        _transactions.insert(0, record);
-        repository.saveTransaction(record);
-
-        _lastAlertMessage =
-            '✅ KAUF AUSGEFÜHRT: ${order.amount.toStringAsFixed(2)}x ${matchingAsset.symbol} @ ${matchingAsset.currentPrice.toStringAsFixed(2)} € eingebucht!';
-      } else {
-        // Verkaufs-Order abwickeln
-        double cashReturn = 0.0;
-        double realizedPnL = 0.0;
-
-        if (order.leverage > 1 || order.isShort) {
-          final effLeverage = order.leverage > 1 ? order.leverage : 1;
-          final portionCollateral = order.collateral ??
-              ((order.amount * (order.averageBuyPrice ?? order.estimatedPrice)) / effLeverage);
-          final currentVal = order.amount * matchingAsset.currentPrice;
-          final entryVal = order.amount * (order.averageBuyPrice ?? order.estimatedPrice);
-          final portionPnL = order.isShort ? (entryVal - currentVal) : (currentVal - entryVal);
-          cashReturn = (portionCollateral + portionPnL).clamp(0.0, double.infinity);
-          realizedPnL = portionPnL;
+          _lastAlertMessage =
+              '✅ KAUF AUSGEFÜHRT: ${order.amount.toStringAsFixed(2)}x ${matchingAsset.symbol} @ ${matchingAsset.currentPrice.toStringAsFixed(2)} € eingebucht!';
         } else {
-          cashReturn = order.amount * matchingAsset.currentPrice;
-          realizedPnL = (matchingAsset.currentPrice - (order.averageBuyPrice ?? order.estimatedPrice)) * order.amount;
+          // Verkaufs-Order abwickeln
+          double cashReturn = 0.0;
+          double realizedPnL = 0.0;
+
+          if (order.leverage > 1 || order.isShort) {
+            final effLeverage = order.leverage > 1 ? order.leverage : 1;
+            final portionCollateral =
+                order.collateral ??
+                ((order.amount *
+                        (order.averageBuyPrice ?? order.estimatedPrice)) /
+                    effLeverage);
+            final currentVal = order.amount * matchingAsset.currentPrice;
+            final entryVal =
+                order.amount * (order.averageBuyPrice ?? order.estimatedPrice);
+            final portionPnL = order.isShort
+                ? (entryVal - currentVal)
+                : (currentVal - entryVal);
+            cashReturn = (portionCollateral + portionPnL).clamp(
+              0.0,
+              double.infinity,
+            );
+            realizedPnL = portionPnL;
+          } else {
+            cashReturn = order.amount * matchingAsset.currentPrice;
+            realizedPnL =
+                (matchingAsset.currentPrice -
+                    (order.averageBuyPrice ?? order.estimatedPrice)) *
+                order.amount;
+          }
+
+          _cash += cashReturn;
+          repository.saveCashBalance(_cash);
+
+          final record = TransactionRecord(
+            id: _uuid.v4(),
+            symbol: matchingAsset.symbol,
+            name: matchingAsset.name,
+            type: TransactionType.sell,
+            amount: order.amount,
+            price: matchingAsset.currentPrice,
+            totalAmount: cashReturn,
+            realizedPnL: realizedPnL,
+            timestamp: now,
+            note:
+                'Börsen-Verkauf ausgeführt (${order.brokerVenue ?? "Orderbuch"})',
+          );
+          _transactions.insert(0, record);
+          repository.saveTransaction(record);
+
+          questService.recordTrade(
+            tradeAmount: cashReturn,
+            isCommodity: matchingAsset.type == AssetType.commodity,
+            leverage: order.leverage,
+            profit: realizedPnL,
+            totalPositionsCount: _positions.length,
+          );
+
+          _lastAlertMessage =
+              '✅ VERKAUF AUSGEFÜHRT: ${order.amount.toStringAsFixed(2)}x ${matchingAsset.symbol} für ${cashReturn.toStringAsFixed(2)} € abgerechnet!';
         }
-
-        _cash += cashReturn;
-        repository.saveCashBalance(_cash);
-
-        final record = TransactionRecord(
-          id: _uuid.v4(),
-          symbol: matchingAsset.symbol,
-          name: matchingAsset.name,
-          type: TransactionType.sell,
-          amount: order.amount,
-          price: matchingAsset.currentPrice,
-          totalAmount: cashReturn,
-          realizedPnL: realizedPnL,
-          timestamp: now,
-          note: 'Börsen-Verkauf ausgeführt (${order.brokerVenue ?? "Orderbuch"})',
-        );
-        _transactions.insert(0, record);
-        repository.saveTransaction(record);
-
-        questService.recordTrade(
-          tradeAmount: cashReturn,
-          isCommodity: matchingAsset.type == AssetType.commodity,
-          leverage: order.leverage,
-          profit: realizedPnL,
-          totalPositionsCount: _positions.length,
-        );
-
-        _lastAlertMessage =
-            '✅ VERKAUF AUSGEFÜHRT: ${order.amount.toStringAsFixed(2)}x ${matchingAsset.symbol} für ${cashReturn.toStringAsFixed(2)} € abgerechnet!';
       }
-    }
 
-    if (changes) {
-      repository.savePendingOrders(_pendingOrders);
-      repository.savePositions(_positions);
-      _checkAllAchievements();
-      _updateLeaderboard(forceCloud: true);
-      notifyListeners();
-    }
+      if (changes) {
+        repository.savePendingOrders(_pendingOrders);
+        repository.savePositions(_positions);
+        _checkAllAchievements();
+        _updateLeaderboard(forceCloud: true);
+        notifyListeners();
+      }
 
-    _checkSavingsPlans();
+      _checkSavingsPlans();
+    } finally {
+      _executingPendingOrders = false;
+    }
   }
 
   /// Führt fällige Sparpläne automatisch aus
   Future<void> _checkSavingsPlans() async {
     final due = savingsPlanService.getDuePlans();
     for (final plan in due) {
-      final matchingAssets = _assets.where(
-        (a) => a.symbol == plan.assetSymbol,
-      );
+      final matchingAssets = _assets.where((a) => a.symbol == plan.assetSymbol);
       if (matchingAssets.isEmpty) continue;
       final asset = matchingAssets.first;
+      if (asset.type == AssetType.bond) {
+        await _checkBondsCouponPayout(force: true);
+      }
       if (_cash >= plan.amountEur && asset.currentPrice > 0) {
         final shares = plan.amountEur / asset.currentPrice;
         _cash -= plan.amountEur;
@@ -1150,7 +1377,8 @@ class PortfolioProvider extends ChangeNotifier {
         if (existingIndex != -1) {
           final existing = _positions[existingIndex];
           final newTotalAmount = existing.amount + shares;
-          final newAvgPrice = ((existing.amount * existing.averageBuyPrice) +
+          final newAvgPrice =
+              ((existing.amount * existing.averageBuyPrice) +
                   (shares * asset.currentPrice)) /
               newTotalAmount;
           _positions[existingIndex] = existing.copyWith(
@@ -1190,7 +1418,8 @@ class PortfolioProvider extends ChangeNotifier {
         _transactions.insert(0, record);
         await repository.saveTransaction(record);
         await savingsPlanService.markExecuted(plan.id, plan.amountEur);
-        _lastAlertMessage = '🏦 Sparplan ausgeführt: ${plan.amountEur.toStringAsFixed(2)} € in ${plan.assetSymbol} investiert!';
+        _lastAlertMessage =
+            '🏦 Sparplan ausgeführt: ${plan.amountEur.toStringAsFixed(2)} € in ${plan.assetSymbol} investiert!';
         notifyListeners();
       }
     }
@@ -1200,20 +1429,28 @@ class PortfolioProvider extends ChangeNotifier {
   Future<void> cancelPendingOrder(PendingOrder order) async {
     if (order.status != PendingOrderStatus.pending) return;
 
+    if (!order.isBuy && order.assetType == AssetType.bond) {
+      await _checkBondsCouponPayout(force: true);
+      if (order.status != PendingOrderStatus.pending) return;
+    }
     order.status = PendingOrderStatus.cancelled;
     if (order.isBuy) {
       _cash += order.totalEstimatedCost; // Geld zurückerstatten
       await repository.saveCashBalance(_cash);
     } else {
       // Verkaufsmenge zurück in Depotposition einbuchen
-      final idx = _positions.indexWhere((p) =>
-          (p.assetId == order.assetId || p.symbol == order.symbol) &&
-          p.leverage == order.leverage &&
-          p.isShort == order.isShort);
+      final idx = _positions.indexWhere(
+        (p) =>
+            (p.assetId == order.assetId || p.symbol == order.symbol) &&
+            p.leverage == order.leverage &&
+            p.isShort == order.isShort,
+      );
       if (idx != -1) {
         _positions[idx] = _positions[idx].copyWith(
           amount: _positions[idx].amount + order.amount,
-          collateral: order.collateral != null ? (_positions[idx].collateral + order.collateral!) : _positions[idx].collateral,
+          collateral: order.collateral != null
+              ? (_positions[idx].collateral + order.collateral!)
+              : _positions[idx].collateral,
         );
       } else {
         _positions.add(
@@ -1248,7 +1485,9 @@ class PortfolioProvider extends ChangeNotifier {
     buffer.writeln('====================================================');
     buffer.writeln('           TRADING GAME – DEPOTAUSZUG               ');
     buffer.writeln('====================================================');
-    buffer.writeln('Erstellungsdatum: ${now.toIso8601String().substring(0, 16)}');
+    buffer.writeln(
+      'Erstellungsdatum: ${now.toIso8601String().substring(0, 16)}',
+    );
     buffer.writeln('Depot-Inhaber:    Aktiver Händler');
     buffer.writeln('Währung:          EUR (€)');
     buffer.writeln('----------------------------------------------------');
@@ -1257,14 +1496,18 @@ class PortfolioProvider extends ChangeNotifier {
     buffer.writeln('Freies Barmittel: ${_cash.toStringAsFixed(2)} €');
     buffer.writeln('Positionswert:    ${totalInvested.toStringAsFixed(2)} €');
     buffer.writeln('Kreditbestand:    ${totalDebt.toStringAsFixed(2)} €');
-    buffer.writeln('Realisierte G/V:  ${totalRealizedPnL.toStringAsFixed(2)} €');
+    buffer.writeln(
+      'Realisierte G/V:  ${totalRealizedPnL.toStringAsFixed(2)} €',
+    );
     buffer.writeln('----------------------------------------------------');
     buffer.writeln('DEPOTBESTAND:');
     if (_positions.isEmpty) {
       buffer.writeln('Keine offenen Wertpapierpositionen.');
     } else {
       for (final p in _positions) {
-        buffer.writeln('- ${p.symbol} (${p.name}): ${p.amount} Stk. @ ${p.averageBuyPrice.toStringAsFixed(2)} € (Wert: ${(p.amount * p.currentPrice).toStringAsFixed(2)} €)');
+        buffer.writeln(
+          '- ${p.symbol} (${p.name}): ${p.amount} Stk. @ ${p.averageBuyPrice.toStringAsFixed(2)} € (Wert: ${(p.amount * p.currentPrice).toStringAsFixed(2)} €)',
+        );
       }
     }
     buffer.writeln('----------------------------------------------------');
@@ -1274,7 +1517,9 @@ class PortfolioProvider extends ChangeNotifier {
       buffer.writeln('Keine Transaktionen verbucht.');
     } else {
       for (final t in recent) {
-        buffer.writeln('[${t.timestamp.toIso8601String().substring(0, 10)}] ${t.type.displayName.toUpperCase()}: ${t.amount}x ${t.symbol} @ ${t.price.toStringAsFixed(2)} € = ${t.totalAmount.toStringAsFixed(2)} €');
+        buffer.writeln(
+          '[${t.timestamp.toIso8601String().substring(0, 10)}] ${t.type.displayName.toUpperCase()}: ${t.amount}x ${t.symbol} @ ${t.price.toStringAsFixed(2)} € = ${t.totalAmount.toStringAsFixed(2)} €',
+        );
       }
     }
     buffer.writeln('====================================================');
@@ -1284,43 +1529,76 @@ class PortfolioProvider extends ChangeNotifier {
   }
 
   // --- ANLEIHEN KUPON-AUSSCHÜTTUNG ---
-  int _ticksCount = 0;
-  void _checkBondsCouponPayout() {
-    _ticksCount++;
-    // Alle 20 Ticks (~50 Sekunden) wird ein anteiliger Zinskupon gutgeschrieben
-    if (_ticksCount % 20 != 0) return;
+  Future<void> _couponSettlement = Future<void>.value();
 
-    double totalCouponPaid = 0.0;
-    for (final pos in _positions) {
-      if (pos.type == AssetType.bond) {
-        final matchingAssets = _assets.where((a) => a.id == pos.assetId || a.symbol == pos.symbol);
-        if (matchingAssets.isEmpty) continue;
-        final asset = matchingAssets.first;
-        final rate = asset.couponRate ?? 0.035;
-        // Simulierte anteilige Ausschüttung
-        final payout = (pos.amount * pos.currentPrice) * (rate / 365 * 10);
-        if (payout > 0.01) {
-          totalCouponPaid += payout;
-          final record = TransactionRecord(
-            id: _uuid.v4(),
-            symbol: pos.symbol,
-            name: pos.name,
-            type: TransactionType.couponPayout,
-            amount: 1,
-            price: payout,
-            totalAmount: payout,
-            timestamp: DateTime.now(),
-            note: 'Zinskupon ${(rate * 100).toStringAsFixed(1)}% p.a.',
-          );
-          _transactions.insert(0, record);
-          repository.saveTransaction(record);
+  Future<void> _checkBondsCouponPayout({bool force = false}) {
+    // Serialize tick and trade settlements so they cannot credit the same span.
+    final settlement = _couponSettlement.then((_) => _settleBondCoupons(force));
+    _couponSettlement = settlement.catchError((Object error) {
+      debugPrint('Kupon-Abrechnung fehlgeschlagen: $error');
+    });
+    return settlement;
+  }
+
+  Future<void> _settleBondCoupons(bool force) async {
+    final profileId = repository is LocalTradingRepository
+        ? (repository as LocalTradingRepository).userId
+        : _activeUid;
+    final prefs = await SharedPreferences.getInstance();
+    final currentProfileId = repository is LocalTradingRepository
+        ? (repository as LocalTradingRepository).userId
+        : _activeUid;
+    if (_isLoading || profileId != currentProfileId) return;
+    final now = DateTime.now();
+    double totalCouponPaid = 0;
+    for (final pos in List<Position>.of(_positions)) {
+      if (pos.type != AssetType.bond || pos.isLeveraged || pos.isShort) continue;
+      final asset = _assets.where((a) => a.id == pos.assetId).firstOrNull;
+      if (asset == null) continue;
+      final key =
+          'tg_coupon_cursor_${Uri.encodeComponent(profileId)}_${pos.id}';
+      final savedThrough = DateTime.tryParse(prefs.getString(key) ?? '');
+      var paidThrough = savedThrough ?? pos.openedAt;
+      if (savedThrough == null) {
+        // Preserve the last pre-migration payout without relying on history later.
+        for (final transaction in _transactions) {
+          if (transaction.type == TransactionType.couponPayout &&
+              transaction.symbol == pos.symbol &&
+              transaction.timestamp.isAfter(paidThrough)) {
+            paidThrough = transaction.timestamp;
+          }
         }
       }
+      final rate = asset.couponRate ?? 0.035;
+      final payout = BondCouponService.accrued(
+        position: pos,
+        annualRate: rate,
+        paidThrough: paidThrough,
+        now: now,
+      );
+      // Keep sub-cent interest accrued until payout or a holding change.
+      if (!force && payout < 0.01) continue;
+      if (now.isBefore(paidThrough)) continue;
+      await prefs.setString(key, now.toIso8601String());
+      if (payout <= 0) continue;
+      _cash += payout;
+      totalCouponPaid += payout;
+      final record = TransactionRecord(
+        id: _uuid.v4(),
+        symbol: pos.symbol,
+        name: pos.name,
+        type: TransactionType.couponPayout,
+        amount: 1,
+        price: payout,
+        totalAmount: payout,
+        timestamp: now,
+        note: 'Zinskupon ${(rate * 100).toStringAsFixed(1)}% p.a. [${pos.id}]',
+      );
+      _transactions.insert(0, record);
+      await repository.saveCashBalance(_cash);
+      await repository.saveTransaction(record);
     }
-
     if (totalCouponPaid > 0) {
-      _cash += totalCouponPaid;
-      repository.saveCashBalance(_cash);
       _lastAlertMessage =
           '💰 Kupon-Gutschrift! Du hast ${totalCouponPaid.toStringAsFixed(2)} € Zinsen auf deine Anleihen erhalten.';
     }
@@ -1355,7 +1633,8 @@ class PortfolioProvider extends ChangeNotifier {
     _transactions.insert(0, record);
     await repository.saveTransaction(record);
 
-    _lastAlertMessage = '🎉 Glückwunsch! Du hast ${item.name} erworben. Dein Prestige steigt!';
+    _lastAlertMessage =
+        '🎉 Glückwunsch! Du hast ${item.name} erworben. Dein Prestige steigt!';
     _updateLeaderboard(forceCloud: true);
     notifyListeners();
     return true;
@@ -1364,8 +1643,10 @@ class PortfolioProvider extends ChangeNotifier {
   // --- KREDIT & SCHULDEN SYSTEM ---
   Future<void> declareInsolvency() async {
     _isInsolvent = true;
-    _insolvencyLockoutUntil = DateTime.now().add(const Duration(days: 5)); // 5 echte Tage = 120h
-    
+    _insolvencyLockoutUntil = DateTime.now().add(
+      const Duration(days: 5),
+    ); // 5 echte Tage = 120h
+
     // Notverkauf aller Positionen
     for (final pos in List<Position>.from(_positions)) {
       final recoveryCash = pos.currentValue * 0.8;
@@ -1414,7 +1695,8 @@ class PortfolioProvider extends ChangeNotifier {
     _transactions.insert(0, record);
     await repository.saveTransaction(record);
 
-    _lastAlertMessage = '🚨 PRIVATINSOLVENZ ANGEMELDET! 5 Tage Kreditsperre aktiv.';
+    _lastAlertMessage =
+        '🚨 PRIVATINSOLVENZ ANGEMELDET! 5 Tage Kreditsperre aktiv.';
     _updateLeaderboard(forceCloud: true);
     notifyListeners();
   }
@@ -1423,15 +1705,21 @@ class PortfolioProvider extends ChangeNotifier {
     required double principal,
     required int durationDays,
   }) async {
-    if (!principal.isFinite || principal <= 0 || durationDays <= 0 || durationDays > 365) {
+    if (!principal.isFinite ||
+        principal <= 0 ||
+        durationDays <= 0 ||
+        durationDays > 365) {
       _lastAlertMessage = 'Kreditbetrag und Laufzeit sind ungültig.';
       notifyListeners();
       return false;
     }
     // Erste Kreditaufnahme ist bankenseitig auf maximal 25.000 € gedeckelt
-    final previousBankLoans = _transactions.where((t) => t.type == TransactionType.loanPayout);
+    final previousBankLoans = _transactions.where(
+      (t) => t.type == TransactionType.loanPayout,
+    );
     if (previousBankLoans.isEmpty && principal > 25000.0) {
-      _lastAlertMessage = '⚠️ Der erste Bankkredit ist bankenseitig auf maximal 25.000 € begrenzt!';
+      _lastAlertMessage =
+          '⚠️ Der erste Bankkredit ist bankenseitig auf maximal 25.000 € begrenzt!';
       notifyListeners();
       return false;
     }
@@ -1450,7 +1738,8 @@ class PortfolioProvider extends ChangeNotifier {
         _lastAlertMessage =
             '⏳ Kredit-Abkühlphase: Nach jedem Kredit gilt eine 24-Stunden-Sperre (noch ${rem.inHours}h ${rem.inMinutes % 60}m)!';
       } else {
-        _lastAlertMessage = '⚠️ Du hast bereits einen aktiven Bankkredit! Tilge diesen zuerst ab.';
+        _lastAlertMessage =
+            '⚠️ Du hast bereits einen aktiven Bankkredit! Tilge diesen zuerst ab.';
       }
       notifyListeners();
       return false;
@@ -1498,7 +1787,8 @@ class PortfolioProvider extends ChangeNotifier {
       price: principal,
       totalAmount: principal,
       timestamp: now,
-      note: '${principal.toStringAsFixed(0)} € zu ${(rating.baseInterestRate * 100).toStringAsFixed(1)}% p.a. ($durationDays Tage)',
+      note:
+          '${principal.toStringAsFixed(0)} € zu ${(rating.baseInterestRate * 100).toStringAsFixed(1)}% p.a. ($durationDays Tage)',
     );
 
     _transactions.insert(0, record);
@@ -1512,14 +1802,18 @@ class PortfolioProvider extends ChangeNotifier {
     return true;
   }
 
-  bool get canTakeRecoveryLoan => _isInsolvent &&
-      _insolvencyLockoutUntil != null && !isUnderCreditLockout && !isLoanOnCooldown &&
+  bool get canTakeRecoveryLoan =>
+      _isInsolvent &&
+      _insolvencyLockoutUntil != null &&
+      !isUnderCreditLockout &&
+      !isLoanOnCooldown &&
       !activeLoans.any((l) => l.id.startsWith('sanierung_loan_'));
 
   /// Einmaliger Neustart nach Ablauf der Insolvenz-Kreditsperre.
   Future<bool> takeSanierungsKredit() async {
     if (!canTakeRecoveryLoan) {
-      _lastAlertMessage = 'Sanierungskredit erst nach Insolvenz und Ablauf der Kreditsperre verfügbar.';
+      _lastAlertMessage =
+          'Sanierungskredit erst nach Insolvenz und Ablauf der Kreditsperre verfügbar.';
       notifyListeners();
       return false;
     }
@@ -1547,7 +1841,8 @@ class PortfolioProvider extends ChangeNotifier {
       price: loan.principal,
       totalAmount: loan.principal,
       timestamp: DateTime.now(),
-      note: '10.000 € Sanierungskredit (12% p.a., 90 Tage) – Sofortiger Neustart nach Insolvenz!',
+      note:
+          '10.000 € Sanierungskredit (12% p.a., 90 Tage) – Sofortiger Neustart nach Insolvenz!',
     );
 
     _transactions.insert(0, record);
@@ -1562,11 +1857,15 @@ class PortfolioProvider extends ChangeNotifier {
   }
 
   Future<bool> repayLoan(Loan loan, double amount) async {
-    if (!amount.isFinite || amount <= 0 || loan.isPaid ||
+    if (!amount.isFinite ||
+        amount <= 0 ||
+        loan.isPaid ||
         !_loans.any((l) => identical(l, loan))) {
       return false;
     }
-    final actualRepay = amount > loan.remainingDebt ? loan.remainingDebt : amount;
+    final actualRepay = amount > loan.remainingDebt
+        ? loan.remainingDebt
+        : amount;
     if (actualRepay <= 0) return false;
 
     if (_cash < actualRepay) {
@@ -1596,7 +1895,8 @@ class PortfolioProvider extends ChangeNotifier {
       price: actualRepay,
       totalAmount: actualRepay,
       timestamp: DateTime.now(),
-      note: 'Tilgung: -${actualRepay.toStringAsFixed(2)} € (Restschuld: ${loan.remainingDebt.toStringAsFixed(2)} €)',
+      note:
+          'Tilgung: -${actualRepay.toStringAsFixed(2)} € (Restschuld: ${loan.remainingDebt.toStringAsFixed(2)} €)',
     );
 
     _transactions.insert(0, record);
@@ -1612,7 +1912,11 @@ class PortfolioProvider extends ChangeNotifier {
 
   // --- LEADERBOARD SYNCHRONISATION ---
   void _updateLeaderboard({bool forceCloud = false}) {
-    final luxuryCount = _luxuryItems.fold<int>(0, (sum, i) => sum + i.ownedCount);
+    if (_isLoading) return;
+    final luxuryCount = _luxuryItems.fold<int>(
+      0,
+      (sum, i) => sum + i.ownedCount,
+    );
 
     String myUid = 'player_user';
     String myName = 'Börsen-Profi';
@@ -1620,7 +1924,8 @@ class PortfolioProvider extends ChangeNotifier {
       final fbUser = FirebaseAuth.instance.currentUser;
       if (fbUser != null && fbUser.uid.isNotEmpty) {
         myUid = fbUser.uid;
-        if (fbUser.displayName != null && fbUser.displayName!.trim().isNotEmpty) {
+        if (fbUser.displayName != null &&
+            fbUser.displayName!.trim().isNotEmpty) {
           myName = fbUser.displayName!.trim();
         } else if (fbUser.email != null && fbUser.email!.isNotEmpty) {
           myName = fbUser.email!.split('@').first;
@@ -1630,21 +1935,27 @@ class PortfolioProvider extends ChangeNotifier {
       }
     } catch (_) {}
 
+    if (_playerProfile?.uid == myUid) myName = _playerProfile!.displayName;
+
     final playerEntry = LeaderboardEntry(
       id: myUid,
       name: 'Du ($myName)',
-      city: 'Wien / Österreich',
+      city: _playerProfile?.uid == myUid ? playerCountry : 'Land nicht gewählt',
       title: currentRank.title,
       badge: currentRank.badge,
       avatarEmoji: '😎',
-      strategy: positions.isEmpty ? 'Cash & Multi-Asset' : '${positions.first.symbol} & Momentum',
+      strategy: positions.isEmpty
+          ? 'Cash & Multi-Asset'
+          : '${positions.first.symbol} & Momentum',
       netWorth: netWorth,
       roiPercent: totalRoiPercent * 100,
       isPlayer: true,
       luxuryCount: luxuryCount,
     );
 
-    final playerEntryIndex = _leaderboard.indexWhere((e) => e.isPlayer || e.id == myUid);
+    final playerEntryIndex = _leaderboard.indexWhere(
+      (e) => e.isPlayer || e.id == myUid,
+    );
     if (playerEntryIndex != -1) {
       _leaderboard[playerEntryIndex] = playerEntry;
     } else {
@@ -1673,7 +1984,8 @@ class PortfolioProvider extends ChangeNotifier {
     questService.claimQuest(questId, (cashReward, prestigeReward) {
       _cash += cashReward;
       repository.saveCashBalance(_cash);
-      _lastAlertMessage = '🎁 Belohnung abgeholt: +${cashReward.toStringAsFixed(0)} € & +$prestigeReward Prestige!';
+      _lastAlertMessage =
+          '🎁 Belohnung abgeholt: +${cashReward.toStringAsFixed(0)} € & +$prestigeReward Prestige!';
       _updateLeaderboard(forceCloud: true);
       notifyListeners();
     });
@@ -1681,7 +1993,9 @@ class PortfolioProvider extends ChangeNotifier {
 
   // --- 2. SOCIAL TRADING & COPY-TRADING ---
   Future<bool> copyTrader(CopyTrader trader, double allocatedAmount) async {
-    if (!allocatedAmount.isFinite || !copyTraders.contains(trader)) return false;
+    if (!allocatedAmount.isFinite || !copyTraders.contains(trader)) {
+      return false;
+    }
     if (_cash < allocatedAmount || allocatedAmount < 500) return false;
 
     _cash -= allocatedAmount;
@@ -1692,15 +2006,15 @@ class PortfolioProvider extends ChangeNotifier {
       final weight = entry.value;
       final sliceAmount = allocatedAmount * weight;
 
-      final matchingAssets = _assets.where(
-        (a) => a.symbol == symbol,
-      );
+      final matchingAssets = _assets.where((a) => a.symbol == symbol);
       if (matchingAssets.isEmpty) continue;
       final asset = matchingAssets.first;
 
       final shares = sliceAmount / asset.currentPrice;
 
-      final existingIndex = _positions.indexWhere((p) => p.symbol == asset.symbol && !p.isLeveraged);
+      final existingIndex = _positions.indexWhere(
+        (p) => p.symbol == asset.symbol && !p.isLeveraged,
+      );
       if (existingIndex != -1) {
         final existing = _positions[existingIndex];
         final totalOld = existing.amount * existing.averageBuyPrice;
@@ -1712,17 +2026,19 @@ class PortfolioProvider extends ChangeNotifier {
           currentPrice: asset.currentPrice,
         );
       } else {
-        _positions.add(Position(
-          id: _uuid.v4(),
-          assetId: asset.id,
-          symbol: asset.symbol,
-          name: asset.name,
-          type: asset.type,
-          amount: shares,
-          averageBuyPrice: asset.currentPrice,
-          currentPrice: asset.currentPrice,
-          openedAt: DateTime.now(),
-        ));
+        _positions.add(
+          Position(
+            id: _uuid.v4(),
+            assetId: asset.id,
+            symbol: asset.symbol,
+            name: asset.name,
+            type: asset.type,
+            amount: shares,
+            averageBuyPrice: asset.currentPrice,
+            currentPrice: asset.currentPrice,
+            openedAt: DateTime.now(),
+          ),
+        );
       }
     }
 
@@ -1741,7 +2057,8 @@ class PortfolioProvider extends ChangeNotifier {
 
     await repository.savePositions(_positions);
     await repository.saveTransaction(record);
-    _lastAlertMessage = '🤝 Du kopierst jetzt ${trader.name} mit ${allocatedAmount.toStringAsFixed(0)} €!';
+    _lastAlertMessage =
+        '🤝 Du kopierst jetzt ${trader.name} mit ${allocatedAmount.toStringAsFixed(0)} €!';
     _updateLeaderboard(forceCloud: true);
     notifyListeners();
     return true;
@@ -1750,9 +2067,13 @@ class PortfolioProvider extends ChangeNotifier {
   // --- 4. DIVIDENDEN & PASSIVES EINKOMMEN ---
   bool get canClaimMonthlyDividends {
     final now = DateTime.now();
-    return monthlyPassiveIncome > 0 && !_transactions.any((t) =>
-        t.type == TransactionType.dividendPayout &&
-        t.timestamp.year == now.year && t.timestamp.month == now.month);
+    return monthlyPassiveIncome > 0 &&
+        !_transactions.any(
+          (t) =>
+              t.type == TransactionType.dividendPayout &&
+              t.timestamp.year == now.year &&
+              t.timestamp.month == now.month,
+        );
   }
 
   void payoutSimulatedDividends() {
@@ -1777,7 +2098,8 @@ class PortfolioProvider extends ChangeNotifier {
     );
     _transactions.insert(0, record);
     repository.saveTransaction(record);
-    _lastAlertMessage = '💵 Dividenden gutgeschrieben: +${payout.toStringAsFixed(2)} €!';
+    _lastAlertMessage =
+        '💵 Dividenden gutgeschrieben: +${payout.toStringAsFixed(2)} €!';
     _updateLeaderboard(forceCloud: true);
     notifyListeners();
   }
@@ -1811,7 +2133,8 @@ class PortfolioProvider extends ChangeNotifier {
     });
 
     if (success) {
-      _lastAlertMessage = '🤖 Neuer Trading-Bot Slot freigeschaltet! Mehr Automatisierung aktiv.';
+      _lastAlertMessage =
+          '🤖 Neuer Trading-Bot Slot freigeschaltet! Mehr Automatisierung aktiv.';
       _checkAllAchievements();
       notifyListeners();
     }
@@ -1837,7 +2160,8 @@ class PortfolioProvider extends ChangeNotifier {
       _lastAlertMessage =
           '🤖 Limit-Order vorgemerkt: ${orderType.displayName} für ${asset.symbol} @ ${targetPrice.toStringAsFixed(2)} €';
     } else {
-      _lastAlertMessage = '⚠️ Kein freier Bot-Slot verfügbar! Schalte weitere Slots frei.';
+      _lastAlertMessage =
+          '⚠️ Kein freier Bot-Slot verfügbar! Schalte weitere Slots frei.';
     }
 
     notifyListeners();
@@ -1870,8 +2194,13 @@ class PortfolioProvider extends ChangeNotifier {
           );
           if (matchingPositions.isNotEmpty) {
             final pos = matchingPositions.first;
-            final sellAmt = order.amount > pos.amount ? pos.amount : order.amount;
-            final success = await executeSell(position: pos, sellAmount: sellAmt);
+            final sellAmt = order.amount > pos.amount
+                ? pos.amount
+                : order.amount;
+            final success = await executeSell(
+              position: pos,
+              sellAmount: sellAmt,
+            );
             if (success) {
               _lastAlertMessage =
                   '🤖 Bot Limit-Verkauf (${order.orderType == AutomationOrderType.takeProfit ? "Take-Profit" : "Stop-Loss"}) ausgeführt: ${sellAmt}x ${order.symbol} @ ${asset.currentPrice.toStringAsFixed(2)} €';
@@ -1889,14 +2218,34 @@ class PortfolioProvider extends ChangeNotifier {
     final playerEntry = _leaderboard.where((e) => e.isPlayer).firstOrNull;
     final hasCompetitors = _leaderboard.any((e) => !e.isPlayer);
     final playerRank = hasCompetitors ? (playerEntry?.rank ?? 0) : 0;
-    final totalTrades = _transactions.where((t) => t.type == TransactionType.buy || t.type == TransactionType.sell).length;
+    final totalTrades = _transactions
+        .where(
+          (t) =>
+              t.type == TransactionType.buy || t.type == TransactionType.sell,
+        )
+        .length;
     final winningStreak = _calculateWinningStreak();
-    final hasWonLeveraged = _transactions.any((t) => (t.note?.contains('Hebel') == true || t.note?.contains('CFD') == true) && (t.realizedPnL ?? 0) > 0);
-    final hasSanierungSettled = _loans.any((l) => l.id.startsWith('sanierung_loan_') && l.isPaid);
-    final hasBotTriggered = automationService.allOrders.any((o) => o.isTriggered);
-    final hasOffMarketCrypto = _transactions.any((t) =>
-        (t.symbol.contains('BTC') || t.symbol.contains('ETH') || t.symbol.contains('SOL')) &&
-        (t.timestamp.hour < 9 || t.timestamp.hour >= 17 || t.timestamp.weekday >= 6));
+    final hasWonLeveraged = _transactions.any(
+      (t) =>
+          (t.note?.contains('Hebel') == true ||
+              t.note?.contains('CFD') == true) &&
+          (t.realizedPnL ?? 0) > 0,
+    );
+    final hasSanierungSettled = _loans.any(
+      (l) => l.id.startsWith('sanierung_loan_') && l.isPaid,
+    );
+    final hasBotTriggered = automationService.allOrders.any(
+      (o) => o.isTriggered,
+    );
+    final hasOffMarketCrypto = _transactions.any(
+      (t) =>
+          (t.symbol.contains('BTC') ||
+              t.symbol.contains('ETH') ||
+              t.symbol.contains('SOL')) &&
+          (t.timestamp.hour < 9 ||
+              t.timestamp.hour >= 17 ||
+              t.timestamp.weekday >= 6),
+    );
 
     achievementService.checkAchievements(
       netWorth: netWorth,
@@ -1906,7 +2255,9 @@ class PortfolioProvider extends ChangeNotifier {
       monthlyPassiveIncome: monthlyPassiveIncome,
       hasDebt: totalDebt > 0,
       ownedLuxuryCount: _luxuryItems.fold(0, (sum, i) => sum + i.ownedCount),
-      hasCopyTrade: _transactions.any((t) => t.note?.contains('Kopiert Portfolio') == true),
+      hasCopyTrade: _transactions.any(
+        (t) => t.note?.contains('Kopiert Portfolio') == true,
+      ),
       hasBotOrderTriggered: hasBotTriggered,
       hasWonHighLeverage: hasWonLeveraged,
       leaderboardRank: playerRank,
@@ -1919,7 +2270,10 @@ class PortfolioProvider extends ChangeNotifier {
   int _calculateWinningStreak() {
     int streak = 0;
     int maxStreak = 0;
-    final sells = _transactions.where((t) => t.type == TransactionType.sell && t.realizedPnL != null).toList().reversed;
+    final sells = _transactions
+        .where((t) => t.type == TransactionType.sell && t.realizedPnL != null)
+        .toList()
+        .reversed;
     for (final t in sells) {
       if (t.realizedPnL! > 0) {
         streak++;

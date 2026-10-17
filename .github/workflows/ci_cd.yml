@@ -39,6 +39,14 @@ jobs:
       - name: Run Tests
         run: flutter test
 
+      - name: Setup Node for quote validation
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Test quote normalization
+        run: node --test functions/market_quotes.test.js
+
   build_web:
     name: 🌐 Build & Deploy Web (Firebase)
     needs: test
