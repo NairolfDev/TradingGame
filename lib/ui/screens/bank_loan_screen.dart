@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import '../widgets/motion_safe.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../data/models/loan_model.dart';
@@ -631,7 +632,7 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                 ),
               ],
             ),
-          ).animate().fadeIn(duration: 400.ms).slideY(begin: 0.1, end: 0),
+          ).motionSafe(context).fadeIn(duration: 400.ms).slideY(begin: 0.1, end: 0),
 
           const SizedBox(height: 20),
 
@@ -844,7 +845,7 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                     ),
                   ],
                 ),
-              ).animate().fadeIn(duration: 350.ms);
+              ).motionSafe(context).fadeIn(duration: 350.ms);
             }),
           ],
 
@@ -1159,7 +1160,7 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                 ),
               ],
             ),
-          ).animate().fadeIn(duration: 400.ms, delay: 100.ms),
+          ).motionSafe(context).fadeIn(duration: 400.ms, delay: 100.ms),
 
           const SizedBox(height: 20),
 

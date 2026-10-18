@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import '../widgets/motion_safe.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../logic/portfolio_provider.dart';
@@ -318,7 +319,7 @@ class DashboardScreen extends StatelessWidget {
                     ],
                   ),
                 ),
-              ).animate().fadeIn(duration: 400.ms, delay: 100.ms),
+              ).motionSafe(context).fadeIn(duration: 400.ms, delay: 100.ms),
 
               const SizedBox(height: 14),
 
