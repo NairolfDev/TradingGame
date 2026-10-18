@@ -80,7 +80,7 @@ class DividendsScreen extends StatelessWidget {
                               'Jährliche Ausschüttung:',
                               style: TextStyle(
                                 color: AppColors.textSecondary,
-                                fontSize: 11,
+                                fontSize: 12,
                               ),
                             ),
                             Text(
@@ -108,7 +108,7 @@ class DividendsScreen extends StatelessWidget {
                               'Monatlicher Cashflow:',
                               style: TextStyle(
                                 color: AppColors.textSecondary,
-                                fontSize: 11,
+                                fontSize: 12,
                               ),
                             ),
                             Text(
@@ -254,7 +254,7 @@ class DividendsScreen extends StatelessWidget {
                               '${item.assetSymbol} • Rendite: ${item.dividendYieldPercent.toStringAsFixed(1)}% p.a.',
                               style: TextStyle(
                                 color: AppColors.textSecondary,
-                                fontSize: 11,
+                                fontSize: 12,
                               ),
                             ),
                           ],
@@ -275,7 +275,7 @@ class DividendsScreen extends StatelessWidget {
                             'Ex-Tag: $dateStr',
                             style: TextStyle(
                               color: AppColors.textSecondary,
-                              fontSize: 10,
+                              fontSize: 12,
                             ),
                           ),
                         ],

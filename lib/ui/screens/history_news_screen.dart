@@ -5,9 +5,12 @@ import '../../core/constants/app_colors.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../data/models/transaction.dart';
 import '../../logic/portfolio_provider.dart';
+import '../widgets/empty_state.dart';
 
 class HistoryNewsScreen extends StatelessWidget {
-  const HistoryNewsScreen({super.key});
+  /// Takes people to the markets from the empty order history.
+  final VoidCallback? onOpenMarkets;
+  const HistoryNewsScreen({super.key, this.onOpenMarkets});
 
   @override
   Widget build(BuildContext context) {
@@ -45,12 +48,11 @@ class HistoryNewsScreen extends StatelessWidget {
     final newsList = provider.newsEvents;
 
     if (newsList.isEmpty) {
-      return Center(
-        child: Text(
-          'Noch keine aktuellen Eilmeldungen.\nNeue Meldungen erscheinen, sobald eine Nachrichtenquelle verfügbar ist.',
-          textAlign: TextAlign.center,
-          style: TextStyle(color: AppColors.textSecondary),
-        ),
+      return const EmptyState(
+        icon: Icons.newspaper,
+        title: 'Noch keine Eilmeldungen',
+        message:
+            'Neue Meldungen erscheinen hier, sobald eine Nachrichtenquelle verfügbar ist.',
       );
     }
 
@@ -94,7 +96,7 @@ class HistoryNewsScreen extends StatelessWidget {
                     child: Text(
                       isBull ? 'BULLISH ↗' : 'BEARISH ↘',
                       style: TextStyle(
-                        fontSize: 10,
+                        fontSize: 12,
                         fontWeight: FontWeight.bold,
                         color: isBull ? AppColors.profit : AppColors.loss,
                       ),
@@ -102,7 +104,7 @@ class HistoryNewsScreen extends StatelessWidget {
                   ),
                   Text(
                     dateFormat.format(news.timestamp),
-                    style: TextStyle(fontSize: 11, color: AppColors.textMuted),
+                    style: TextStyle(fontSize: 12, color: AppColors.textMuted),
                   ),
                 ],
               ),
@@ -131,12 +133,13 @@ class HistoryNewsScreen extends StatelessWidget {
     final transactions = provider.transactions;
 
     if (transactions.isEmpty) {
-      return Center(
-        child: Text(
-          'Noch keine Transaktionen vorhanden.\nKaufe Wertpapiere oder Prestige-Güter!',
-          textAlign: TextAlign.center,
-          style: TextStyle(color: AppColors.textSecondary),
-        ),
+      return EmptyState(
+        icon: Icons.receipt_long,
+        title: 'Noch keine Transaktionen',
+        message:
+            'Kaufe Wertpapiere oder Prestige-Güter, dann erscheinen sie hier.',
+        actionLabel: onOpenMarkets == null ? null : 'Märkte entdecken',
+        onAction: onOpenMarkets,
       );
     }
 
@@ -165,7 +168,7 @@ class HistoryNewsScreen extends StatelessWidget {
             badgeColor = AppColors.bond;
             break;
           case TransactionType.luxuryPurchase:
-            badgeColor = AppColors.gold;
+            badgeColor = AppColors.purple;
             break;
           case TransactionType.loanPayout:
             badgeColor = AppColors.accent;
@@ -199,7 +202,7 @@ class HistoryNewsScreen extends StatelessWidget {
                   tx.type.displayName,
                   style: TextStyle(
                     color: badgeColor,
-                    fontSize: 11,
+                    fontSize: 12,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -222,7 +225,7 @@ class HistoryNewsScreen extends StatelessWidget {
                     Text(
                       dateFormat.format(tx.timestamp),
                       style: TextStyle(
-                        fontSize: 10,
+                        fontSize: 12,
                         color: AppColors.textMuted,
                       ),
                     ),
@@ -244,7 +247,7 @@ class HistoryNewsScreen extends StatelessWidget {
                     Text(
                       '${tx.realizedPnL! >= 0 ? "+" : ""}${CurrencyFormatter.format(tx.realizedPnL!)}',
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: 12,
                         fontWeight: FontWeight.bold,
                         color: tx.realizedPnL! >= 0
                             ? AppColors.profit

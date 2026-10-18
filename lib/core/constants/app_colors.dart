@@ -45,7 +45,8 @@ class AppPalette {
     required this.heroGradient,
   });
 
-  // Text/background pairs below keep ≥4.5:1 contrast for body text.
+  // Every text/symbol colour keeps ≥4.5:1 on background, surface and
+  // surfaceElevated; test/palette_contrast_test.dart enforces it.
   static const gameDark = AppPalette(
     brightness: Brightness.dark,
     background: Color(0xFF0B0820),
@@ -73,15 +74,15 @@ class AppPalette {
     surface: Color(0xFFFFFFFF),
     surfaceElevated: Color(0xFFEDE8FF),
     cardBorder: Color(0xFFD8CFFA),
-    primary: Color(0xFF0A9A57),
+    primary: Color(0xFF077944),
     onPrimary: Color(0xFFFFFFFF),
-    accent: Color(0xFF0A7DB8),
-    gold: Color(0xFFA86A00),
+    accent: Color(0xFF086FA3),
+    gold: Color(0xFF935D00),
     goldDark: Color(0xFF7A4D00),
     purple: Color(0xFF7339D9),
-    profit: Color(0xFF0A8A4E),
-    loss: Color(0xFFD2234A),
-    warning: Color(0xFFB85C00),
+    profit: Color(0xFF087944),
+    loss: Color(0xFFCB2147),
+    warning: Color(0xFFA55200),
     textPrimary: Color(0xFF1A1438),
     textSecondary: Color(0xFF4F4775),
     textMuted: Color(0xFF5E567F),
@@ -115,7 +116,7 @@ class AppPalette {
     surface: Color(0xFFFFFFFF),
     surfaceElevated: Color(0xFFF0F2F5),
     cardBorder: Color(0xFFDDE1E7),
-    primary: Color(0xFF0B8A4C),
+    primary: Color(0xFF0A7E45),
     onPrimary: Color(0xFFFFFFFF),
     accent: Color(0xFF1A66C2),
     gold: Color(0xFF946200),
@@ -123,7 +124,7 @@ class AppPalette {
     purple: Color(0xFF6D4AC9),
     profit: Color(0xFF0B7D45),
     loss: Color(0xFFC7362B),
-    warning: Color(0xFFA85A00),
+    warning: Color(0xFFA65900),
     textPrimary: Color(0xFF14181F),
     textSecondary: Color(0xFF4A5361),
     textMuted: Color(0xFF5A6372),

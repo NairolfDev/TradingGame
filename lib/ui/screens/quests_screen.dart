@@ -89,7 +89,7 @@ class QuestsScreen extends StatelessWidget {
                           style: TextStyle(
                             color: AppColors.gold,
                             fontWeight: FontWeight.bold,
-                            fontSize: 11,
+                            fontSize: 12,
                           ),
                         ),
                       ),
@@ -141,7 +141,7 @@ class QuestsScreen extends StatelessWidget {
                           Text(
                             'Tag $day',
                             style: TextStyle(
-                              fontSize: 10,
+                              fontSize: 12,
                               color: isUnlocked
                                   ? AppColors.gold
                                   : AppColors.textPrimary.withValues(

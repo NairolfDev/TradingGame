@@ -36,23 +36,30 @@ void main() {
     );
     await tester.pump();
     expect(tester.takeException(), isNull);
+    // On a phone the filters live in a sheet behind the filter button.
+    await tester.tap(find.byIcon(Icons.tune));
+    await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(FilterChip, 'ATX'));
-    await tester.pump();
+    await tester.pumpAndSettle();
     expect(find.textContaining('20 Treffer'), findsOneWidget);
+    await tester.tap(find.textContaining('Ergebnisse anzeigen'));
+    await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), 'Erste');
     await tester.pump(const Duration(milliseconds: 300));
     expect(find.textContaining('1 Treffer'), findsOneWidget);
+    await tester.tap(find.byIcon(Icons.tune));
+    await tester.pumpAndSettle();
     await tester.ensureVisible(find.text('Zurücksetzen'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Zurücksetzen'));
-    await tester.pump();
+    await tester.pumpAndSettle();
     expect(
       find.textContaining('${portfolio.assets.length} Treffer'),
       findsOneWidget,
     );
     await tester.ensureVisible(find.text('Weitere Filter'));
     await tester.tap(find.text('Weitere Filter'));
-    await tester.pump();
+    await tester.pumpAndSettle();
     expect(find.text('Branche'), findsOneWidget);
     expect(find.text('Assetklasse'), findsOneWidget);
     expect(tester.takeException(), isNull);

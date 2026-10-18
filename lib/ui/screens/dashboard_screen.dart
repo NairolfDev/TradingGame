@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import '../widgets/motion_safe.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../logic/portfolio_provider.dart';
@@ -284,7 +285,7 @@ class DashboardScreen extends StatelessWidget {
                                   child: Text(
                                     provider.creditRating.grade,
                                     style: TextStyle(
-                                      fontSize: 10,
+                                      fontSize: 12,
                                       fontWeight: FontWeight.bold,
                                       color: AppColors.primary,
                                     ),
@@ -298,7 +299,7 @@ class DashboardScreen extends StatelessWidget {
                                   ? 'Restschuld: ${CurrencyFormatter.format(provider.totalDebt)} (${provider.activeLoans.length} Kredite) • Jetzt tilgen'
                                   : 'Keine Schulden • Kredit aufnehmen ab ${(provider.creditRating.baseInterestRate * 100).toStringAsFixed(1)}%',
                               style: TextStyle(
-                                fontSize: 11,
+                                fontSize: 12,
                                 color: provider.totalDebt > 0
                                     ? AppColors.loss
                                     : AppColors.textSecondary,
@@ -318,7 +319,7 @@ class DashboardScreen extends StatelessWidget {
                     ],
                   ),
                 ),
-              ).animate().fadeIn(duration: 400.ms, delay: 100.ms),
+              ).motionSafe(context).fadeIn(duration: 400.ms, delay: 100.ms),
 
               const SizedBox(height: 14),
 
@@ -340,10 +341,7 @@ class DashboardScreen extends StatelessWidget {
                       children: [
                         Row(
                           children: [
-                            Text(
-                              rank.badge,
-                              style: const TextStyle(fontSize: 16),
-                            ),
+                            Icon(rank.symbol, size: 20, color: rank.color),
                             const SizedBox(width: 8),
                             Text(
                               rank.title,
@@ -359,7 +357,7 @@ class DashboardScreen extends StatelessWidget {
                           Text(
                             'Nächster Rang: ${nextRank.title}',
                             style: TextStyle(
-                              fontSize: 11,
+                              fontSize: 12,
                               color: AppColors.textSecondary,
                             ),
                           ),
@@ -367,7 +365,7 @@ class DashboardScreen extends StatelessWidget {
                           Text(
                             '👑 Höchster Rang erreicht!',
                             style: TextStyle(
-                              fontSize: 11,
+                              fontSize: 12,
                               color: AppColors.gold,
                               fontWeight: FontWeight.bold,
                             ),
@@ -386,7 +384,7 @@ class DashboardScreen extends StatelessWidget {
                         Text(
                           'Prestige-Punkte: ${provider.totalPrestigePoints} 💎',
                           style: TextStyle(
-                            fontSize: 11,
+                            fontSize: 12,
                             color: AppColors.textMuted,
                           ),
                         ),
@@ -394,7 +392,7 @@ class DashboardScreen extends StatelessWidget {
                           Text(
                             'Noch ${CurrencyFormatter.format(nextRank.minNetWorth - netWorth)} bis Rang-Up',
                             style: TextStyle(
-                              fontSize: 11,
+                              fontSize: 12,
                               color: AppColors.textMuted,
                             ),
                           ),
@@ -433,7 +431,7 @@ class DashboardScreen extends StatelessWidget {
                     child: Text(
                       'NEU',
                       style: TextStyle(
-                        fontSize: 10,
+                        fontSize: 12,
                         fontWeight: FontWeight.bold,
                         color: AppColors.primary,
                       ),
@@ -565,7 +563,7 @@ class DashboardScreen extends StatelessWidget {
                             '${provider.pendingOrders.length}',
                             style: TextStyle(
                               color: AppColors.gold,
-                              fontSize: 11,
+                              fontSize: 12,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -575,7 +573,7 @@ class DashboardScreen extends StatelessWidget {
                     Text(
                       'Warten auf Marktöffnung',
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: 12,
                         color: AppColors.textMuted,
                       ),
                     ),
@@ -754,7 +752,7 @@ class DashboardScreen extends StatelessWidget {
                     child: Text(
                       badge,
                       style: TextStyle(
-                        fontSize: 10,
+                        fontSize: 12,
                         fontWeight: FontWeight.bold,
                         color: color,
                       ),
@@ -774,13 +772,13 @@ class DashboardScreen extends StatelessWidget {
             const SizedBox(height: 2),
             Text(
               subtitle,
-              style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
             ),
             const SizedBox(height: 6),
             Text(
               detail,
               style: TextStyle(
-                fontSize: 11,
+                fontSize: 12,
                 fontWeight: FontWeight.bold,
                 color: color,
               ),

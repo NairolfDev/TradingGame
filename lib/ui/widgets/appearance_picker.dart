@@ -52,22 +52,21 @@ class AppearancePicker extends StatelessWidget {
           const SizedBox(height: 8),
           SizedBox(
             width: double.infinity,
-            child: SegmentedButton<bool>(
+            child: SegmentedButton<AppAppearance>(
+              showSelectedIcon: false,
               segments: const [
-                ButtonSegment(
-                  value: true,
-                  icon: Icon(Icons.dark_mode_outlined),
-                  label: Text('Dunkel'),
-                ),
-                ButtonSegment(
-                  value: false,
-                  icon: Icon(Icons.light_mode_outlined),
-                  label: Text('Hell'),
-                ),
+                ButtonSegment(value: AppAppearance.system, label: Text('Auto')),
+                ButtonSegment(value: AppAppearance.dark, label: Text('Dunkel')),
+                ButtonSegment(value: AppAppearance.light, label: Text('Hell')),
               ],
-              selected: {theme.isDark},
-              onSelectionChanged: (s) => theme.setDark(s.first),
+              selected: {theme.appearance},
+              onSelectionChanged: (s) => theme.setAppearance(s.first),
             ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Auto folgt der Helligkeit deines Geräts.',
+            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
           ),
         ],
       ),

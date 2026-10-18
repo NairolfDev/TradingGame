@@ -105,7 +105,7 @@ class AssetCard extends StatelessWidget {
                 style: TextStyle(color: AppColors.textSecondary),
               ),
               Text(
-                provider.quoteStatus(asset),
+                provider.quoteStatusShort(asset),
                 style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
               ),
             ],

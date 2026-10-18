@@ -8,7 +8,15 @@ import 'game_fx.dart';
 class PortfolioSummary extends StatelessWidget {
   final PortfolioProvider portfolio;
 
-  const PortfolioSummary({super.key, required this.portfolio});
+  /// Flat card without gradient and formula hint, for screens (Portfolio)
+  /// whose own content is the lists below.
+  final bool compact;
+
+  const PortfolioSummary({
+    super.key,
+    required this.portfolio,
+    this.compact = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -36,13 +44,37 @@ class PortfolioSummary extends StatelessWidget {
 
     return Container(
       padding: const EdgeInsets.all(20),
-      decoration: heroDecoration(glow: profitColor),
+      decoration: compact
+          ? BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.cardBorder),
+            )
+          : heroDecoration(glow: profitColor),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Nettovermögen',
-            style: TextStyle(fontSize: 16, color: AppColors.textSecondary),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Nettovermögen',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ),
+              if (!compact)
+                IconButton(
+                  tooltip: 'Wie wird das berechnet?',
+                  icon: Icon(
+                    Icons.info_outline,
+                    color: AppColors.textSecondary,
+                  ),
+                  onPressed: () => _showFormula(context),
+                ),
+            ],
           ),
           const SizedBox(height: 8),
           AnimatedMoney(
@@ -74,7 +106,7 @@ class PortfolioSummary extends StatelessWidget {
               final scale = MediaQuery.textScalerOf(context).scale(1);
               final columns = constraints.maxWidth >= 900 * scale
                   ? 4
-                  : constraints.maxWidth >= 480 * scale
+                  : constraints.maxWidth >= 280 * scale
                   ? 2
                   : 1;
               final width =
@@ -89,14 +121,8 @@ class PortfolioSummary extends StatelessWidget {
               );
             },
           ),
-          const SizedBox(height: 16),
-          Text(
-            'Nettovermögen = Cash + investierter Wert + reserviertes '
-            'Kauf-Cash + Luxusbesitz − Schulden.',
-            style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
-          ),
           if (reservedSales > 0) ...[
-            const SizedBox(height: 8),
+            const SizedBox(height: 16),
             Text(
               'Davon für Verkäufe vorgemerkt: '
               '${CurrencyFormatter.format(reservedSales)}. Bereits im '
@@ -105,6 +131,36 @@ class PortfolioSummary extends StatelessWidget {
             ),
           ],
         ],
+      ),
+    );
+  }
+
+  /// Progressive disclosure: the formula is one tap away instead of
+  /// permanently taking three lines on a phone.
+  void _showFormula(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (_) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'So wird das Nettovermögen berechnet',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Nettovermögen = Cash + investierter Wert + reserviertes '
+                'Kauf-Cash + Luxusbesitz − Schulden.',
+                style: TextStyle(color: AppColors.textSecondary),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

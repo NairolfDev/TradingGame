@@ -17,6 +17,10 @@ class CurrencyFormatter {
     return _euroFormat.format(value);
   }
 
+  /// A dash instead of a misleading "€ 0,00" when a value is missing.
+  static String formatOrDash(num? value) =>
+      value == null || !value.isFinite || value <= 0 ? '–' : format(value);
+
   static String formatPrice(num value) {
     if (value < 1) {
       return '${value.toStringAsFixed(4)} €';
@@ -40,6 +44,9 @@ class CurrencyFormatter {
     if (value == value.roundToDouble()) {
       return value.toInt().toString();
     }
-    return value.toStringAsFixed(maxDecimals).replaceAll(RegExp(r'0*$'), '').replaceAll(RegExp(r'\.$'), '');
+    return value
+        .toStringAsFixed(maxDecimals)
+        .replaceAll(RegExp(r'0*$'), '')
+        .replaceAll(RegExp(r'\.$'), '');
   }
 }

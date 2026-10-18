@@ -63,7 +63,10 @@ Widget _app(Widget child, {double scale = 1}) => MaterialApp(
     data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(scale)),
     child: child!,
   ),
-  home: ChangeNotifierProvider<PortfolioProvider>.value(value: _Portfolio(), child: child),
+  home: ChangeNotifierProvider<PortfolioProvider>.value(
+    value: _Portfolio(),
+    child: child,
+  ),
 );
 
 void main() {
@@ -92,6 +95,66 @@ void main() {
     );
   });
 
+  testWidgets(
+    'phone: metrics sit in two columns, the formula hides behind info',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(375, 900));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpWidget(
+        _app(
+          Scaffold(
+            body: SingleChildScrollView(
+              child: PortfolioSummary(portfolio: _Portfolio()),
+            ),
+          ),
+        ),
+      );
+      final cash = tester.getTopLeft(find.text('Frei verfügbares Cash'));
+      final invested = tester.getTopLeft(find.text('Investierter Wert'));
+      final reserved = tester.getTopLeft(
+        find.text('Für Käufe reserviertes Cash'),
+      );
+      expect(invested.dy, cash.dy, reason: 'two metrics per row');
+      expect(invested.dx, greaterThan(cash.dx));
+      expect(reserved.dy, greaterThan(cash.dy));
+
+      expect(find.textContaining('Nettovermögen = Cash'), findsNothing);
+      await tester.tap(find.byIcon(Icons.info_outline));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Nettovermögen = Cash'), findsOneWidget);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
+
+  testWidgets('compact summary is flat, shorter and has no formula info', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(375, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    Future<double> height({required bool compact}) async {
+      await tester.pumpWidget(
+        _app(
+          Scaffold(
+            body: SingleChildScrollView(
+              child: PortfolioSummary(
+                portfolio: _Portfolio(),
+                compact: compact,
+              ),
+            ),
+          ),
+        ),
+      );
+      return tester.getSize(find.byType(PortfolioSummary)).height;
+    }
+
+    final full = await height(compact: false);
+    final compact = await height(compact: true);
+    expect(compact, lessThan(full));
+    expect(find.byIcon(Icons.info_outline), findsNothing);
+    expect(find.text('Frei verfügbares Cash'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox());
+  });
+
   for (final width in [375.0, 768.0, 1440.0]) {
     for (final scale in [1.0, 2.0]) {
       testWidgets('portfolio fits width $width with text scale $scale', (
@@ -99,7 +162,7 @@ void main() {
       ) async {
         await tester.binding.setSurfaceSize(Size(width, 1000));
         addTearDown(() => tester.binding.setSurfaceSize(null));
-        await tester.pumpWidget(_app(const PortfolioScreen(), scale: scale));
+        await tester.pumpWidget(_app(PortfolioScreen(onOpenMarkets: () {}), scale: scale));
         expect(tester.takeException(), isNull);
         await tester.scrollUntilVisible(find.byType(PositionTile), 400);
         expect(tester.takeException(), isNull);
@@ -117,6 +180,3 @@ void main() {
     }
   }
 }
-
-
-

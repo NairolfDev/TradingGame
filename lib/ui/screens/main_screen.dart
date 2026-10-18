@@ -117,7 +117,7 @@ class _MainScreenState extends State<MainScreen> {
                           ? 'Gast-Modus'
                           : auth.currentUser!.authProvider.toUpperCase(),
                       style: TextStyle(
-                        fontSize: 10,
+                        fontSize: 12,
                         fontWeight: FontWeight.bold,
                         color: AppColors.primary,
                       ),
@@ -218,8 +218,8 @@ class _MainScreenState extends State<MainScreen> {
           ? SimplisticDashboardScreen(onNavigateTab: _onDashboardNavigate)
           : DashboardScreen(onNavigateTab: _onDashboardNavigate),
       const MarketsScreen(),
-      const PortfolioScreen(),
-      const HistoryNewsScreen(),
+      PortfolioScreen(onOpenMarkets: () => _onTabTapped(1)),
+      HistoryNewsScreen(onOpenMarkets: () => _onTabTapped(1)),
       MoreScreen(
         onProfile: () => _openProfileDialog(context, auth),
         onCheckUpdates: () => _checkVersionUpdate(isManual: true),

@@ -101,6 +101,11 @@ void main() {
           ),
         );
         await tester.pump();
+        if (width < 600) {
+          // Phone: saved views are in the filter sheet.
+          await tester.tap(find.byIcon(Icons.tune));
+          await tester.pumpAndSettle();
+        }
         expect(find.text('Ansichten'), findsOneWidget);
         expect(
           find.byType(DataTable),
