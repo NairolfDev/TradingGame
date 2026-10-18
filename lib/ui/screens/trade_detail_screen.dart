@@ -377,12 +377,12 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
               children: [
                 _buildStatTile(
                   '24h Hoch',
-                  CurrencyFormatter.format(liveAsset.dailyHigh),
+                  CurrencyFormatter.formatOrDash(liveAsset.dailyHigh),
                 ),
                 const SizedBox(width: 8),
                 _buildStatTile(
                   '24h Tief',
-                  CurrencyFormatter.format(liveAsset.dailyLow),
+                  CurrencyFormatter.formatOrDash(liveAsset.dailyLow),
                 ),
                 const SizedBox(width: 8),
                 if (liveAsset.couponRate != null)
@@ -393,7 +393,9 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
                 else
                   _buildStatTile(
                     'Volatilität',
-                    '${(liveAsset.volatility * 100).toInt()}%',
+                    liveAsset.volatility > 0
+                        ? '${(liveAsset.volatility * 100).toInt()}%'
+                        : '–',
                   ),
               ],
             ),

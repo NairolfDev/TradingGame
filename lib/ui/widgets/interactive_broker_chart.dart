@@ -92,8 +92,45 @@ class _InteractiveBrokerChartState extends State<InteractiveBrokerChart> {
     _loadLiveSeries();
   }
 
+  /// Permanent gap (no live source / proxy said 422): a short note instead of
+  /// an empty chart with a retry that can never succeed.
+  Widget _unavailableNote() => Padding(
+    padding: const EdgeInsets.all(16),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(Icons.show_chart, color: AppColors.textSecondary),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Kein EUR-Verlauf verfügbar',
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Für dieses Instrument gibt es keine währungsbereinigte '
+                'Kursreihe. Wir zeichnen keine erfundenen Kurven.',
+                style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+
   @override
   Widget build(BuildContext context) {
+    if (!_isLoading && LiveMarketDataService.historyUnavailable(widget.asset)) {
+      return _unavailableNote();
+    }
     final series = _liveFetchedSeries ?? const <double>[];
     if (!_isLoading && series.length < 2) _emptyTimeframes.add(_timeframe);
     final minVal = series.isEmpty ? 0.0 : series.reduce(min);
