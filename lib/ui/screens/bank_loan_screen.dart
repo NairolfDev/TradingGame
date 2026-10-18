@@ -29,9 +29,7 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
     } else if (grade.startsWith('BBB')) {
       return AppColors.accent; // Cyan / Blue
     } else if (grade.startsWith('BB')) {
-      return AppColors.gold; // Amber
-    } else if (grade.startsWith('CCC')) {
-      return AppColors.warning;
+      return AppColors.warning; // Amber
     } else {
       return AppColors.loss; // Crimson / Red Kredithai
     }
@@ -953,10 +951,10 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                           vertical: 3,
                         ),
                         decoration: BoxDecoration(
-                          color: AppColors.accentGold.withValues(alpha: 0.15),
+                          color: AppColors.accent.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(
-                            color: AppColors.accentGold.withValues(alpha: 0.5),
+                            color: AppColors.accent.withValues(alpha: 0.5),
                           ),
                         ),
                         child: Text(
@@ -964,7 +962,7 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
-                            color: AppColors.gold,
+                            color: AppColors.accent,
                           ),
                         ),
                       ),

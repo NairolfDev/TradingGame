@@ -113,7 +113,7 @@ class _SimplisticDashboardScreenState extends State<SimplisticDashboardScreen> {
                       '⏱️ 5–15 Min. Routing',
                       style: TextStyle(
                         fontSize: 12,
-                        color: AppColors.gold,
+                        color: AppColors.accent,
                         fontWeight: FontWeight.bold,
                       ),
                     ),

@@ -77,7 +77,7 @@ class _WatchlistMarqueeTickerState extends State<WatchlistMarqueeTicker> {
         color: AppColors.surface.withValues(alpha: 0.95),
         border: Border(
           top: BorderSide(
-            color: AppColors.accentGold.withValues(alpha: 0.4),
+            color: AppColors.accent.withValues(alpha: 0.4),
             width: 1.0,
           ),
           bottom: BorderSide(color: AppColors.cardBorder, width: 0.5),
@@ -112,7 +112,7 @@ class _WatchlistMarqueeTickerState extends State<WatchlistMarqueeTicker> {
                 Text(
                   watchlisted.isNotEmpty ? 'WATCHLIST' : 'KURSE',
                   style: TextStyle(
-                    color: AppColors.accentGold,
+                    color: AppColors.accent,
                     fontSize: 12,
                     fontWeight: FontWeight.w900,
                     letterSpacing: 0.8,

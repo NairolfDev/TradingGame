@@ -27,7 +27,7 @@ class PendingOrderCard extends StatelessWidget {
             runSpacing: 8,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              Icon(Icons.schedule, color: AppColors.gold),
+              Icon(Icons.schedule, color: AppColors.warning),
               Text(
                 '${order.isBuy ? "Kauf" : "Verkauf"} ${order.symbol}',
                 style: TextStyle(
@@ -56,7 +56,7 @@ class PendingOrderCard extends StatelessWidget {
                       '${order.minutesRemaining == 0 ? "< 1" : order.minutesRemaining} Min. '
                       '(${order.brokerVenue ?? "Börsenplatz"})'
                 : 'Wartet auf die nächste Börsenöffnung',
-            style: TextStyle(fontSize: 14, color: AppColors.gold),
+            style: TextStyle(fontSize: 14, color: AppColors.warning),
           ),
           const SizedBox(height: 12),
           TextButton(

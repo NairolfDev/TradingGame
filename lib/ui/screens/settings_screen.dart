@@ -74,7 +74,7 @@ class SettingsScreen extends StatelessWidget {
                       size: 16,
                       color: provider.isSimplisticMode
                           ? AppColors.primary
-                          : AppColors.gold,
+                          : AppColors.accent,
                     ),
                     const SizedBox(width: 8),
                     Text(
@@ -86,7 +86,7 @@ class SettingsScreen extends StatelessWidget {
                         fontWeight: FontWeight.w600,
                         color: provider.isSimplisticMode
                             ? AppColors.primary
-                            : AppColors.gold,
+                            : AppColors.accent,
                       ),
                     ),
                   ],
@@ -134,7 +134,7 @@ class SettingsScreen extends StatelessWidget {
                           : Icons.bolt,
                       size: 16,
                       color: provider.isRealisticOrderDelay
-                          ? AppColors.gold
+                          ? AppColors.accent
                           : AppColors.textMuted,
                     ),
                     const SizedBox(width: 8),
@@ -146,7 +146,7 @@ class SettingsScreen extends StatelessWidget {
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                         color: provider.isRealisticOrderDelay
-                            ? AppColors.gold
+                            ? AppColors.accent
                             : AppColors.textMuted,
                       ),
                     ),

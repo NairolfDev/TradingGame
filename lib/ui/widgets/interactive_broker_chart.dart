@@ -208,7 +208,7 @@ class _InteractiveBrokerChartState extends State<InteractiveBrokerChart> {
               IconButton(
                 icon: Icon(
                   _showSMA ? Icons.auto_graph : Icons.show_chart,
-                  color: _showSMA ? AppColors.gold : AppColors.textMuted,
+                  color: _showSMA ? AppColors.accent : AppColors.textMuted,
                 ),
                 tooltip: _showSMA
                     ? 'Gleitenden Durchschnitt ausblenden'
@@ -442,7 +442,7 @@ class _InteractiveBrokerChartState extends State<InteractiveBrokerChart> {
           spots: smaSpots,
           isCurved: false,
           curveSmoothness: 0.3,
-          color: AppColors.gold,
+          color: AppColors.accent,
           barWidth: 1.5,
           dashArray: [5, 5],
           dotData: const FlDotData(show: false),

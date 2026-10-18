@@ -168,7 +168,7 @@ class HistoryNewsScreen extends StatelessWidget {
             badgeColor = AppColors.bond;
             break;
           case TransactionType.luxuryPurchase:
-            badgeColor = AppColors.gold;
+            badgeColor = AppColors.purple;
             break;
           case TransactionType.loanPayout:
             badgeColor = AppColors.accent;

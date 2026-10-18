@@ -192,7 +192,7 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
             icon: Icon(
               liveAsset.isWatchlisted ? Icons.star : Icons.star_border,
               color: liveAsset.isWatchlisted
-                  ? AppColors.accentGold
+                  ? AppColors.accent
                   : AppColors.textMuted,
             ),
             tooltip: liveAsset.isWatchlisted
@@ -329,14 +329,14 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
                 border: Border.all(
                   color: isOpen
                       ? AppColors.cardBorder
-                      : AppColors.gold.withValues(alpha: 0.4),
+                      : AppColors.warning.withValues(alpha: 0.4),
                 ),
               ),
               child: Row(
                 children: [
                   Icon(
                     isOpen ? Icons.info_outline : Icons.schedule,
-                    color: isOpen ? AppColors.accent : AppColors.gold,
+                    color: isOpen ? AppColors.accent : AppColors.warning,
                     size: 20,
                   ),
                   const SizedBox(width: 10),
@@ -360,7 +360,7 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
                             fontSize: 12,
                             color: isOpen
                                 ? AppColors.textSecondary
-                                : AppColors.gold,
+                                : AppColors.warning,
                           ),
                         ),
                       ],
@@ -806,7 +806,7 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.accentGold.withValues(alpha: 0.3)),
+        border: Border.all(color: AppColors.accent.withValues(alpha: 0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -819,7 +819,7 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.smart_toy_outlined, color: AppColors.accentGold),
+                  Icon(Icons.smart_toy_outlined, color: AppColors.accent),
                   const SizedBox(width: 8),
                   Flexible(
                     child: Text(
@@ -836,7 +836,7 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: AppColors.accentGold.withValues(alpha: 0.15),
+                  color: AppColors.accent.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
@@ -844,7 +844,7 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
-                    color: AppColors.accentGold,
+                    color: AppColors.accent,
                   ),
                 ),
               ),
@@ -943,7 +943,7 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
                   icon: const Icon(Icons.add, size: 16),
                   label: const Text('Limit-Order setzen'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.accentGold,
+                    backgroundColor: AppColors.accent,
                     foregroundColor: AppColors.onPrimary,
                     textStyle: const TextStyle(
                       fontSize: 12,
@@ -964,8 +964,8 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
                     '+Slot (${CurrencyFormatter.format(provider.nextAutomationSlotCost!)})',
                   ),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.accentGold,
-                    side: BorderSide(color: AppColors.accentGold),
+                    foregroundColor: AppColors.accent,
+                    side: BorderSide(color: AppColors.accent),
                     textStyle: const TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
@@ -1023,7 +1023,7 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
             if (provider.nextAutomationSlotCost != null)
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.accentGold,
+                  backgroundColor: AppColors.accent,
                   foregroundColor: AppColors.onPrimary,
                 ),
                 onPressed: () async {
