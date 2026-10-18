@@ -17,6 +17,7 @@ void main() {
     portfolio.marketEngine.stop();
     portfolio.newsService.dispose();
     await portfolio.setRealisticOrderDelay(false);
+    portfolio.bankClock = () => DateTime(2026, 10, 14); // Wednesday
   });
 
   tearDown(() => portfolio.dispose());
@@ -177,6 +178,7 @@ void main() {
       while (portfolio.isLoading) {
         await Future<void>.delayed(const Duration(milliseconds: 10));
       }
+      portfolio.bankClock = () => DateTime(2026, 10, 14);
       expect(portfolio.canTakeRecoveryLoan, isTrue);
       expect(await portfolio.takeSanierungsKredit(), isTrue);
       expect(await portfolio.takeSanierungsKredit(), isFalse);
