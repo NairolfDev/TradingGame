@@ -341,10 +341,7 @@ class DashboardScreen extends StatelessWidget {
                       children: [
                         Row(
                           children: [
-                            Text(
-                              rank.badge,
-                              style: const TextStyle(fontSize: 16),
-                            ),
+                            Icon(rank.symbol, size: 20, color: rank.color),
                             const SizedBox(width: 8),
                             Text(
                               rank.title,

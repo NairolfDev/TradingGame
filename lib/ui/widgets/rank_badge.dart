@@ -24,7 +24,7 @@ class RankBadge extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(rank.badge, style: const TextStyle(fontSize: 12)),
+            Icon(rank.symbol, size: 14, color: rank.color),
             const SizedBox(width: 4),
             Flexible(
               child: Text(
@@ -65,7 +65,7 @@ class RankBadge extends StatelessWidget {
               color: rank.color.withValues(alpha: 0.2),
               shape: BoxShape.circle,
             ),
-            child: Text(rank.badge, style: const TextStyle(fontSize: 18)),
+            child: Icon(rank.symbol, size: 22, color: rank.color),
           ),
           const SizedBox(width: 8),
           Flexible(

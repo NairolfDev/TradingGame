@@ -4,7 +4,10 @@ class RankInfo {
   final int level;
   final String title;
   final double minNetWorth;
+
+  /// Emoji kept for the cloud leaderboard format; the UI draws [symbol].
   final String badge;
+  final IconData symbol;
   final Color color;
   final String description;
 
@@ -13,6 +16,7 @@ class RankInfo {
     required this.title,
     required this.minNetWorth,
     required this.badge,
+    required this.symbol,
     required this.color,
     required this.description,
   });
@@ -23,30 +27,37 @@ class RankInfo {
       title: 'Börsen-Praktikant',
       minNetWorth: -999999999.0,
       badge: '☕',
+      symbol: Icons.coffee_outlined,
       color: Color(0xFF8B9CB2),
-      description: 'Lerne die Grundlagen, starte mit 50.000 € Kredit und sammle Erfahrung.',
+      description:
+          'Lerne die Grundlagen, starte mit 50.000 € Kredit und sammle Erfahrung.',
     ),
     RankInfo(
       level: 2,
       title: 'Junior Retail Trader',
       minNetWorth: 10000.0,
       badge: '📈',
+      symbol: Icons.trending_up,
       color: Color(0xFF00B0FF),
-      description: 'Erste 10.000 € Reingewinn erzielt. Eigene Markt-Strategie greift.',
+      description:
+          'Erste 10.000 € Reingewinn erzielt. Eigene Markt-Strategie greift.',
     ),
     RankInfo(
       level: 3,
       title: 'Floor Broker',
       minNetWorth: 50000.0,
       badge: '💼',
+      symbol: Icons.work_outline,
       color: Color(0xFF00E676),
-      description: '50.000 € Reinvermögen! Startkredit voll reingeholt, nun schuldenfrei.',
+      description:
+          '50.000 € Reinvermögen! Startkredit voll reingeholt, nun schuldenfrei.',
     ),
     RankInfo(
       level: 4,
       title: 'Senior Portfolio Manager',
       minNetWorth: 150000.0,
       badge: '🏆',
+      symbol: Icons.emoji_events_outlined,
       color: Color(0xFFFFD700),
       description: 'Verwaltet ein sechsstelliges Reinvermögen mit kühlem Kopf.',
     ),
@@ -55,6 +66,7 @@ class RankInfo {
       title: 'Hedgefonds-Direktor',
       minNetWorth: 500000.0,
       badge: '👑',
+      symbol: Icons.workspace_premium_outlined,
       color: Color(0xFFFF7A00),
       description: 'Nutzt aggressive Hebel, bewegt Märkte nach Belieben.',
     ),
@@ -63,16 +75,20 @@ class RankInfo {
       title: 'Wall Street Legende',
       minNetWorth: 1000000.0,
       badge: '💎',
+      symbol: Icons.diamond_outlined,
       color: Color(0xFFAB47BC),
-      description: 'Millionär. Luxus-Penthouses und Sportwagen zieren deinen Alltag.',
+      description:
+          'Millionär. Luxus-Penthouses und Sportwagen zieren deinen Alltag.',
     ),
     RankInfo(
       level: 7,
       title: 'Finanz-Oligarch',
       minNetWorth: 2500000.0,
       badge: '🔱',
+      symbol: Icons.military_tech_outlined,
       color: Color(0xFFE040FB),
-      description: 'Die weltweiten Börsen tanzen nach deiner Pfeife. Unantastbar.',
+      description:
+          'Die weltweiten Börsen tanzen nach deiner Pfeife. Unantastbar.',
     ),
   ];
 
