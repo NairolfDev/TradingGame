@@ -112,7 +112,7 @@ class _SimplisticDashboardScreenState extends State<SimplisticDashboardScreen> {
                     Text(
                       '⏱️ 5–15 Min. Routing',
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: 12,
                         color: AppColors.gold,
                         fontWeight: FontWeight.bold,
                       ),
@@ -243,7 +243,7 @@ class _SimplisticDashboardScreenState extends State<SimplisticDashboardScreen> {
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
-                                  fontSize: 11,
+                                  fontSize: 12,
                                   color: AppColors.textSecondary,
                                 ),
                               ),
@@ -251,7 +251,7 @@ class _SimplisticDashboardScreenState extends State<SimplisticDashboardScreen> {
                               Text(
                                 '${CurrencyFormatter.formatAmount(pos.amount)} Stk. @ ${CurrencyFormatter.formatPrice(pos.averageBuyPrice)}',
                                 style: TextStyle(
-                                  fontSize: 11,
+                                  fontSize: 12,
                                   color: AppColors.textMuted,
                                 ),
                               ),
@@ -274,7 +274,7 @@ class _SimplisticDashboardScreenState extends State<SimplisticDashboardScreen> {
                               Text(
                                 '${posProfit ? "+" : ""}${CurrencyFormatter.format(posPnL)} (${CurrencyFormatter.formatPercent(pos.unrealizedPnLPercent)})',
                                 style: TextStyle(
-                                  fontSize: 11,
+                                  fontSize: 12,
                                   fontWeight: FontWeight.bold,
                                   color: posProfit
                                       ? AppColors.bullish
@@ -307,7 +307,7 @@ class _SimplisticDashboardScreenState extends State<SimplisticDashboardScreen> {
                           child: const Text(
                             'Verkaufen',
                             style: TextStyle(
-                              fontSize: 11,
+                              fontSize: 12,
                               fontWeight: FontWeight.bold,
                             ),
                           ),

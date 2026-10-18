@@ -284,7 +284,7 @@ class DashboardScreen extends StatelessWidget {
                                   child: Text(
                                     provider.creditRating.grade,
                                     style: TextStyle(
-                                      fontSize: 10,
+                                      fontSize: 12,
                                       fontWeight: FontWeight.bold,
                                       color: AppColors.primary,
                                     ),
@@ -298,7 +298,7 @@ class DashboardScreen extends StatelessWidget {
                                   ? 'Restschuld: ${CurrencyFormatter.format(provider.totalDebt)} (${provider.activeLoans.length} Kredite) • Jetzt tilgen'
                                   : 'Keine Schulden • Kredit aufnehmen ab ${(provider.creditRating.baseInterestRate * 100).toStringAsFixed(1)}%',
                               style: TextStyle(
-                                fontSize: 11,
+                                fontSize: 12,
                                 color: provider.totalDebt > 0
                                     ? AppColors.loss
                                     : AppColors.textSecondary,
@@ -359,7 +359,7 @@ class DashboardScreen extends StatelessWidget {
                           Text(
                             'Nächster Rang: ${nextRank.title}',
                             style: TextStyle(
-                              fontSize: 11,
+                              fontSize: 12,
                               color: AppColors.textSecondary,
                             ),
                           ),
@@ -367,7 +367,7 @@ class DashboardScreen extends StatelessWidget {
                           Text(
                             '👑 Höchster Rang erreicht!',
                             style: TextStyle(
-                              fontSize: 11,
+                              fontSize: 12,
                               color: AppColors.gold,
                               fontWeight: FontWeight.bold,
                             ),
@@ -386,7 +386,7 @@ class DashboardScreen extends StatelessWidget {
                         Text(
                           'Prestige-Punkte: ${provider.totalPrestigePoints} 💎',
                           style: TextStyle(
-                            fontSize: 11,
+                            fontSize: 12,
                             color: AppColors.textMuted,
                           ),
                         ),
@@ -394,7 +394,7 @@ class DashboardScreen extends StatelessWidget {
                           Text(
                             'Noch ${CurrencyFormatter.format(nextRank.minNetWorth - netWorth)} bis Rang-Up',
                             style: TextStyle(
-                              fontSize: 11,
+                              fontSize: 12,
                               color: AppColors.textMuted,
                             ),
                           ),
@@ -433,7 +433,7 @@ class DashboardScreen extends StatelessWidget {
                     child: Text(
                       'NEU',
                       style: TextStyle(
-                        fontSize: 10,
+                        fontSize: 12,
                         fontWeight: FontWeight.bold,
                         color: AppColors.primary,
                       ),
@@ -565,7 +565,7 @@ class DashboardScreen extends StatelessWidget {
                             '${provider.pendingOrders.length}',
                             style: TextStyle(
                               color: AppColors.gold,
-                              fontSize: 11,
+                              fontSize: 12,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -575,7 +575,7 @@ class DashboardScreen extends StatelessWidget {
                     Text(
                       'Warten auf Marktöffnung',
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: 12,
                         color: AppColors.textMuted,
                       ),
                     ),
@@ -754,7 +754,7 @@ class DashboardScreen extends StatelessWidget {
                     child: Text(
                       badge,
                       style: TextStyle(
-                        fontSize: 10,
+                        fontSize: 12,
                         fontWeight: FontWeight.bold,
                         color: color,
                       ),
@@ -774,13 +774,13 @@ class DashboardScreen extends StatelessWidget {
             const SizedBox(height: 2),
             Text(
               subtitle,
-              style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
             ),
             const SizedBox(height: 6),
             Text(
               detail,
               style: TextStyle(
-                fontSize: 11,
+                fontSize: 12,
                 fontWeight: FontWeight.bold,
                 color: color,
               ),

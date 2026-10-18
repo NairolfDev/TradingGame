@@ -294,7 +294,7 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
         minimumSize: Size.zero,
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
       ),
-      child: Text(label, style: const TextStyle(fontSize: 11)),
+      child: Text(label, style: const TextStyle(fontSize: 12)),
     );
   }
 
@@ -392,7 +392,7 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
             const SizedBox(height: 12),
             Text(
               'Hinweis: Dieser Betrag erhöht deine Verbindlichkeiten und senkt dein Net Worth bis zur Tilgung.',
-              style: TextStyle(fontSize: 11, color: AppColors.textMuted),
+              style: TextStyle(fontSize: 12, color: AppColors.textMuted),
             ),
           ],
         ),
@@ -530,7 +530,7 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                     Text(
                       'DEINE KREDITWÜRDIGKEIT (RATING)',
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: 12,
                         letterSpacing: 1.2,
                         fontWeight: FontWeight.w700,
                         color: AppColors.textSecondary,
@@ -593,7 +593,7 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                         Text(
                           'Aktueller Kreditzins p.a.:',
                           style: TextStyle(
-                            fontSize: 11,
+                            fontSize: 12,
                             color: AppColors.textMuted,
                           ),
                         ),
@@ -613,7 +613,7 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                         Text(
                           'Aktive Gesamtverbindlichkeiten:',
                           style: TextStyle(
-                            fontSize: 11,
+                            fontSize: 12,
                             color: AppColors.textMuted,
                           ),
                         ),
@@ -758,7 +758,7 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                                 ? '⚠️ ÜBERFÄLLIG'
                                 : '$daysLeft Tage übrig',
                             style: TextStyle(
-                              fontSize: 11,
+                              fontSize: 12,
                               fontWeight: FontWeight.bold,
                               color: isOverdue
                                   ? AppColors.loss
@@ -810,14 +810,14 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                         Text(
                           'Getilgt: ${CurrencyFormatter.format(loan.paidAmount)} (${(paidPercent * 100).toStringAsFixed(0)}%)',
                           style: TextStyle(
-                            fontSize: 11,
+                            fontSize: 12,
                             color: AppColors.textMuted,
                           ),
                         ),
                         Text(
                           'Frist: ${loan.dueDate.day}.${loan.dueDate.month}.${loan.dueDate.year}',
                           style: TextStyle(
-                            fontSize: 11,
+                            fontSize: 12,
                             color: AppColors.textMuted,
                           ),
                         ),
@@ -961,7 +961,7 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                         child: Text(
                           '1. Kredit: Max. 25.000 €',
                           style: TextStyle(
-                            fontSize: 10,
+                            fontSize: 12,
                             fontWeight: FontWeight.bold,
                             color: AppColors.gold,
                           ),
@@ -1234,7 +1234,7 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(title, style: TextStyle(fontSize: 11, color: AppColors.textMuted)),
+        Text(title, style: TextStyle(fontSize: 12, color: AppColors.textMuted)),
         const SizedBox(height: 2),
         Text(
           value,

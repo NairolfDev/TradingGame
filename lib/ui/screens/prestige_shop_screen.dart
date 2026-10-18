@@ -60,7 +60,7 @@ class _PrestigeShopScreenState extends State<PrestigeShopScreen> {
                     Text(
                       'STATUS & COOLNESS',
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: 12,
                         letterSpacing: 1.5,
                         fontWeight: FontWeight.bold,
                         color: AppColors.gold,
@@ -83,7 +83,7 @@ class _PrestigeShopScreenState extends State<PrestigeShopScreen> {
                           Text(
                             '${provider.totalPrestigePoints} Prestige',
                             style: TextStyle(
-                              fontSize: 11,
+                              fontSize: 12,
                               fontWeight: FontWeight.bold,
                               color: AppColors.gold,
                             ),
@@ -117,7 +117,7 @@ class _PrestigeShopScreenState extends State<PrestigeShopScreen> {
                         Text(
                           'Gesamter Luxuswert:',
                           style: TextStyle(
-                            fontSize: 11,
+                            fontSize: 12,
                             color: AppColors.textSecondary,
                           ),
                         ),
@@ -137,7 +137,7 @@ class _PrestigeShopScreenState extends State<PrestigeShopScreen> {
                         Text(
                           'Verfügbares Cash:',
                           style: TextStyle(
-                            fontSize: 11,
+                            fontSize: 12,
                             color: AppColors.textSecondary,
                           ),
                         ),
@@ -280,7 +280,7 @@ class _PrestigeShopScreenState extends State<PrestigeShopScreen> {
                         child: Text(
                           '${item.ownedCount}x im Besitz',
                           style: TextStyle(
-                            fontSize: 10,
+                            fontSize: 12,
                             fontWeight: FontWeight.bold,
                             color: AppColors.gold,
                           ),
@@ -293,7 +293,7 @@ class _PrestigeShopScreenState extends State<PrestigeShopScreen> {
                 Text(
                   item.description,
                   style: TextStyle(
-                    fontSize: 11,
+                    fontSize: 12,
                     color: AppColors.textSecondary,
                   ),
                 ),
@@ -312,7 +312,7 @@ class _PrestigeShopScreenState extends State<PrestigeShopScreen> {
                       child: Text(
                         '+${item.prestigePoints} Prestige',
                         style: TextStyle(
-                          fontSize: 10,
+                          fontSize: 12,
                           fontWeight: FontWeight.bold,
                           color: AppColors.accent,
                         ),

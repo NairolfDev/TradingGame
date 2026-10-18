@@ -241,7 +241,7 @@ class SettingsScreen extends StatelessWidget {
               ),
               subtitle: Text(
                 'Erstellt eine strukturierte Abrechnung aller Depotwerte, Positionen, Transaktionen und Zinserträge.',
-                style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
               ),
               trailing: Icon(Icons.chevron_right, color: AppColors.textMuted),
               onTap: () => _showStatementDialog(context, provider),
@@ -425,7 +425,7 @@ class SettingsScreen extends StatelessWidget {
     return Text(
       title,
       style: TextStyle(
-        fontSize: 11,
+        fontSize: 12,
         fontWeight: FontWeight.bold,
         letterSpacing: 1.1,
         color: AppColors.textMuted,
@@ -473,7 +473,7 @@ class SettingsScreen extends StatelessWidget {
               ),
               Text(
                 '${CurrencyFormatter.format(plan.amountEur)} • ${plan.frequency.displayName} • Investiert: ${CurrencyFormatter.format(plan.totalInvested)}',
-                style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
               ),
             ],
           ),
@@ -677,7 +677,7 @@ class SettingsScreen extends StatelessWidget {
               statement,
               style: TextStyle(
                 fontFamily: 'monospace',
-                fontSize: 11,
+                fontSize: 12,
                 color: AppColors.textSecondary,
                 height: 1.4,
               ),

@@ -94,7 +94,7 @@ class HistoryNewsScreen extends StatelessWidget {
                     child: Text(
                       isBull ? 'BULLISH ↗' : 'BEARISH ↘',
                       style: TextStyle(
-                        fontSize: 10,
+                        fontSize: 12,
                         fontWeight: FontWeight.bold,
                         color: isBull ? AppColors.profit : AppColors.loss,
                       ),
@@ -102,7 +102,7 @@ class HistoryNewsScreen extends StatelessWidget {
                   ),
                   Text(
                     dateFormat.format(news.timestamp),
-                    style: TextStyle(fontSize: 11, color: AppColors.textMuted),
+                    style: TextStyle(fontSize: 12, color: AppColors.textMuted),
                   ),
                 ],
               ),
@@ -199,7 +199,7 @@ class HistoryNewsScreen extends StatelessWidget {
                   tx.type.displayName,
                   style: TextStyle(
                     color: badgeColor,
-                    fontSize: 11,
+                    fontSize: 12,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -222,7 +222,7 @@ class HistoryNewsScreen extends StatelessWidget {
                     Text(
                       dateFormat.format(tx.timestamp),
                       style: TextStyle(
-                        fontSize: 10,
+                        fontSize: 12,
                         color: AppColors.textMuted,
                       ),
                     ),
@@ -244,7 +244,7 @@ class HistoryNewsScreen extends StatelessWidget {
                     Text(
                       '${tx.realizedPnL! >= 0 ? "+" : ""}${CurrencyFormatter.format(tx.realizedPnL!)}',
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: 12,
                         fontWeight: FontWeight.bold,
                         color: tx.realizedPnL! >= 0
                             ? AppColors.profit

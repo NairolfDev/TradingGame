@@ -64,7 +64,7 @@ class BreakingNewsTicker extends StatelessWidget {
                     style: TextStyle(
                       color: AppColors.onPrimary,
                       fontWeight: FontWeight.bold,
-                      fontSize: 10,
+                      fontSize: 12,
                     ),
                   ),
                 ],
@@ -96,7 +96,7 @@ class BreakingNewsTicker extends StatelessWidget {
                 style: TextStyle(
                   color: isBullish ? AppColors.bullish : AppColors.bearish,
                   fontWeight: FontWeight.bold,
-                  fontSize: 11,
+                  fontSize: 12,
                 ),
               ),
             ),

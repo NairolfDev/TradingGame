@@ -253,7 +253,7 @@ class _InteractiveBrokerChartState extends State<InteractiveBrokerChart> {
               'Quelle: Yahoo Finance · ${series.length} Kurspunkte in EUR · '
               'Tief ${CurrencyFormatter.format(minVal)} · '
               'Hoch ${CurrencyFormatter.format(maxVal)}',
-              style: TextStyle(fontSize: 11, color: AppColors.textMuted),
+              style: TextStyle(fontSize: 12, color: AppColors.textMuted),
             ),
           ),
 
@@ -476,7 +476,7 @@ class _InteractiveBrokerChartState extends State<InteractiveBrokerChart> {
                 }
                 return Text(
                   _axisLabel(value, diff),
-                  style: TextStyle(color: AppColors.textMuted, fontSize: 10),
+                  style: TextStyle(color: AppColors.textMuted, fontSize: 12),
                 );
               },
             ),

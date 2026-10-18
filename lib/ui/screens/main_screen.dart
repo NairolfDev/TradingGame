@@ -117,7 +117,7 @@ class _MainScreenState extends State<MainScreen> {
                           ? 'Gast-Modus'
                           : auth.currentUser!.authProvider.toUpperCase(),
                       style: TextStyle(
-                        fontSize: 10,
+                        fontSize: 12,
                         fontWeight: FontWeight.bold,
                         color: AppColors.primary,
                       ),

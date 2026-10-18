@@ -103,7 +103,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                 Text(
                   'Rangliste',
                   style: TextStyle(
-                    fontSize: 11,
+                    fontSize: 12,
                     fontWeight: FontWeight.bold,
                     color: AppColors.profit,
                   ),
@@ -183,7 +183,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                       Text(
                         '${playerEntry.title} • ${playerEntry.city}',
                         style: TextStyle(
-                          fontSize: 11,
+                          fontSize: 12,
                           color: AppColors.textSecondary,
                         ),
                       ),
@@ -204,7 +204,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                     Text(
                       '${playerEntry.roiPercent >= 0 ? "+" : ""}${playerEntry.roiPercent.toStringAsFixed(2)}% ROI',
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: 12,
                         fontWeight: FontWeight.bold,
                         color: playerEntry.roiPercent >= 0
                             ? AppColors.profit
@@ -232,7 +232,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
               ),
               Text(
                 '${entries.length} Teilnehmer',
-                style: TextStyle(fontSize: 11, color: AppColors.textMuted),
+                style: TextStyle(fontSize: 12, color: AppColors.textMuted),
               ),
             ],
           ),
@@ -272,7 +272,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                         Text(
                           'Keine Fake-Bots! Sobald weitere Spieler online handeln, siehst du sie hier in Echtzeit synchronisiert.',
                           style: TextStyle(
-                            fontSize: 11,
+                            fontSize: 12,
                             color: AppColors.textSecondary,
                           ),
                         ),
@@ -336,7 +336,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
           Text(
             CurrencyFormatter.formatCompact(entry.netWorth),
             style: TextStyle(
-              fontSize: 11,
+              fontSize: 12,
               color: AppColors.textSecondary,
               fontWeight: FontWeight.w600,
             ),
@@ -375,7 +375,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                 Text(
                   '${entry.roiPercent >= 0 ? "+" : ""}${entry.roiPercent.toStringAsFixed(1)}%',
                   style: TextStyle(
-                    fontSize: 10,
+                    fontSize: 12,
                     color: AppColors.profit,
                     fontWeight: FontWeight.bold,
                   ),
@@ -451,7 +451,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                 Text(
                   '${entry.strategy} • ${entry.city}',
                   style: TextStyle(
-                    fontSize: 10,
+                    fontSize: 12,
                     color: AppColors.textSecondary,
                   ),
                   maxLines: 1,
@@ -474,7 +474,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
               Text(
                 '${entry.roiPercent >= 0 ? "+" : ""}${entry.roiPercent.toStringAsFixed(2)}% ROI',
                 style: TextStyle(
-                  fontSize: 11,
+                  fontSize: 12,
                   fontWeight: FontWeight.bold,
                   color: entry.roiPercent >= 0
                       ? AppColors.profit

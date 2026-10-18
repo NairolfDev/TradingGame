@@ -31,7 +31,7 @@ class RankBadge extends StatelessWidget {
                 rank.title,
                 style: TextStyle(
                   color: rank.color,
-                  fontSize: 11,
+                  fontSize: 12,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -77,7 +77,7 @@ class RankBadge extends StatelessWidget {
                   'Rang Lvl ${rank.level}',
                   style: TextStyle(
                     color: AppColors.textMuted,
-                    fontSize: 10,
+                    fontSize: 12,
                     fontWeight: FontWeight.w600,
                     letterSpacing: 0.5,
                   ),
