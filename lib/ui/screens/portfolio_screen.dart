@@ -2,13 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../logic/portfolio_provider.dart';
+import '../widgets/empty_state.dart';
 import '../widgets/pending_order_card.dart';
 import '../widgets/portfolio_summary.dart';
 import '../widgets/position_tile.dart';
 import '../widgets/sell_order_sheet.dart';
 
 class PortfolioScreen extends StatelessWidget {
-  const PortfolioScreen({super.key});
+  /// Takes people to the markets when there is nothing to show yet.
+  final VoidCallback onOpenMarkets;
+  const PortfolioScreen({super.key, required this.onOpenMarkets});
 
   @override
   Widget build(BuildContext context) {
@@ -40,11 +43,15 @@ class PortfolioScreen extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               if (portfolio.positions.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 16),
-                  child: Text(
-                    'Keine aktiven Positionen. Unter Märkte kannst du '
-                    'Wertpapiere entdecken und deine erste Order aufgeben.',
+                ConstrainedBox(
+                  constraints: const BoxConstraints(minHeight: 260),
+                  child: EmptyState(
+                    icon: Icons.account_balance_wallet_outlined,
+                    title: 'Noch keine Positionen',
+                    message:
+                        'Entdecke Wertpapiere und gib deine erste Order auf.',
+                    actionLabel: 'Märkte entdecken',
+                    onAction: onOpenMarkets,
                   ),
                 ),
               for (final position in portfolio.positions)

@@ -5,9 +5,12 @@ import '../../core/constants/app_colors.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../data/models/transaction.dart';
 import '../../logic/portfolio_provider.dart';
+import '../widgets/empty_state.dart';
 
 class HistoryNewsScreen extends StatelessWidget {
-  const HistoryNewsScreen({super.key});
+  /// Takes people to the markets from the empty order history.
+  final VoidCallback? onOpenMarkets;
+  const HistoryNewsScreen({super.key, this.onOpenMarkets});
 
   @override
   Widget build(BuildContext context) {
@@ -45,12 +48,11 @@ class HistoryNewsScreen extends StatelessWidget {
     final newsList = provider.newsEvents;
 
     if (newsList.isEmpty) {
-      return Center(
-        child: Text(
-          'Noch keine aktuellen Eilmeldungen.\nNeue Meldungen erscheinen, sobald eine Nachrichtenquelle verfügbar ist.',
-          textAlign: TextAlign.center,
-          style: TextStyle(color: AppColors.textSecondary),
-        ),
+      return const EmptyState(
+        icon: Icons.newspaper,
+        title: 'Noch keine Eilmeldungen',
+        message:
+            'Neue Meldungen erscheinen hier, sobald eine Nachrichtenquelle verfügbar ist.',
       );
     }
 
@@ -131,12 +133,13 @@ class HistoryNewsScreen extends StatelessWidget {
     final transactions = provider.transactions;
 
     if (transactions.isEmpty) {
-      return Center(
-        child: Text(
-          'Noch keine Transaktionen vorhanden.\nKaufe Wertpapiere oder Prestige-Güter!',
-          textAlign: TextAlign.center,
-          style: TextStyle(color: AppColors.textSecondary),
-        ),
+      return EmptyState(
+        icon: Icons.receipt_long,
+        title: 'Noch keine Transaktionen',
+        message:
+            'Kaufe Wertpapiere oder Prestige-Güter, dann erscheinen sie hier.',
+        actionLabel: onOpenMarkets == null ? null : 'Märkte entdecken',
+        onAction: onOpenMarkets,
       );
     }
 

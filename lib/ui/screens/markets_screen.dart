@@ -7,6 +7,7 @@ import '../../logic/market_filter_views.dart';
 import '../../data/models/asset.dart';
 import '../../logic/portfolio_provider.dart';
 import '../widgets/asset_card.dart';
+import '../widgets/empty_state.dart';
 import 'trade_detail_screen.dart';
 
 class MarketsScreen extends StatefulWidget {
@@ -298,6 +299,18 @@ class _MarketsScreenState extends State<MarketsScreen> {
     });
     if (_scroll.hasClients) _scroll.jumpTo(0);
   }
+
+  Widget _noHits() => ConstrainedBox(
+    constraints: const BoxConstraints(minHeight: 320),
+    child: EmptyState(
+      icon: Icons.search_off,
+      title: 'Keine Treffer',
+      message:
+          'Zu dieser Suche passt kein Instrument. Passe Suche oder Filter an.',
+      actionLabel: 'Filter zurücksetzen',
+      onAction: _reset,
+    ),
+  );
 
   void _reset() {
     _debounce?.cancel();
@@ -782,12 +795,7 @@ class _MarketsScreenState extends State<MarketsScreen> {
                   filters,
                   summary,
                   if (pageAssets.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.all(32),
-                      child: Center(
-                        child: Text('Keine Instrumente für diese Filter.'),
-                      ),
-                    )
+                    _noHits()
                   else
                     for (final asset in pageAssets)
                       Padding(
@@ -817,16 +825,7 @@ class _MarketsScreenState extends State<MarketsScreen> {
                 child: RefreshIndicator(
                   onRefresh: () => provider.fetchLiveMarketQuotes(),
                   child: pageAssets.isEmpty
-                      ? ListView(
-                          children: const [
-                            SizedBox(height: 80),
-                            Center(
-                              child: Text(
-                                'Keine Instrumente für diese Filter.',
-                              ),
-                            ),
-                          ],
-                        )
+                      ? ListView(children: [_noHits()])
                       : MediaQuery.sizeOf(context).width >= 1000
                       ? _desktopTable(pageAssets, provider)
                       : ListView.builder(

@@ -162,7 +162,7 @@ void main() {
       ) async {
         await tester.binding.setSurfaceSize(Size(width, 1000));
         addTearDown(() => tester.binding.setSurfaceSize(null));
-        await tester.pumpWidget(_app(const PortfolioScreen(), scale: scale));
+        await tester.pumpWidget(_app(PortfolioScreen(onOpenMarkets: () {}), scale: scale));
         expect(tester.takeException(), isNull);
         await tester.scrollUntilVisible(find.byType(PositionTile), 400);
         expect(tester.takeException(), isNull);
