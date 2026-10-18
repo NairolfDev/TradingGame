@@ -388,7 +388,7 @@ class _PrestigeShopScreenState extends State<PrestigeShopScreen> {
             Icon(Icons.lock_outline, color: AppColors.gold, size: 26),
             SizedBox(width: 10),
             Text(
-              '🔒 Anmelden erforderlich',
+              'Anmelden erforderlich',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,

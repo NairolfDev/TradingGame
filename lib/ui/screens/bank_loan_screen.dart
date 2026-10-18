@@ -762,7 +762,7 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                           ),
                           child: Text(
                             isOverdue
-                                ? '⚠️ ÜBERFÄLLIG'
+                                ? 'ÜBERFÄLLIG'
                                 : '$daysLeft Tage übrig',
                             style: TextStyle(
                               fontSize: 12,
@@ -1189,11 +1189,11 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                       !provider.isBankOpen
                           ? 'Bank geschlossen · wieder ab Montag'
                           : provider.isUnderCreditLockout
-                          ? '🔒 5-Tage Kreditsperre aktiv (${provider.creditLockoutTimeRemaining.inDays}T ${provider.creditLockoutTimeRemaining.inHours % 24}h)'
+                          ? '5-Tage-Kreditsperre aktiv (${provider.creditLockoutTimeRemaining.inDays}T ${provider.creditLockoutTimeRemaining.inHours % 24}h)'
                           : (provider.isLoanOnCooldown
-                                ? '⏳ Abkühlphase: 24h Sperre (noch ${provider.loanCooldownRemaining.inHours}h)'
+                                ? 'Abkühlphase: 24 h Sperre (noch ${provider.loanCooldownRemaining.inHours}h)'
                                 : (!provider.canTakeLoan
-                                      ? '⚠️ Bereits 1 Bankkredit aktiv'
+                                      ? 'Bereits ein Bankkredit aktiv'
                                       : 'Kredit über ${CurrencyFormatter.format(_requestedAmount)} jetzt beantragen')),
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,

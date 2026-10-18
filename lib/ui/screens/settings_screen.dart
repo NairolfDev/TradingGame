@@ -98,7 +98,7 @@ class SettingsScreen extends StatelessWidget {
           const SizedBox(height: 24),
 
           // 2. REALISTISCHE ORDERAUSFÜHRUNG
-          _buildSectionHeader('⏱️ BÖRSEN-ORDERAUSFÜHRUNG & REALISMUS'),
+          _buildSectionHeader('BÖRSEN-ORDERAUSFÜHRUNG & REALISMUS'),
           const SizedBox(height: 10),
           _buildCard(
             child: Column(

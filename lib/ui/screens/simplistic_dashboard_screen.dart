@@ -110,7 +110,7 @@ class _SimplisticDashboardScreenState extends State<SimplisticDashboardScreen> {
                   ),
                   if (provider.isRealisticOrderDelay)
                     Text(
-                      '⏱️ 5–15 Min. Routing',
+                      '5–15 Min. Routing',
                       style: TextStyle(
                         fontSize: 12,
                         color: AppColors.accent,
