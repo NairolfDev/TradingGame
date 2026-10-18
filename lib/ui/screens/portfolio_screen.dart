@@ -32,7 +32,7 @@ class PortfolioScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 16),
-              PortfolioSummary(portfolio: portfolio),
+              PortfolioSummary(portfolio: portfolio, compact: true),
               const SizedBox(height: 24),
               Text(
                 'Positionen (${portfolio.positions.length})',
