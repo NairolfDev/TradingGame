@@ -34,32 +34,37 @@ class MarketSchedule {
 
   const MarketSchedule(this.region);
 
-  static MarketSchedule forAsset(Asset asset) {
-    if (asset.type == AssetType.crypto) {
+  static MarketSchedule forAsset(Asset asset) =>
+      forSymbol(asset.symbol, asset.type);
+
+  /// Same rules as [forAsset] for callers that only have symbol and type,
+  /// e.g. a pending order.
+  static MarketSchedule forSymbol(String symbol, AssetType type) {
+    if (type == AssetType.crypto) {
       return const MarketSchedule(MarketRegion.crypto24_7);
     }
     // Asien (Japan .T, China .HK, TSMC, etc.)
-    if (asset.symbol.contains('.T') ||
-        asset.symbol.contains('.HK') ||
-        asset.symbol == 'TSM' ||
-        asset.symbol == 'BABA' ||
-        asset.symbol.contains('JGB')) {
+    if (symbol.contains('.T') ||
+        symbol.contains('.HK') ||
+        symbol == 'TSM' ||
+        symbol == 'BABA' ||
+        symbol.contains('JGB')) {
       return const MarketSchedule(MarketRegion.asiaTokyoHongKong);
     }
     // Europa (Wien .VI, DAX .DE, EU ETFs, Bundesanleihen)
-    if (asset.symbol.contains('.VI') ||
-        asset.symbol.contains('.DE') ||
-        asset.symbol.endsWith('.AS') ||
-        asset.symbol == 'EUNL' ||
-        asset.symbol == 'VUSA' ||
-        asset.symbol == 'IS3N' ||
-        asset.symbol == 'ATX.ETF' ||
-        asset.symbol == 'EXS1' ||
-        asset.symbol.startsWith('RAGB') ||
-        asset.symbol.startsWith('BUND') ||
-        asset.symbol.startsWith('SIEM') ||
-        asset.symbol.contains('DAX-') ||
-        asset.symbol.contains('ATX-')) {
+    if (symbol.contains('.VI') ||
+        symbol.contains('.DE') ||
+        symbol.endsWith('.AS') ||
+        symbol == 'EUNL' ||
+        symbol == 'VUSA' ||
+        symbol == 'IS3N' ||
+        symbol == 'ATX.ETF' ||
+        symbol == 'EXS1' ||
+        symbol.startsWith('RAGB') ||
+        symbol.startsWith('BUND') ||
+        symbol.startsWith('SIEM') ||
+        symbol.contains('DAX-') ||
+        symbol.contains('ATX-')) {
       return const MarketSchedule(MarketRegion.viennaEurope);
     }
     // US Wall Street (NYSE, NASDAQ, S&P 500)
@@ -113,6 +118,10 @@ class MarketSchedule {
         return currentMinutes >= openMinutes && currentMinutes < closeMinutes;
     }
   }
+
+  /// e.g. "Wall Street · Öffnet Montag um 15:30 Uhr"
+  String nextOpeningLine([DateTime? dateTime]) =>
+      '${region.shortName} · ${getNextOpenTimeString(dateTime)}';
 
   String getNextOpenTimeString([DateTime? dateTime]) {
     final now = dateTime ?? DateTime.now();

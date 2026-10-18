@@ -1,17 +1,35 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/currency_formatter.dart';
+import '../../data/models/market_schedule.dart';
 import '../../data/models/pending_order.dart';
 
 class PendingOrderCard extends StatelessWidget {
   final PendingOrder order;
   final VoidCallback onCancel;
 
+  /// Clock for the "opens next" text; defaults to the current time.
+  final DateTime? now;
+
   const PendingOrderCard({
     super.key,
     required this.order,
     required this.onCancel,
+    this.now,
   });
+
+  /// When the market of a waiting order opens next, e.g.
+  /// "Wall Street · Öffnet Montag um 15:30 Uhr".
+  Widget _nextOpening() {
+    final schedule = MarketSchedule.forSymbol(order.symbol, order.assetType);
+    return Padding(
+      padding: const EdgeInsets.only(top: 2),
+      child: Text(
+        schedule.nextOpeningLine(now),
+        style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) => Card(
@@ -58,6 +76,7 @@ class PendingOrderCard extends StatelessWidget {
                 : 'Wartet auf die nächste Börsenöffnung',
             style: TextStyle(fontSize: 14, color: AppColors.warning),
           ),
+          if (order.scheduledExecutionTime == null) _nextOpening(),
           const SizedBox(height: 12),
           TextButton(
             onPressed: onCancel,

@@ -363,6 +363,18 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
                                 : AppColors.warning,
                           ),
                         ),
+                        if (!isOpen)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 2),
+                            child: Text(
+                              schedule.getNextOpenTimeString(),
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                          ),
                       ],
                     ),
                   ),
@@ -1371,6 +1383,11 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
                     ? 'Ausführung zum verfügbaren Kursstand.'
                     : 'Vorab-Order: Ausführung nach Börsenöffnung.',
               ),
+              if (!isOpen)
+                Text(
+                  MarketSchedule.forAsset(asset).nextOpeningLine(),
+                  style: TextStyle(color: AppColors.textSecondary),
+                ),
               const SizedBox(height: 16),
               _buildSheetRow(
                 'Voraussichtliche Menge',
