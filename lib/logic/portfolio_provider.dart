@@ -16,6 +16,7 @@ import '../data/repositories/trading_repository.dart';
 import '../data/repositories/local_trading_repository.dart';
 import '../data/repositories/firebase_trading_repository.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'bank_hours.dart';
 import 'market_engine.dart';
 import 'trading_fee_service.dart';
 import 'bond_coupon_service.dart';
@@ -225,7 +226,14 @@ class PortfolioProvider extends ChangeNotifier {
     return diff.isNegative ? Duration.zero : diff;
   }
 
+  /// Clock for the bank's weekday rule; replaceable in tests.
+  DateTime Function() bankClock = DateTime.now;
+
+  /// Loans are only granted Monday to Friday.
+  bool get isBankOpen => BankHours.isOpen(bankClock());
+
   bool get canTakeLoan {
+    if (!isBankOpen) return false;
     if (_isInsolvent) return false;
     if (isUnderCreditLockout) return false;
     if (isLoanOnCooldown) return false;
@@ -1788,6 +1796,11 @@ class PortfolioProvider extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+    if (!isBankOpen) {
+      _lastAlertMessage = BankHours.closedMessage;
+      notifyListeners();
+      return false;
+    }
     // Erste Kreditaufnahme ist bankenseitig auf maximal 25.000 € gedeckelt
     final previousBankLoans = _transactions.where(
       (t) => t.type == TransactionType.loanPayout,
@@ -1877,15 +1890,25 @@ class PortfolioProvider extends ChangeNotifier {
     return true;
   }
 
-  bool get canTakeRecoveryLoan =>
+  bool get _recoveryLoanReady =>
       _isInsolvent &&
       _insolvencyLockoutUntil != null &&
       !isUnderCreditLockout &&
       !isLoanOnCooldown &&
       !activeLoans.any((l) => l.id.startsWith('sanierung_loan_'));
 
+  bool get canTakeRecoveryLoan => _recoveryLoanReady && isBankOpen;
+
+  /// Everything is in place except the weekday: the UI says "from Monday".
+  bool get recoveryLoanWaitsForBank => _recoveryLoanReady && !isBankOpen;
+
   /// Einmaliger Neustart nach Ablauf der Insolvenz-Kreditsperre.
   Future<bool> takeSanierungsKredit() async {
+    if (recoveryLoanWaitsForBank) {
+      _lastAlertMessage = BankHours.closedMessage;
+      notifyListeners();
+      return false;
+    }
     if (!canTakeRecoveryLoan) {
       _lastAlertMessage =
           'Sanierungskredit erst nach Insolvenz und Ablauf der Kreditsperre verfügbar.';

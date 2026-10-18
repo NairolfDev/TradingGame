@@ -8,6 +8,7 @@ import '../../data/models/loan_model.dart';
 import '../../data/models/transaction.dart';
 import '../../logic/portfolio_provider.dart';
 import '../../logic/auth_provider.dart';
+import '../../logic/bank_hours.dart';
 import '../../logic/credit_rating_service.dart';
 import 'auth_screen.dart';
 
@@ -480,13 +481,16 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
           children: [
             Icon(Icons.account_balance, color: AppColors.primary, size: 22),
             SizedBox(width: 8),
-            Text(
-              'BANK & KREDIT-SCHALTER',
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 1.2,
-                color: AppColors.textPrimary,
+            Flexible(
+              child: Text(
+                'BANK & KREDIT-SCHALTER',
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 1.2,
+                  color: AppColors.textPrimary,
+                ),
               ),
             ),
           ],
@@ -635,10 +639,14 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
           const SizedBox(height: 20),
 
           // 2. LAUFENDE KREDITE SECTION
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 12,
+            runSpacing: 4,
             children: [
               Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(Icons.credit_card, size: 18, color: AppColors.primary),
                   const SizedBox(width: 8),
@@ -868,6 +876,14 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                         '${provider.creditLockoutTimeRemaining.inHours % 24} Stunden und '
                         '${provider.creditLockoutTimeRemaining.inMinutes % 60} Minuten. '
                         'Der Sanierungskredit ist nach Ablauf der Sperre verfügbar.',
+                        style: TextStyle(
+                          color: AppColors.textSecondary,
+                          height: 1.5,
+                        ),
+                      )
+                    else if (provider.recoveryLoanWaitsForBank)
+                      Text(
+                        BankHours.closedMessage,
                         style: TextStyle(
                           color: AppColors.textSecondary,
                           height: 1.5,
@@ -1123,6 +1139,34 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
 
                 const SizedBox(height: 18),
 
+                if (!provider.isBankOpen) ...[
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.warning.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: AppColors.warning.withValues(alpha: 0.5),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.event_busy, color: AppColors.warning),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            BankHours.closedMessage,
+                            style: TextStyle(
+                              color: AppColors.textPrimary,
+                              height: 1.4,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
@@ -1142,7 +1186,9 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                       ),
                     ),
                     child: Text(
-                      provider.isUnderCreditLockout
+                      !provider.isBankOpen
+                          ? 'Bank geschlossen · wieder ab Montag'
+                          : provider.isUnderCreditLockout
                           ? '🔒 5-Tage Kreditsperre aktiv (${provider.creditLockoutTimeRemaining.inDays}T ${provider.creditLockoutTimeRemaining.inHours % 24}h)'
                           : (provider.isLoanOnCooldown
                                 ? '⏳ Abkühlphase: 24h Sperre (noch ${provider.loanCooldownRemaining.inHours}h)'
