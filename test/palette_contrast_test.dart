@@ -23,8 +23,9 @@ void main() {
     final failures = <String>[];
     void check(String palette, String fg, Color a, String bg, Color b) {
       final c = contrast(a, b);
-      if (c < 4.5)
-        failures.add('$palette: $fg on $bg = ${c.toStringAsFixed(2)}');
+      if (c < 4.5) {
+        failures.add();
+      }
     }
 
     palettes.forEach((name, p) {
