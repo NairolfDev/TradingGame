@@ -7,6 +7,7 @@ import '../../logic/market_filter_views.dart';
 import '../../data/models/asset.dart';
 import '../../logic/portfolio_provider.dart';
 import '../widgets/asset_card.dart';
+import '../widgets/empty_state.dart';
 import 'trade_detail_screen.dart';
 
 class MarketsScreen extends StatefulWidget {
@@ -291,6 +292,69 @@ class _MarketsScreenState extends State<MarketsScreen> {
     super.dispose();
   }
 
+  StateSetter? _sheetSetState;
+  int _hitCount = 0;
+
+  bool get _isActive =>
+      _query.isNotEmpty ||
+      _type != null ||
+      _groups.isNotEmpty ||
+      _sector != null ||
+      _watchlist ||
+      _open ||
+      _sort != 'name';
+
+  /// Active filters except the search text (shown on the filter button).
+  int get _filterCount =>
+      (_type != null ? 1 : 0) +
+      _groups.length +
+      (_sector != null ? 1 : 0) +
+      (_watchlist ? 1 : 0) +
+      (_open ? 1 : 0) +
+      (_sort != 'name' ? 1 : 0);
+
+  /// Keeps the open filter sheet in sync with every state change.
+  @override
+  void setState(VoidCallback fn) {
+    super.setState(fn);
+    _sheetSetState?.call(() {});
+  }
+
+  /// Phone: filters live in a sheet so the results start near the top
+  /// (Apple layout: progressive disclosure).
+  void _openFilterSheet(List<Widget> Function() controls) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      useSafeArea: true,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (_, setSheet) {
+          _sheetSetState = setSheet;
+          return SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Filter',
+                  style: Theme.of(sheetContext).textTheme.titleLarge,
+                ),
+                const SizedBox(height: 8),
+                ...controls(),
+                const SizedBox(height: 16),
+                FilledButton(
+                  onPressed: () => Navigator.pop(sheetContext),
+                  child: Text('$_hitCount Ergebnisse anzeigen'),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    ).whenComplete(() => _sheetSetState = null);
+  }
+
   void _change(VoidCallback update) {
     setState(() {
       update();
@@ -298,6 +362,18 @@ class _MarketsScreenState extends State<MarketsScreen> {
     });
     if (_scroll.hasClients) _scroll.jumpTo(0);
   }
+
+  Widget _noHits() => ConstrainedBox(
+    constraints: const BoxConstraints(minHeight: 320),
+    child: EmptyState(
+      icon: Icons.search_off,
+      title: 'Keine Treffer',
+      message:
+          'Zu dieser Suche passt kein Instrument. Passe Suche oder Filter an.',
+      actionLabel: 'Filter zurücksetzen',
+      onAction: _reset,
+    ),
+  );
 
   void _reset() {
     _debounce?.cancel();
@@ -382,14 +458,7 @@ class _MarketsScreenState extends State<MarketsScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) provider.setVisibleMarketAssets(pageAssets);
     });
-    final active =
-        _query.isNotEmpty ||
-        _type != null ||
-        _groups.isNotEmpty ||
-        _sector != null ||
-        _watchlist ||
-        _open ||
-        _sort != 'name';
+    _hitCount = filtered.length;
 
     return Scaffold(
       appBar: AppBar(
@@ -423,317 +492,340 @@ class _MarketsScreenState extends State<MarketsScreen> {
       ),
       body: LayoutBuilder(
         builder: (context, bodyConstraints) {
-          final filters = Padding(
-            key: _filtersKey,
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-            child: Column(
+          // Filter building blocks, rebuilt on demand so the phone sheet can
+          // show live state (see setState override).
+          Widget searchField() => TextField(
+            controller: _search,
+            decoration: InputDecoration(
+              labelText: 'Instrument suchen',
+              hintText: 'Name, Symbol oder Industrie',
+              prefixIcon: const Icon(Icons.search),
+              suffixIcon: _search.text.isEmpty
+                  ? null
+                  : IconButton(
+                      tooltip: 'Suche löschen',
+                      icon: const Icon(Icons.close),
+                      onPressed: () {
+                        _debounce?.cancel();
+                        _search.clear();
+                        _change(() => _query = '');
+                      },
+                    ),
+              border: const OutlineInputBorder(),
+              isDense: true,
+            ),
+            onChanged: (value) {
+              _debounce?.cancel();
+              _debounce = Timer(const Duration(milliseconds: 250), () {
+                if (mounted) _change(() => _query = value);
+              });
+            },
+          );
+          Widget viewsRow() => Align(
+            alignment: Alignment.centerLeft,
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 4,
               children: [
-                TextField(
-                  controller: _search,
-                  decoration: InputDecoration(
-                    labelText: 'Instrument suchen',
-                    hintText: 'Name, Symbol oder Industrie',
-                    prefixIcon: const Icon(Icons.search),
-                    suffixIcon: _search.text.isEmpty
-                        ? null
-                        : IconButton(
-                            tooltip: 'Suche löschen',
-                            icon: const Icon(Icons.close),
-                            onPressed: () {
-                              _debounce?.cancel();
-                              _search.clear();
-                              _change(() => _query = '');
-                            },
-                          ),
-                    border: const OutlineInputBorder(),
-                    isDense: true,
-                  ),
-                  onChanged: (value) {
-                    _debounce?.cancel();
-                    _debounce = Timer(const Duration(milliseconds: 250), () {
-                      if (mounted) _change(() => _query = value);
-                    });
-                  },
-                ),
-                const SizedBox(height: 8),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Wrap(
-                    spacing: 8,
-                    runSpacing: 4,
-                    children: [
-                      PopupMenuButton<String>(
-                        tooltip: 'Gespeicherte Filteransichten',
-                        onSelected: (name) => _applyView(switch (name) {
-                          'preset:DAX' => {
-                            'groups': ['DAX'],
-                          },
-                          'preset:ATX' => {
-                            'groups': ['ATX'],
-                          },
-                          'preset:Nasdaq Technologie' => {
-                            'groups': ['Nasdaq'],
-                            'sector': 'Technologie',
-                          },
-                          _ => _views[name] ?? {},
-                        }),
-                        itemBuilder: (_) => [
-                          for (final name in [
-                            'DAX',
-                            'ATX',
-                            'Nasdaq Technologie',
-                          ])
-                            PopupMenuItem(
-                              value: 'preset:$name',
-                              child: Text(name),
-                            ),
-                          if (_views.isNotEmpty) const PopupMenuDivider(),
-                          for (final name in _views.keys)
-                            PopupMenuItem(value: name, child: Text(name)),
-                        ],
-                        child: const Padding(
-                          padding: EdgeInsets.all(12),
-                          child: Text('Ansichten'),
-                        ),
-                      ),
-                      TextButton.icon(
-                        onPressed: _savingView ? null : _saveView,
-                        icon: const Icon(Icons.bookmark_add_outlined),
-                        label: const Text('Ansicht speichern'),
-                      ),
-                      if (_views.isNotEmpty)
-                        PopupMenuButton<String>(
-                          tooltip: 'Persönliche Ansicht löschen',
-                          icon: const Icon(Icons.bookmark_remove_outlined),
-                          onSelected: _savingView
-                              ? null
-                              : (name) =>
-                                    _persistViews({..._views}..remove(name)),
-                          itemBuilder: (_) => [
-                            for (final name in _views.keys)
-                              PopupMenuItem(value: name, child: Text(name)),
-                          ],
-                        ),
-                    ],
-                  ),
-                ),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Wrap(
-                    spacing: 6,
-                    runSpacing: 2,
-                    children: [
-                      for (final group in [
-                        'Nasdaq',
-                        'DAX',
-                        'ATX',
-                        'Nikkei 225',
-                      ])
-                        FilterChip(
-                          label: Text(group),
-                          selected: _groups.contains(group),
-                          onSelected: (selected) => _change(() {
-                            if (selected) {
-                              _groups.add(group);
-                            } else {
-                              _groups.remove(group);
-                            }
-                          }),
-                        ),
-                    ],
-                  ),
-                ),
-                Wrap(
-                  alignment: WrapAlignment.spaceBetween,
-                  spacing: 12,
-                  children: [
-                    TextButton.icon(
-                      onPressed: () => setState(() => _more = !_more),
-                      icon: Icon(_more ? Icons.expand_less : Icons.tune),
-                      label: const Text('Weitere Filter'),
-                    ),
-                    if (active)
-                      TextButton(
-                        onPressed: _reset,
-                        child: const Text('Zurücksetzen'),
-                      ),
+                PopupMenuButton<String>(
+                  tooltip: 'Gespeicherte Filteransichten',
+                  onSelected: (name) => _applyView(switch (name) {
+                    'preset:DAX' => {
+                      'groups': ['DAX'],
+                    },
+                    'preset:ATX' => {
+                      'groups': ['ATX'],
+                    },
+                    'preset:Nasdaq Technologie' => {
+                      'groups': ['Nasdaq'],
+                      'sector': 'Technologie',
+                    },
+                    _ => _views[name] ?? {},
+                  }),
+                  itemBuilder: (_) => [
+                    for (final name in ['DAX', 'ATX', 'Nasdaq Technologie'])
+                      PopupMenuItem(value: 'preset:$name', child: Text(name)),
+                    if (_views.isNotEmpty) const PopupMenuDivider(),
+                    for (final name in _views.keys)
+                      PopupMenuItem(value: name, child: Text(name)),
                   ],
-                ),
-                if (active)
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: Wrap(
-                      spacing: 6,
-                      runSpacing: 4,
-                      children: [
-                        if (_query.isNotEmpty)
-                          InputChip(
-                            label: Text('Suche: $_query'),
-                            onDeleted: () {
-                              _debounce?.cancel();
-                              _search.clear();
-                              _change(() => _query = '');
-                            },
-                          ),
-                        if (_type != null)
-                          InputChip(
-                            label: Text(_type!.displayName),
-                            onDeleted: () => _change(() => _type = null),
-                          ),
-                        for (final group in _groups)
-                          InputChip(
-                            label: Text('Index: $group'),
-                            onDeleted: () =>
-                                _change(() => _groups.remove(group)),
-                          ),
-                        if (_sector != null)
-                          InputChip(
-                            label: Text('Branche: $_sector'),
-                            onDeleted: () => _change(() => _sector = null),
-                          ),
-                        if (_watchlist)
-                          InputChip(
-                            label: const Text('Nur Watchlist'),
-                            onDeleted: () => _change(() => _watchlist = false),
-                          ),
-                        if (_open)
-                          InputChip(
-                            label: const Text('Börse offen'),
-                            onDeleted: () => _change(() => _open = false),
-                          ),
-                        if (_sort != 'name')
-                          InputChip(
-                            label: const Text('Sortierung aktiv'),
-                            onDeleted: () => _change(() => _sort = 'name'),
-                          ),
-                      ],
-                    ),
+                  child: const Padding(
+                    padding: EdgeInsets.all(12),
+                    child: Text('Ansichten'),
                   ),
-                if (_more)
-                  Wrap(
-                    spacing: 12,
-                    runSpacing: 8,
-                    children: [
-                      SizedBox(
-                        width: 180,
-                        child: DropdownButtonFormField<AssetType>(
-                          isExpanded: true,
-                          initialValue: _type,
-                          key: ValueKey('type-$_type'),
-                          decoration: const InputDecoration(
-                            labelText: 'Assetklasse',
-                          ),
-                          items: [
-                            const DropdownMenuItem<AssetType>(
-                              value: null,
-                              child: Text('Alle Assetklassen'),
-                            ),
-                            ...AssetType.values.map(
-                              (type) => DropdownMenuItem(
-                                value: type,
-                                child: Text(type.displayName),
-                              ),
-                            ),
-                          ],
-                          onChanged: (value) => _change(() => _type = value),
-                        ),
-                      ),
-                      SizedBox(
-                        width: 220,
-                        child: DropdownButtonFormField<String>(
-                          initialValue: _sector,
-                          key: ValueKey('sector-$_sector'),
-                          isExpanded: true,
-                          decoration: const InputDecoration(
-                            labelText: 'Branche',
-                          ),
-                          items: [
-                            const DropdownMenuItem<String>(
-                              value: null,
-                              child: Text('Alle Branchen'),
-                            ),
-                            ...sectors.map(
-                              (sector) => DropdownMenuItem(
-                                value: sector,
-                                child: Text(
-                                  sector,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ),
-                          ],
-                          onChanged: (value) => _change(() => _sector = value),
-                        ),
-                      ),
-                      SizedBox(
-                        width: 220,
-                        child: DropdownButtonFormField<String>(
-                          isExpanded: true,
-                          initialValue:
-                              [
-                                'name',
-                                'nameDesc',
-                                'priceAsc',
-                                'priceDesc',
-                                'gain',
-                                'loss',
-                              ].contains(_sort)
-                              ? _sort
-                              : null,
-                          key: ValueKey('sort-$_sort'),
-                          decoration: const InputDecoration(
-                            labelText: 'Sortieren',
-                          ),
-                          items: const [
-                            DropdownMenuItem(
-                              value: 'name',
-                              child: Text('Name A–Z'),
-                            ),
-                            DropdownMenuItem(
-                              value: 'nameDesc',
-                              child: Text('Name Z–A'),
-                            ),
-                            DropdownMenuItem(
-                              value: 'priceAsc',
-                              child: Text('Preis aufsteigend'),
-                            ),
-                            DropdownMenuItem(
-                              value: 'priceDesc',
-                              child: Text('Preis absteigend'),
-                            ),
-                            DropdownMenuItem(
-                              value: 'gain',
-                              child: Text(
-                                'Gewinner',
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            DropdownMenuItem(
-                              value: 'loss',
-                              child: Text(
-                                'Verlierer',
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                          onChanged: (value) =>
-                              _change(() => _sort = value ?? 'name'),
-                        ),
-                      ),
-                      FilterChip(
-                        label: const Text('Nur Watchlist'),
-                        selected: _watchlist,
-                        onSelected: (v) => _change(() => _watchlist = v),
-                      ),
-                      FilterChip(
-                        label: const Text('Börse offen'),
-                        selected: _open,
-                        onSelected: (v) => _change(() => _open = v),
-                      ),
+                ),
+                TextButton.icon(
+                  onPressed: _savingView ? null : _saveView,
+                  icon: const Icon(Icons.bookmark_add_outlined),
+                  label: const Text('Ansicht speichern'),
+                ),
+                if (_views.isNotEmpty)
+                  PopupMenuButton<String>(
+                    tooltip: 'Persönliche Ansicht löschen',
+                    icon: const Icon(Icons.bookmark_remove_outlined),
+                    onSelected: _savingView
+                        ? null
+                        : (name) => _persistViews({..._views}..remove(name)),
+                    itemBuilder: (_) => [
+                      for (final name in _views.keys)
+                        PopupMenuItem(value: name, child: Text(name)),
                     ],
                   ),
               ],
             ),
+          );
+          Widget groupsRow() => Align(
+            alignment: Alignment.centerLeft,
+            child: Wrap(
+              spacing: 6,
+              runSpacing: 2,
+              children: [
+                for (final group in ['Nasdaq', 'DAX', 'ATX', 'Nikkei 225'])
+                  FilterChip(
+                    label: Text(group),
+                    selected: _groups.contains(group),
+                    onSelected: (selected) => _change(() {
+                      if (selected) {
+                        _groups.add(group);
+                      } else {
+                        _groups.remove(group);
+                      }
+                    }),
+                  ),
+              ],
+            ),
+          );
+          Widget moreRow() => Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            spacing: 12,
+            children: [
+              TextButton.icon(
+                onPressed: () => setState(() => _more = !_more),
+                icon: Icon(_more ? Icons.expand_less : Icons.tune),
+                label: const Text('Weitere Filter'),
+              ),
+              if (_isActive)
+                TextButton(
+                  onPressed: _reset,
+                  child: const Text('Zurücksetzen'),
+                ),
+            ],
+          );
+          List<Widget> activeChips() => [
+            if (_isActive)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  children: [
+                    if (_query.isNotEmpty)
+                      InputChip(
+                        label: Text('Suche: $_query'),
+                        onDeleted: () {
+                          _debounce?.cancel();
+                          _search.clear();
+                          _change(() => _query = '');
+                        },
+                      ),
+                    if (_type != null)
+                      InputChip(
+                        label: Text(_type!.displayName),
+                        onDeleted: () => _change(() => _type = null),
+                      ),
+                    for (final group in _groups)
+                      InputChip(
+                        label: Text('Index: $group'),
+                        onDeleted: () => _change(() => _groups.remove(group)),
+                      ),
+                    if (_sector != null)
+                      InputChip(
+                        label: Text('Branche: $_sector'),
+                        onDeleted: () => _change(() => _sector = null),
+                      ),
+                    if (_watchlist)
+                      InputChip(
+                        label: const Text('Nur Watchlist'),
+                        onDeleted: () => _change(() => _watchlist = false),
+                      ),
+                    if (_open)
+                      InputChip(
+                        label: const Text('Börse offen'),
+                        onDeleted: () => _change(() => _open = false),
+                      ),
+                    if (_sort != 'name')
+                      InputChip(
+                        label: const Text('Sortierung aktiv'),
+                        onDeleted: () => _change(() => _sort = 'name'),
+                      ),
+                  ],
+                ),
+              ),
+          ];
+          List<Widget> dropdowns() => [
+            if (_more)
+              Wrap(
+                spacing: 12,
+                runSpacing: 8,
+                children: [
+                  SizedBox(
+                    width: 180,
+                    child: DropdownButtonFormField<AssetType>(
+                      isExpanded: true,
+                      initialValue: _type,
+                      key: ValueKey('type-$_type'),
+                      decoration: const InputDecoration(
+                        labelText: 'Assetklasse',
+                      ),
+                      items: [
+                        const DropdownMenuItem<AssetType>(
+                          value: null,
+                          child: Text('Alle Assetklassen'),
+                        ),
+                        ...AssetType.values.map(
+                          (type) => DropdownMenuItem(
+                            value: type,
+                            child: Text(type.displayName),
+                          ),
+                        ),
+                      ],
+                      onChanged: (value) => _change(() => _type = value),
+                    ),
+                  ),
+                  SizedBox(
+                    width: 220,
+                    child: DropdownButtonFormField<String>(
+                      initialValue: _sector,
+                      key: ValueKey('sector-$_sector'),
+                      isExpanded: true,
+                      decoration: const InputDecoration(labelText: 'Branche'),
+                      items: [
+                        const DropdownMenuItem<String>(
+                          value: null,
+                          child: Text('Alle Branchen'),
+                        ),
+                        ...sectors.map(
+                          (sector) => DropdownMenuItem(
+                            value: sector,
+                            child: Text(
+                              sector,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ),
+                      ],
+                      onChanged: (value) => _change(() => _sector = value),
+                    ),
+                  ),
+                  SizedBox(
+                    width: 220,
+                    child: DropdownButtonFormField<String>(
+                      isExpanded: true,
+                      initialValue:
+                          [
+                            'name',
+                            'nameDesc',
+                            'priceAsc',
+                            'priceDesc',
+                            'gain',
+                            'loss',
+                          ].contains(_sort)
+                          ? _sort
+                          : null,
+                      key: ValueKey('sort-$_sort'),
+                      decoration: const InputDecoration(labelText: 'Sortieren'),
+                      items: const [
+                        DropdownMenuItem(
+                          value: 'name',
+                          child: Text('Name A–Z'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'nameDesc',
+                          child: Text('Name Z–A'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'priceAsc',
+                          child: Text('Preis aufsteigend'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'priceDesc',
+                          child: Text('Preis absteigend'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'gain',
+                          child: Text(
+                            'Gewinner',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        DropdownMenuItem(
+                          value: 'loss',
+                          child: Text(
+                            'Verlierer',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                      onChanged: (value) =>
+                          _change(() => _sort = value ?? 'name'),
+                    ),
+                  ),
+                  FilterChip(
+                    label: const Text('Nur Watchlist'),
+                    selected: _watchlist,
+                    onSelected: (v) => _change(() => _watchlist = v),
+                  ),
+                  FilterChip(
+                    label: const Text('Börse offen'),
+                    selected: _open,
+                    onSelected: (v) => _change(() => _open = v),
+                  ),
+                ],
+              ),
+          ];
+          final phone = MediaQuery.sizeOf(context).width < 600;
+          final filters = Padding(
+            key: _filtersKey,
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            child: phone
+                ? Column(
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(child: searchField()),
+                          const SizedBox(width: 8),
+                          Badge(
+                            isLabelVisible: _filterCount > 0,
+                            label: Text('$_filterCount'),
+                            child: IconButton.filledTonal(
+                              tooltip: 'Filter',
+                              icon: const Icon(Icons.tune),
+                              onPressed: () => _openFilterSheet(
+                                () => [
+                                  viewsRow(),
+                                  groupsRow(),
+                                  moreRow(),
+                                  ...dropdowns(),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      ...activeChips(),
+                    ],
+                  )
+                : Column(
+                    children: [
+                      searchField(),
+                      const SizedBox(height: 8),
+                      viewsRow(),
+                      groupsRow(),
+                      moreRow(),
+                      ...activeChips(),
+                      ...dropdowns(),
+                    ],
+                  ),
           );
           final summary = Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -782,12 +874,7 @@ class _MarketsScreenState extends State<MarketsScreen> {
                   filters,
                   summary,
                   if (pageAssets.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.all(32),
-                      child: Center(
-                        child: Text('Keine Instrumente für diese Filter.'),
-                      ),
-                    )
+                    _noHits()
                   else
                     for (final asset in pageAssets)
                       Padding(
@@ -817,16 +904,7 @@ class _MarketsScreenState extends State<MarketsScreen> {
                 child: RefreshIndicator(
                   onRefresh: () => provider.fetchLiveMarketQuotes(),
                   child: pageAssets.isEmpty
-                      ? ListView(
-                          children: const [
-                            SizedBox(height: 80),
-                            Center(
-                              child: Text(
-                                'Keine Instrumente für diese Filter.',
-                              ),
-                            ),
-                          ],
-                        )
+                      ? ListView(children: [_noHits()])
                       : MediaQuery.sizeOf(context).width >= 1000
                       ? _desktopTable(pageAssets, provider)
                       : ListView.builder(

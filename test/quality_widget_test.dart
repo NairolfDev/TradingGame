@@ -12,7 +12,9 @@ import 'package:trading_game/ui/widgets/interactive_broker_chart.dart';
 import 'package:trading_game/ui/widgets/order_book_widget.dart';
 
 void main() {
-  testWidgets('dashboard keeps title and account metrics readable at 375px', (tester) async {
+  testWidgets('dashboard keeps title and account metrics readable at 375px', (
+    tester,
+  ) async {
     SharedPreferences.setMockInitialValues({});
     await tester.binding.setSurfaceSize(const Size(375, 812));
     addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -25,9 +27,12 @@ void main() {
       portfolio.marketEngine.stop();
     });
     addTearDown(portfolio.dispose);
-    await tester.pumpWidget(ChangeNotifierProvider.value(value: portfolio,
-      child: MaterialApp(home: DashboardScreen(onNavigateTab: (_) {})),
-    ));
+    await tester.pumpWidget(
+      ChangeNotifierProvider.value(
+        value: portfolio,
+        child: MaterialApp(home: DashboardScreen(onNavigateTab: (_) {})),
+      ),
+    );
     await tester.pumpAndSettle();
     expect(find.text('Frei verfügbares Cash'), findsOneWidget);
     expect(find.text('Schulden'), findsOneWidget);
@@ -59,8 +64,8 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
-          body: SizedBox(
-            height: 320,
+          body: Align(
+            alignment: Alignment.topCenter,
             child: InteractiveBrokerChart(
               asset: InitialAssets.getAssets().firstWhere(
                 (a) => a.type == AssetType.bond,
@@ -72,10 +77,43 @@ void main() {
       ),
     );
     await tester.pump();
-    expect(find.textContaining('Keine EUR-Kursdaten'), findsOneWidget);
-    await tester.tap(find.text('1Y'));
+    await tester.pump();
+    // Bonds have no live source: permanent, so a compact note instead of a
+    // retry button, timeframe chips or a half-screen empty chart.
+    expect(find.text('Kein EUR-Verlauf verfügbar'), findsOneWidget);
+    expect(find.text('Erneut laden'), findsNothing);
+    expect(find.text('1Y'), findsNothing);
+    final note = find.descendant(
+      of: find.byType(InteractiveBrokerChart),
+      matching: find.byType(Row),
+    );
+    expect(tester.getSize(note.first).height, lessThan(140));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a temporary chart failure still offers a retry', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(375, 667));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            height: 400,
+            child: InteractiveBrokerChart(
+              asset: InitialAssets.getAssets().firstWhere(
+                (a) => a.symbol == 'BTC',
+              ),
+              isPositive: true,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
     await tester.pump();
     expect(find.textContaining('Keine EUR-Kursdaten'), findsOneWidget);
+    expect(find.text('Erneut laden'), findsOneWidget);
+    expect(find.text('1Y'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

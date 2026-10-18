@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import '../widgets/motion_safe.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../data/models/loan_model.dart';
@@ -28,9 +29,7 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
     } else if (grade.startsWith('BBB')) {
       return AppColors.accent; // Cyan / Blue
     } else if (grade.startsWith('BB')) {
-      return AppColors.gold; // Amber
-    } else if (grade.startsWith('CCC')) {
-      return AppColors.warning;
+      return AppColors.warning; // Amber
     } else {
       return AppColors.loss; // Crimson / Red Kredithai
     }
@@ -294,7 +293,7 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
         minimumSize: Size.zero,
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
       ),
-      child: Text(label, style: const TextStyle(fontSize: 11)),
+      child: Text(label, style: const TextStyle(fontSize: 12)),
     );
   }
 
@@ -392,7 +391,7 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
             const SizedBox(height: 12),
             Text(
               'Hinweis: Dieser Betrag erhöht deine Verbindlichkeiten und senkt dein Net Worth bis zur Tilgung.',
-              style: TextStyle(fontSize: 11, color: AppColors.textMuted),
+              style: TextStyle(fontSize: 12, color: AppColors.textMuted),
             ),
           ],
         ),
@@ -530,7 +529,7 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                     Text(
                       'DEINE KREDITWÜRDIGKEIT (RATING)',
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: 12,
                         letterSpacing: 1.2,
                         fontWeight: FontWeight.w700,
                         color: AppColors.textSecondary,
@@ -593,7 +592,7 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                         Text(
                           'Aktueller Kreditzins p.a.:',
                           style: TextStyle(
-                            fontSize: 11,
+                            fontSize: 12,
                             color: AppColors.textMuted,
                           ),
                         ),
@@ -613,7 +612,7 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                         Text(
                           'Aktive Gesamtverbindlichkeiten:',
                           style: TextStyle(
-                            fontSize: 11,
+                            fontSize: 12,
                             color: AppColors.textMuted,
                           ),
                         ),
@@ -631,7 +630,7 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                 ),
               ],
             ),
-          ).animate().fadeIn(duration: 400.ms).slideY(begin: 0.1, end: 0),
+          ).motionSafe(context).fadeIn(duration: 400.ms).slideY(begin: 0.1, end: 0),
 
           const SizedBox(height: 20),
 
@@ -758,7 +757,7 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                                 ? '⚠️ ÜBERFÄLLIG'
                                 : '$daysLeft Tage übrig',
                             style: TextStyle(
-                              fontSize: 11,
+                              fontSize: 12,
                               fontWeight: FontWeight.bold,
                               color: isOverdue
                                   ? AppColors.loss
@@ -810,14 +809,14 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                         Text(
                           'Getilgt: ${CurrencyFormatter.format(loan.paidAmount)} (${(paidPercent * 100).toStringAsFixed(0)}%)',
                           style: TextStyle(
-                            fontSize: 11,
+                            fontSize: 12,
                             color: AppColors.textMuted,
                           ),
                         ),
                         Text(
                           'Frist: ${loan.dueDate.day}.${loan.dueDate.month}.${loan.dueDate.year}',
                           style: TextStyle(
-                            fontSize: 11,
+                            fontSize: 12,
                             color: AppColors.textMuted,
                           ),
                         ),
@@ -844,7 +843,7 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                     ),
                   ],
                 ),
-              ).animate().fadeIn(duration: 350.ms);
+              ).motionSafe(context).fadeIn(duration: 350.ms);
             }),
           ],
 
@@ -952,18 +951,18 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                           vertical: 3,
                         ),
                         decoration: BoxDecoration(
-                          color: AppColors.accentGold.withValues(alpha: 0.15),
+                          color: AppColors.accent.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(
-                            color: AppColors.accentGold.withValues(alpha: 0.5),
+                            color: AppColors.accent.withValues(alpha: 0.5),
                           ),
                         ),
                         child: Text(
                           '1. Kredit: Max. 25.000 €',
                           style: TextStyle(
-                            fontSize: 10,
+                            fontSize: 12,
                             fontWeight: FontWeight.bold,
-                            color: AppColors.gold,
+                            color: AppColors.accent,
                           ),
                         ),
                       ),
@@ -1159,7 +1158,7 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                 ),
               ],
             ),
-          ).animate().fadeIn(duration: 400.ms, delay: 100.ms),
+          ).motionSafe(context).fadeIn(duration: 400.ms, delay: 100.ms),
 
           const SizedBox(height: 20),
 
@@ -1234,7 +1233,7 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(title, style: TextStyle(fontSize: 11, color: AppColors.textMuted)),
+        Text(title, style: TextStyle(fontSize: 12, color: AppColors.textMuted)),
         const SizedBox(height: 2),
         Text(
           value,

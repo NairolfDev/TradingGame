@@ -77,7 +77,7 @@ class _WatchlistMarqueeTickerState extends State<WatchlistMarqueeTicker> {
         color: AppColors.surface.withValues(alpha: 0.95),
         border: Border(
           top: BorderSide(
-            color: AppColors.accentGold.withValues(alpha: 0.4),
+            color: AppColors.accent.withValues(alpha: 0.4),
             width: 1.0,
           ),
           bottom: BorderSide(color: AppColors.cardBorder, width: 0.5),
@@ -112,8 +112,8 @@ class _WatchlistMarqueeTickerState extends State<WatchlistMarqueeTicker> {
                 Text(
                   watchlisted.isNotEmpty ? 'WATCHLIST' : 'KURSE',
                   style: TextStyle(
-                    color: AppColors.accentGold,
-                    fontSize: 10,
+                    color: AppColors.accent,
+                    fontSize: 12,
                     fontWeight: FontWeight.w900,
                     letterSpacing: 0.8,
                   ),
@@ -162,7 +162,7 @@ class _WatchlistMarqueeTickerState extends State<WatchlistMarqueeTicker> {
                             asset.symbol,
                             style: TextStyle(
                               color: AppColors.textPrimary,
-                              fontSize: 11,
+                              fontSize: 12,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -175,7 +175,7 @@ class _WatchlistMarqueeTickerState extends State<WatchlistMarqueeTicker> {
                                 : 'Kein Kurs',
                             style: TextStyle(
                               color: AppColors.textSecondary,
-                              fontSize: 11,
+                              fontSize: 12,
                             ),
                           ),
                           const SizedBox(width: 4),
@@ -200,7 +200,7 @@ class _WatchlistMarqueeTickerState extends State<WatchlistMarqueeTicker> {
                                 color: isPositive
                                     ? AppColors.profitGreen
                                     : AppColors.lossRed,
-                                fontSize: 9.5,
+                                fontSize: 12,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -210,7 +210,7 @@ class _WatchlistMarqueeTickerState extends State<WatchlistMarqueeTicker> {
                             '•',
                             style: TextStyle(
                               color: AppColors.textMuted,
-                              fontSize: 10,
+                              fontSize: 12,
                             ),
                           ),
                         ],

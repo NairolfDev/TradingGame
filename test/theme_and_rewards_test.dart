@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:trading_game/core/constants/app_colors.dart';
@@ -11,7 +12,7 @@ void main() {
 
   test('theme controller switches all four palettes and persists', () async {
     SharedPreferences.setMockInitialValues({});
-    final theme = ThemeController();
+    final theme = ThemeController(platformBrightness: () => Brightness.dark);
     await Future<void>.delayed(Duration.zero);
     expect(AppColors.palette, same(AppPalette.gameDark));
     expect(AppColors.isGamer, isTrue);
@@ -24,7 +25,7 @@ void main() {
     await theme.setDark(true);
     expect(AppColors.palette, same(AppPalette.simpleDark));
 
-    final restored = ThemeController();
+    final restored = ThemeController(platformBrightness: () => Brightness.dark);
     await Future<void>.delayed(Duration.zero);
     expect(restored.style, AppStyle.schlicht);
     expect(restored.isDark, isTrue);

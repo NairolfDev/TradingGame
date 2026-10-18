@@ -99,7 +99,7 @@ class AchievementsScreen extends StatelessWidget {
                   Text(
                     'Schalte Trophäen durch Trading, Gewinne, Prestige und Bot-Automatisierung frei, um Cash-Boni und Ruhm zu erhalten!',
                     style: TextStyle(
-                      fontSize: 11.5,
+                      fontSize: 12,
                       color: AppColors.textSecondary,
                     ),
                   ),
@@ -202,7 +202,7 @@ class AchievementsScreen extends StatelessWidget {
                             Text(
                               'Erreicht',
                               style: TextStyle(
-                                fontSize: 10,
+                                fontSize: 12,
                                 fontWeight: FontWeight.bold,
                                 color: AppColors.profitGreen,
                               ),
@@ -243,7 +243,7 @@ class AchievementsScreen extends StatelessWidget {
                       child: Text(
                         '+${CurrencyFormatter.format(ach.cashReward)} Bonus',
                         style: TextStyle(
-                          fontSize: 10,
+                          fontSize: 12,
                           fontWeight: FontWeight.bold,
                           color: AppColors.accent,
                         ),
@@ -262,7 +262,7 @@ class AchievementsScreen extends StatelessWidget {
                       child: Text(
                         '+${ach.prestigeReward} Prestige',
                         style: TextStyle(
-                          fontSize: 10,
+                          fontSize: 12,
                           fontWeight: FontWeight.bold,
                           color: AppColors.accentGold,
                         ),
@@ -273,7 +273,7 @@ class AchievementsScreen extends StatelessWidget {
                       Text(
                         DateFormat('dd.MM.yyyy').format(ach.unlockedAt!),
                         style: TextStyle(
-                          fontSize: 10,
+                          fontSize: 12,
                           color: AppColors.textMuted,
                         ),
                       ),

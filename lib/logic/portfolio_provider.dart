@@ -123,6 +123,16 @@ class PortfolioProvider extends ChangeNotifier {
     return '${quote?.source ?? 'Anbieter'} · Stand $date $time · ggf. verzögert$fx';
   }
 
+  /// One short line for lists; the full provider/FX details stay in
+  /// [quoteStatus] on the instrument page.
+  String quoteStatusShort(Asset asset) {
+    final updated = quoteUpdatedAt(asset);
+    if (updated == null) return 'Kurs nicht verfügbar';
+    final time =
+        '${updated.hour.toString().padLeft(2, '0')}:${updated.minute.toString().padLeft(2, '0')}';
+    return 'Stand ${updated.day}.${updated.month}. $time · ggf. verzögert';
+  }
+
   void setVisibleMarketAssets(Iterable<Asset> assets) {
     final ids = assets.map((a) => a.id).take(50).toSet();
     if (setEquals(ids, _visibleMarketAssetIds)) return;

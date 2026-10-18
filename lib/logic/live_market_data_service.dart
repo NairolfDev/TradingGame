@@ -103,6 +103,15 @@ class LiveMarketDataService {
     return updated;
   }
 
+  /// Instruments for which the proxy answered HTTP 422 (no timestamp-aligned
+  /// EUR history): permanent, unlike a network error.
+  static final Set<String> _noHistory = {};
+
+  /// True when no EUR price history can ever be shown for [asset]: there is no
+  /// live source at all, or the proxy refused it permanently.
+  static bool historyUnavailable(Asset asset) =>
+      euroYahooSymbolFor(asset) == null || _noHistory.contains(asset.symbol);
+
   /// Holt historische Zeitreihen für die verschiedenen Timeframes (1D, 1W, 1M, 1Y, 3Y, ALL)
   Future<List<double>?> fetchHistoricalSeries(
     Asset asset,
@@ -118,8 +127,9 @@ class LiveMarketDataService {
 
     try {
       if (symbol.isNotEmpty) {
-        final series = await _fetchYahooHistory(symbol, timeframe);
+        final series = await _fetchYahooHistory(symbol, timeframe, assetKey);
         if (series != null && series.isNotEmpty) {
+          _noHistory.remove(assetKey);
           _historicalSeriesCache.putIfAbsent(assetKey, () => {})[timeframe] =
               series;
           return series;
@@ -184,12 +194,14 @@ class LiveMarketDataService {
   Future<List<double>?> _fetchYahooHistory(
     String yahooSymbol,
     String timeframe,
+    String assetKey,
   ) async {
     try {
       final uri = Uri.parse('$_cloudApiBase/history').replace(
         queryParameters: {'symbol': yahooSymbol, 'timeframe': timeframe},
       );
       final response = await http.get(uri).timeout(const Duration(seconds: 10));
+      if (response.statusCode == 422) _noHistory.add(assetKey);
       if (response.statusCode != 200) return null;
       final data = jsonDecode(response.body) as Map<String, dynamic>;
       final series = (data['series'] as List<dynamic>?)

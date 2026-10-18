@@ -22,6 +22,9 @@ class RewardOverlay extends StatefulWidget {
   State<RewardOverlay> createState() => _RewardOverlayState();
 }
 
+/// How long a card stays when nothing is dismissing it.
+const _visibleFor = Duration(seconds: 8);
+
 class _RewardOverlayState extends State<RewardOverlay>
     with TickerProviderStateMixin {
   StreamSubscription<RewardEvent>? _sub;
@@ -68,10 +71,10 @@ class _RewardOverlayState extends State<RewardOverlay>
     setState(() => _current = e);
     _anim.forward(from: 0);
     _hideTimer?.cancel();
-    _hideTimer = Timer(
-      Duration(milliseconds: celebrate ? 3200 : 2400),
-      _dismiss,
-    );
+    // Apple: avoid time-boxed UI. People using a screen reader or who read
+    // slowly get no timer at all; everyone else gets 8 s plus a close button.
+    final keep = MediaQuery.maybeOf(context)?.accessibleNavigation ?? false;
+    if (!keep) _hideTimer = Timer(_visibleFor, _dismiss);
   }
 
   void _dismiss() {
@@ -192,6 +195,7 @@ class _QuietCard extends StatelessWidget {
                     ),
                   ),
                 ],
+                _CloseButton(onTap),
               ],
             ),
           ),
@@ -314,6 +318,7 @@ class _GamerCard extends StatelessWidget {
                       ],
                     ),
                   ),
+                  _CloseButton(onTap),
                 ],
               ),
             ),
@@ -322,6 +327,28 @@ class _GamerCard extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Explicit way out (Apple: dismiss through an action, not a timer).
+/// No Tooltip: this overlay sits above the Navigator and has no Overlay.
+class _CloseButton extends StatelessWidget {
+  final VoidCallback onTap;
+  const _CloseButton(this.onTap);
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    button: true,
+    label: 'Meldung schließen',
+    excludeSemantics: true,
+    child: InkResponse(
+      onTap: onTap,
+      radius: 24,
+      child: SizedBox.square(
+        dimension: 48,
+        child: Icon(Icons.close, size: 20, color: AppColors.textSecondary),
+      ),
+    ),
+  );
 }
 
 class _ConfettiPainter extends CustomPainter {
