@@ -98,18 +98,48 @@ class LiveMarketDataService {
       return at == null ||
           DateTime.now().difference(at) > const Duration(seconds: 90);
     }).toList();
-    final batch = kIsWeb ? 3 : 6;
-    for (var i = 0; i < supported.length; i += batch) {
+    // Crypto: Binance/CoinGecko, a few at a time.
+    final crypto = supported.where((a) => a.type == AssetType.crypto).toList();
+    for (var i = 0; i < crypto.length; i += 6) {
       await Future.wait(
-        supported.skip(i).take(batch).map((asset) async {
+        crypto.skip(i).take(6).map((asset) async {
           try {
-            final quote = asset.type == AssetType.crypto
-                ? await _fetchCryptoQuote(asset)
-                : await _fetchYahooQuote(euroYahooSymbolFor(asset)!);
+            final quote = await _fetchCryptoQuote(asset);
             if (quote != null) updated[asset.symbol] = quote;
           } catch (_) {}
         }),
       );
+    }
+
+    // Everything else: Yahoo spark in chunks of 20, FX rates in the first one.
+    final others = supported.where((a) => a.type != AssetType.crypto).toList();
+    final symbols = {for (final a in others) euroYahooSymbolFor(a)!}.toList();
+    if (symbols.isNotEmpty) {
+      final fx = _fxSymbols.values.where((f) {
+        final c = _fxCache[f];
+        return c == null ||
+            DateTime.now().difference(c.at) > const Duration(minutes: 5);
+      });
+      symbols.insertAll(0, fx);
+    }
+    final charts = <String, Map<String, dynamic>>{};
+    for (var i = 0; i < symbols.length; i += sparkChunk) {
+      charts.addAll(await _spark(symbols.skip(i).take(sparkChunk).toList()));
+    }
+    for (final f in _fxSymbols.values) {
+      final meta = charts[f]?['meta'];
+      if (meta is Map<String, dynamic>) {
+        _fxCache[f] = (at: DateTime.now(), meta: meta);
+      }
+    }
+    for (final asset in others) {
+      final symbol = euroYahooSymbolFor(asset)!;
+      final chart = charts[symbol];
+      if (chart == null) continue;
+      try {
+        final quote = await _fetchYahooQuote(symbol, chart: chart);
+        if (quote != null) updated[asset.symbol] = quote;
+      } catch (_) {}
     }
     if (updated.isNotEmpty) _lastSyncTime = DateTime.now();
     return updated;
@@ -185,6 +215,10 @@ class LiveMarketDataService {
     final target = Uri.parse(
       '$_yahooChart/${Uri.encodeComponent(symbol)}',
     ).replace(queryParameters: {'interval': interval, 'range': range});
+    return _yahooBody(target, timeout);
+  }
+
+  Future<String?> _yahooBody(Uri target, Duration timeout) async {
     if (!kIsWeb) {
       final r = await http.get(target, headers: _yahooHeaders).timeout(timeout);
       return r.statusCode == 200 ? r.body : null;
@@ -229,9 +263,47 @@ class LiveMarketDataService {
   }
 
   /// Quote in EUR: non-EUR prices use the current FX rate (a snapshot).
-  Future<LiveQuoteResult?> _fetchYahooQuote(String yahooSymbol) async {
+  /// Up to 20 symbols in one request (Yahoo spark): the same per-symbol data
+  /// as a chart, so a whole page of quotes costs one relay call.
+  static const sparkChunk = 20;
+
+  Future<Map<String, Map<String, dynamic>>> _spark(List<String> symbols) async {
+    final target = Uri.parse(
+      'https://query1.finance.yahoo.com/v7/finance/spark',
+    ).replace(
+      queryParameters: {
+        'symbols': symbols.join(','),
+        'range': '1d',
+        'interval': '5m',
+      },
+    );
+    for (var attempt = 0; attempt < 2; attempt++) {
+      try {
+        final body = await _yahooBody(target, const Duration(seconds: 15));
+        if (body == null) continue;
+        final result = ((jsonDecode(body) as Map?)?['spark'] as Map?)?['result'];
+        if (result is! List) continue;
+        return {
+          for (final e in result)
+            if (e is Map &&
+                e['symbol'] is String &&
+                (e['response'] as List?)?.firstOrNull is Map)
+              e['symbol'] as String:
+                  ((e['response'] as List).first as Map).cast<String, dynamic>(),
+        };
+      } catch (_) {
+        // Relay hiccup or truncated body: one more try.
+      }
+    }
+    return const {};
+  }
+
+  Future<LiveQuoteResult?> _fetchYahooQuote(
+    String yahooSymbol, {
+    Map<String, dynamic>? chart,
+  }) async {
     try {
-      final chart = await _chart(
+      chart ??= await _chart(
         yahooSymbol,
         '5m',
         '1d',

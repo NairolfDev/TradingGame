@@ -71,11 +71,30 @@ class Asset {
     this.coingeckoId,
     this.isWatchlisted = false,
     this.marketGroups = const [],
-    this.sector = 'Unbekannt',
+    String sector = 'Unbekannt',
     this.industry = '',
     this.country = '',
     this.catalogDate = '',
-  });
+  }) : sector = _sectorOf(sector, type, category);
+
+  /// Hand-made instruments carry their sector in the category
+  /// ("ATX / Finanzen"); catalog rows bring their own.
+  static String _sectorOf(String sector, AssetType type, String category) {
+    if (sector.trim().isNotEmpty && sector != 'Unbekannt') return sector;
+    final parts = category.split('/');
+    if (parts.length > 1 && parts.last.trim().isNotEmpty) {
+      return parts.last.trim();
+    }
+    if (category.trim().isNotEmpty) return category.trim();
+    return switch (type) {
+      AssetType.crypto => 'Krypto',
+      AssetType.cfd => 'Hebelprodukte',
+      AssetType.bond => 'Anleihen',
+      AssetType.commodity => 'Rohstoffe',
+      AssetType.etf => 'ETF',
+      AssetType.stock => 'Unbekannt',
+    };
+  }
 
   double get change24h => currentPrice - previousClose;
 

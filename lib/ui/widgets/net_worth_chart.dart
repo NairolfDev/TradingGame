@@ -9,6 +9,8 @@ import '../../logic/net_worth_history.dart';
 enum _Range {
   day('1T', Duration(days: 1)),
   week('1W', Duration(days: 7)),
+  month('1M', Duration(days: 30)),
+  year('1J', Duration(days: 365)),
   all('Alles', null);
 
   final String label;
@@ -30,6 +32,18 @@ class _NetWorthChartState extends State<NetWorthChart> {
 
   @override
   Widget build(BuildContext context) {
+    final all = widget.history.points;
+    // A range only makes sense once the history is longer than the range
+    // below it; otherwise every button would show the same short curve.
+    final span = all.length < 2
+        ? Duration.zero
+        : all.last.time.difference(all.first.time);
+    bool usable(_Range r) {
+      final i = _Range.values.indexOf(r);
+      if (r == _Range.all || i == 0) return true;
+      return span > _Range.values[i - 1].window!;
+    }
+    if (!usable(_range)) _range = _Range.all;
     final points = widget.history.within(_range.window);
     final enough = points.length >= 2;
     final first = enough ? points.first.value : 0.0;
@@ -72,7 +86,9 @@ class _NetWorthChartState extends State<NetWorthChart> {
                     ),
                   ),
                   Text(
-                    summary,
+                    enough
+                        ? '$summary · seit ${DateFormat('dd.MM.yy HH:mm').format(points.first.time)}'
+                        : summary,
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
@@ -88,7 +104,11 @@ class _NetWorthChartState extends State<NetWorthChart> {
                 ),
                 segments: [
                   for (final r in _Range.values)
-                    ButtonSegment(value: r, label: Text(r.label)),
+                    ButtonSegment(
+                      value: r,
+                      label: Text(r.label),
+                      enabled: usable(r),
+                    ),
                 ],
                 selected: {_range},
                 onSelectionChanged: (s) => setState(() => _range = s.first),
