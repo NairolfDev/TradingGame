@@ -681,18 +681,68 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
                         ),
                       ],
                     ),
-                    Slider(
-                      value: _leverage.toDouble(),
-                      min: 1,
-                      max: liveAsset.maxLeverage.toDouble(),
-                      divisions: liveAsset.maxLeverage > 1
-                          ? (liveAsset.maxLeverage - 1)
-                          : 1,
-                      activeColor: AppColors.cfd,
-                      onChanged: (val) {
-                        setState(() {
-                          _leverage = val.toInt();
-                        });
+                    Builder(
+                      builder: (context) {
+                        // Up to 100x every step; beyond that fixed stops so
+                        // 500x or 5000x stays reachable with one slider.
+                        final max = liveAsset.maxLeverage;
+                        final steps = max <= 100
+                            ? [for (var i = 1; i <= max; i++) i]
+                            : [
+                                for (final v in const [
+                                  1,
+                                  2,
+                                  3,
+                                  5,
+                                  10,
+                                  20,
+                                  25,
+                                  50,
+                                  75,
+                                  100,
+                                  200,
+                                  250,
+                                  500,
+                                  1000,
+                                  2000,
+                                  2500,
+                                  5000,
+                                ])
+                                  if (v <= max) v,
+                                if (![
+                                  1,
+                                  2,
+                                  3,
+                                  5,
+                                  10,
+                                  20,
+                                  25,
+                                  50,
+                                  75,
+                                  100,
+                                  200,
+                                  250,
+                                  500,
+                                  1000,
+                                  2000,
+                                  2500,
+                                  5000,
+                                ].contains(max))
+                                  max,
+                              ];
+                        var index = steps.indexWhere((v) => v >= _leverage);
+                        if (index < 0) index = steps.length - 1;
+                        return Slider(
+                          value: index.toDouble(),
+                          min: 0,
+                          max: (steps.length - 1).toDouble(),
+                          divisions: steps.length > 1 ? steps.length - 1 : 1,
+                          label: '${steps[index]}x',
+                          activeColor: AppColors.cfd,
+                          onChanged: (val) {
+                            setState(() => _leverage = steps[val.round()]);
+                          },
+                        );
                       },
                     ),
                     if (_leverage > 1) ...[
