@@ -488,6 +488,7 @@ class PortfolioProvider extends ChangeNotifier {
       _leaderboardSubscription = stream.listen((entries) {
         if (entries.isNotEmpty) {
           _leaderboard = entries;
+          _checkAllAchievements(); // e.g. the top-10 reward
           notifyListeners();
         }
       });
@@ -2243,6 +2244,7 @@ class PortfolioProvider extends ChangeNotifier {
   Future<void> reloadLeaderboard() async {
     _leaderboard = await repository.getLeaderboard();
     _updateLeaderboard(forceCloud: true);
+    _checkAllAchievements();
     notifyListeners();
   }
 
@@ -2503,9 +2505,14 @@ class PortfolioProvider extends ChangeNotifier {
 
   // --- 7. GAMIFICATION & ACHIEVEMENTS EVALUATION ---
   void _checkAllAchievements() {
-    final playerEntry = _leaderboard.where((e) => e.isPlayer).firstOrNull;
-    final hasCompetitors = _leaderboard.any((e) => !e.isPlayer);
-    final playerRank = hasCompetitors ? (playerEntry?.rank ?? 0) : 0;
+    // Rank from the live net worth against the others, so it is right even
+    // when the player's own row is stale or missing in the loaded list.
+    final others = _leaderboard
+        .where((e) => !e.isPlayer && e.id != _activeUid)
+        .toList();
+    final playerRank = (_isOnLeaderboard && others.isNotEmpty)
+        ? 1 + others.where((e) => e.netWorth > netWorth).length
+        : 0;
     final totalTrades = _transactions
         .where(
           (t) =>
