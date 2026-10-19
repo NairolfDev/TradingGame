@@ -157,6 +157,13 @@ class LiveMarketDataService {
       _noHistory.contains(asset.symbol);
 
   /// Holt historische Zeitreihen für die verschiedenen Timeframes (1D, 1W, 1M, 1Y, 3Y, ALL)
+  final Map<String, List<DateTime>> _historyTimes = {};
+
+  /// Timestamps of the last series loaded for [asset]/[timeframe] (same
+  /// length and order as the values), for the chart's date axis.
+  List<DateTime>? historyTimes(Asset asset, String timeframe) =>
+      _historyTimes['${asset.symbol}|$timeframe'];
+
   Future<List<double>?> fetchHistoricalSeries(
     Asset asset,
     String timeframe,
@@ -171,8 +178,13 @@ class LiveMarketDataService {
 
     try {
       if (symbol.isNotEmpty) {
-        final series = await _fetchYahooHistory(symbol, timeframe, assetKey);
-        if (series != null && series.isNotEmpty) {
+        final points = await _fetchYahooHistory(symbol, timeframe, assetKey);
+        final series = points?.map((p) => p.v).toList();
+        if (points != null && series != null && series.isNotEmpty) {
+          _historyTimes['$assetKey|$timeframe'] = [
+            for (final p in points)
+              DateTime.fromMillisecondsSinceEpoch(p.t * 1000),
+          ];
           _noHistory.remove(assetKey);
           _historicalSeriesCache.putIfAbsent(assetKey, () => {})[timeframe] =
               series;
@@ -346,8 +358,8 @@ class LiveMarketDataService {
       final result = LiveQuoteResult(
         currentPrice: (price as num) / rate,
         previousClose: (previous as num) / rate,
-        high: currency == 'EUR' ? eur(meta['regularMarketDayHigh']) : null,
-        low: currency == 'EUR' ? eur(meta['regularMarketDayLow']) : null,
+        high: eur(meta['regularMarketDayHigh']),
+        low: eur(meta['regularMarketDayLow']),
         series: currency == 'EUR'
             ? closes
                   ?.whereType<num>()
@@ -369,7 +381,7 @@ class LiveMarketDataService {
     }
   }
 
-  Future<List<double>?> _fetchYahooHistory(
+  Future<List<({int t, double v})>?> _fetchYahooHistory(
     String yahooSymbol,
     String timeframe,
     String assetKey,
@@ -393,7 +405,7 @@ class LiveMarketDataService {
       final currency = (chart['meta'] as Map?)?['currency'];
       final points = _closes(chart);
       if (points.isEmpty) return null;
-      if (currency == 'EUR') return [for (final p in points) p.v];
+      if (currency == 'EUR') return points;
 
       // Other currencies are converted point by point with the EUR rate that
       // was valid at that time (the latest rate not after the timestamp), so
@@ -411,13 +423,18 @@ class LiveMarketDataService {
       );
       final fx = fxChart == null ? <({int t, double v})>[] : _closes(fxChart);
       if (fx.isEmpty) return null;
-      final converted = <double>[];
+      final converted = <({int t, double v})>[];
       var j = -1;
       for (final p in points) {
         while (j + 1 < fx.length && fx[j + 1].t <= p.t) {
           j++;
         }
-        if (j >= 0) converted.add(p.v / fx[j].v);
+        // Before the first FX bar of the range (e.g. Friday's close seen on
+        // Monday morning) the earliest rate is used if it is under 4 days off.
+        final rate = j >= 0
+            ? fx[j].v
+            : (fx.first.t - p.t < 4 * 86400 ? fx.first.v : null);
+        if (rate != null) converted.add((t: p.t, v: p.v / rate));
       }
       return converted.length < 2 ? null : converted;
     } catch (_) {

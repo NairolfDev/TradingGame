@@ -1,3 +1,4 @@
+import 'package:intl/intl.dart';
 import 'dart:math';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
@@ -400,6 +401,43 @@ class _InteractiveBrokerChartState extends State<InteractiveBrokerChart> {
     );
   }
 
+  /// Date axis under the curve: four labels, format by timeframe.
+  SideTitles _dateTitles(int count) {
+    final times = LiveMarketDataService().historyTimes(
+      widget.asset,
+      _timeframe,
+    );
+    if (times == null || times.length != count || count < 2) {
+      return const SideTitles(showTitles: false);
+    }
+    final pattern = switch (_timeframe) {
+      '1D' => 'HH:mm',
+      '1W' => 'dd.MM.',
+      '1M' => 'dd.MM.',
+      _ => 'MM/yy',
+    };
+    final format = DateFormat(pattern);
+    final step = ((count - 1) / 3).ceilToDouble();
+    return SideTitles(
+      showTitles: true,
+      reservedSize: 24,
+      interval: step,
+      getTitlesWidget: (value, meta) {
+        final i = value.round();
+        if (i < 0 || i >= count || value != i.toDouble()) {
+          return const SizedBox.shrink();
+        }
+        return Padding(
+          padding: const EdgeInsets.only(top: 6),
+          child: Text(
+            format.format(times[i]),
+            style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildLineChart(
     List<double> series,
     double minVal,
@@ -518,9 +556,7 @@ class _InteractiveBrokerChartState extends State<InteractiveBrokerChart> {
               },
             ),
           ),
-          bottomTitles: const AxisTitles(
-            sideTitles: SideTitles(showTitles: false),
-          ),
+          bottomTitles: AxisTitles(sideTitles: _dateTitles(series.length)),
         ),
         borderData: FlBorderData(show: false),
         minY: minVal - (diff * 0.08),
