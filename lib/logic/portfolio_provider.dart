@@ -9,6 +9,7 @@ import '../data/models/rank_info.dart';
 import '../data/models/pending_order.dart';
 import '../data/models/news_event.dart';
 import '../data/models/leaderboard_entry.dart';
+import 'net_worth_history.dart';
 import '../data/models/market_schedule.dart';
 import '../data/models/loan_model.dart';
 import '../data/models/reward_event.dart';
@@ -74,6 +75,17 @@ class PortfolioProvider extends ChangeNotifier {
   StreamSubscription<List<LeaderboardEntry>>? _leaderboardSubscription;
   StreamSubscription<User?>? _authSubscription;
   Timer? _liveMarketRefreshTimer;
+
+  /// Net worth over time for the dashboard chart (device-local).
+  final NetWorthHistory netWorthHistory = NetWorthHistory();
+
+  void _recordNetWorth() {
+    if (_isLoading) return;
+    if (netWorthHistory.record(netWorth, DateTime.now())) {
+      unawaited(netWorthHistory.save(_activeUid));
+      notifyListeners();
+    }
+  }
   bool _refreshingQuotes = false;
   final Map<String, DateTime> _quoteUpdatedAt = {};
   final Map<String, LiveQuoteResult> _quoteDetails = {};
@@ -166,6 +178,10 @@ class PortfolioProvider extends ChangeNotifier {
       .toList();
   List<PendingOrder> get allPendingOrders => _pendingOrders;
   List<LeaderboardEntry> get leaderboard => _leaderboard;
+
+  /// False for guests and accounts without a chosen name: they are not ranked.
+  bool get isOnLeaderboard => _isOnLeaderboard;
+  bool _isOnLeaderboard = false;
   List<Loan> get loans => _loans;
   List<Loan> get activeLoans => _loans.where((l) => !l.isPaid).toList();
   List<NewsEvent> get newsEvents => _newsEvents;
@@ -461,6 +477,7 @@ class PortfolioProvider extends ChangeNotifier {
     _isSimplisticMode = prefs.getBool(_keySimplisticMode) ?? false;
     _isRealisticOrderDelay = prefs.getBool(_keyRealisticOrderDelay) ?? true;
     await savingsPlanService.initialize();
+    await netWorthHistory.load(_activeUid);
 
     // Initiales Update der Positionspreise, Leaderboard & Achievements
     _updatePositionsWithCurrentAssetPrices();
@@ -541,6 +558,7 @@ class PortfolioProvider extends ChangeNotifier {
                 latest == null || date.isAfter(latest) ? date : latest,
           );
       await _initializeQuests();
+      await netWorthHistory.load(_activeUid);
       if (version != _accountVersion) return;
       _updatePositionsWithCurrentAssetPrices();
     } catch (e) {
@@ -558,6 +576,7 @@ class PortfolioProvider extends ChangeNotifier {
     _liveMarketRefreshTimer?.cancel();
     fetchLiveMarketQuotes();
     _liveMarketRefreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      _recordNetWorth();
       fetchLiveMarketQuotes();
     });
   }
@@ -2011,6 +2030,7 @@ class PortfolioProvider extends ChangeNotifier {
   // --- LEADERBOARD SYNCHRONISATION ---
   void _updateLeaderboard({bool forceCloud = false}) {
     if (_isLoading) return;
+    _recordNetWorth();
     final luxuryCount = _luxuryItems.fold<int>(
       0,
       (sum, i) => sum + i.ownedCount,
@@ -2034,6 +2054,19 @@ class PortfolioProvider extends ChangeNotifier {
     } catch (_) {}
 
     if (_playerProfile?.uid == myUid) myName = _playerProfile!.displayName;
+
+    // Only signed-in players with a chosen name are ranked; guests and
+    // unnamed accounts never appear on (or are written to) the leaderboard.
+    var listed = false;
+    try {
+      final u = FirebaseAuth.instance.currentUser;
+      listed = u != null && !u.isAnonymous && _playerProfile?.uid == u.uid;
+    } catch (_) {}
+    _isOnLeaderboard = listed;
+    if (!listed) {
+      _leaderboard.removeWhere((e) => e.isPlayer || e.id == myUid);
+      return;
+    }
 
     final playerEntry = LeaderboardEntry(
       id: myUid,

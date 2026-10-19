@@ -5,7 +5,9 @@ import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../core/constants/app_colors.dart';
+import 'app_build.dart';
 import 'platform_reload/reload_helper.dart';
+import 'version_gate.dart';
 
 class AppUpdateInfo {
   final String currentVersion;
@@ -38,6 +40,21 @@ class AppUpdateService {
       currentVersion = packageInfo.version;
     } catch (_) {
       currentVersion = '1.5.0';
+    }
+
+    // The database decides first: every app compares its build with
+    // `config/app.minBuild` and must update when it is older.
+    final config = await fetchVersionConfig();
+    if (config != null) {
+      final build = await currentAppBuild();
+      return AppUpdateInfo(
+        currentVersion: currentVersion,
+        latestVersion: config.version ?? 'Build ${config.minBuild}',
+        hasUpdate: config.blocks(build),
+        releaseNotes:
+            config.notes ?? 'Wichtige Verbesserungen und Fehlerbehebungen.',
+        downloadUrl: defaultReleaseUrl,
+      );
     }
 
     try {
@@ -112,23 +129,19 @@ class AppUpdateService {
           backgroundColor: AppColors.surface,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
-            side: const BorderSide(color: Colors.redAccent, width: 2.0),
+            side: BorderSide(color: AppColors.warning, width: 2.0),
           ),
-          title: const Row(
+          title: Row(
             children: [
-              Icon(
-                Icons.warning_amber_rounded,
-                color: Colors.redAccent,
-                size: 30,
-              ),
-              SizedBox(width: 10),
+              Icon(Icons.system_update, color: AppColors.warning, size: 28),
+              const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  '🚨 Pflicht-Update erforderlich!',
+                  'Update erforderlich',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: Colors.white,
+                    color: AppColors.textPrimary,
                   ),
                 ),
               ),
@@ -141,21 +154,23 @@ class AppUpdateService {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.redAccent.withAlpha(25),
-                  border: Border.all(color: Colors.redAccent.withAlpha(80)),
+                  color: AppColors.warning.withValues(alpha: 0.12),
+                  border: Border.all(
+                    color: AppColors.warning.withValues(alpha: 0.5),
+                  ),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Row(
+                child: Row(
                   children: [
-                    Icon(Icons.lock, color: Colors.redAccent, size: 20),
-                    SizedBox(width: 10),
+                    Icon(Icons.lock, color: AppColors.warning, size: 20),
+                    const SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        'Um weiterspielen zu können, musst du die neueste Version installieren. Ältere Versionen werden gesperrt.',
+                        'Um weiterzuspielen, installiere die neueste Version. Ältere Versionen können nicht mehr speichern.',
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
-                          color: Colors.white,
+                          color: AppColors.textPrimary,
                         ),
                       ),
                     ),
@@ -174,9 +189,9 @@ class AppUpdateService {
                   children: [
                     Text(
                       'Installiert: v${info.currentVersion}',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
-                        color: Colors.redAccent,
+                        color: AppColors.loss,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -198,7 +213,7 @@ class AppUpdateService {
               ),
               const SizedBox(height: 14),
               Text(
-                'Was ist neu in diesem Pflicht-Update:',
+                'Was ist neu:',
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
@@ -210,9 +225,7 @@ class AppUpdateService {
                 constraints: const BoxConstraints(maxHeight: 120),
                 child: SingleChildScrollView(
                   child: Text(
-                    kIsWeb
-                        ? '✨ Neue Features & Synchronisation:\n• Neue Pro-Broker-Charts (Candlesticks & SMA)\n• Edelmetalle & Rohstoffe (Gold, Silber, Platin, Öl)\n• 5-Tage-Privatinsolvenzsperre & Kredit-Cooldown\n• Cyberpunk Neon Bull Branding'
-                        : info.releaseNotes,
+                    info.releaseNotes,
                     style: TextStyle(
                       fontSize: 12,
                       color: AppColors.textSecondary,
@@ -279,7 +292,7 @@ class AppUpdateService {
                 ),
                 label: Text(
                   kIsWeb
-                      ? 'Jetzt neu laden (Strg + Shift + R)'
+                      ? 'Jetzt neu laden'
                       : (defaultTargetPlatform == TargetPlatform.android
                             ? 'Jetzt im Google Play Store updaten'
                             : 'Jetzt Setup.exe herunterladen & updaten'),
@@ -290,7 +303,7 @@ class AppUpdateService {
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.black,
+                  foregroundColor: AppColors.onPrimary,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),

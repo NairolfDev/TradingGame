@@ -292,6 +292,11 @@ class FirebaseTradingRepository implements TradingRepository {
   }
 
   // --- LEADERBOARD (REAL MULTIPLAYER ONLINE RANKING) ---
+  /// Only docs written by signed-in, named players count; older guest or
+  /// unnamed docs (no `verified` flag) stay hidden.
+  static bool _isRankedDoc(QueryDocumentSnapshot<Map<String, dynamic>> d) =>
+      d.data()['verified'] == true;
+
   @override
   Future<List<LeaderboardEntry>> getLeaderboard() async {
     if (!_isFirebaseConfigured) return _fallbackLocal.getLeaderboard();
@@ -305,7 +310,7 @@ class FirebaseTradingRepository implements TradingRepository {
 
       if (snap.docs.isNotEmpty) {
         final myUid = _currentUserId;
-        final entries = snap.docs.map((d) {
+        final entries = snap.docs.where(_isRankedDoc).map((d) {
           final data = d.data();
           final isPlayer = (d.id == myUid || data['id'] == myUid);
           final rawName = data['name'] as String? ?? 'Trader';
@@ -351,7 +356,7 @@ class FirebaseTradingRepository implements TradingRepository {
           .snapshots()
           .map((snap) {
             final myUid = _currentUserId;
-            final entries = snap.docs.map((d) {
+            final entries = snap.docs.where(_isRankedDoc).map((d) {
               final data = d.data();
               final isPlayer = (d.id == myUid || data['id'] == myUid);
               final rawName = data['name'] as String? ?? 'Trader';
@@ -433,6 +438,7 @@ class FirebaseTradingRepository implements TradingRepository {
               'netWorth': player.netWorth,
               'roiPercent': player.roiPercent,
               'luxuryCount': player.luxuryCount,
+              'verified': true,
               'updatedAt': FieldValue.serverTimestamp(),
             }, SetOptions(merge: true));
 

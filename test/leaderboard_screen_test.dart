@@ -33,6 +33,7 @@ List<LeaderboardEntry> rank(List<LeaderboardEntry> base, double mine) =>
       playerCity: 'AT',
       playerTitle: 'Anfänger',
       playerBadge: '',
+      includePlayer: true,
     );
 
 void main() {
@@ -53,6 +54,19 @@ void main() {
     ], 50000);
     expect(r.map((e) => e.name), ['Anna', 'Du', 'Ben']);
     expect(r.firstWhere((e) => e.isPlayer).rank, 2);
+  });
+
+  test('guests (includePlayer false) are not added or kept', () {
+    final r = rankLeaderboard(
+      [entry('a', 'Anna', 60000), entry('me', 'Du (X)', 1, me: true)],
+      playerNetWorth: 5,
+      playerRoiPercent: 0,
+      playerCity: 'AT',
+      playerTitle: 't',
+      playerBadge: '',
+      includePlayer: false,
+    );
+    expect(r.map((e) => e.name), ['Anna']);
   });
 
   testWidgets('long names do not overflow on a narrow phone', (tester) async {
@@ -83,8 +97,10 @@ void main() {
       ),
     );
     await tester.pump();
-    expect(find.text('Dein Rang'), findsOneWidget);
-    expect(find.text('Du'), findsWidgets);
+    // Guests are never ranked: no own row, only the sign-in hint.
+    expect(find.text('Dein Rang'), findsNothing);
+    expect(find.textContaining('Gäste werden nicht gelistet'), findsOneWidget);
+    expect(find.text('Du'), findsNothing);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
     await tester.pump();

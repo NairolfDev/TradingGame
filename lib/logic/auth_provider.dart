@@ -9,11 +9,13 @@ import '../data/countries.dart';
 import '../data/models/user_model.dart';
 import '../data/repositories/player_profile_repository.dart';
 import 'desktop_google_sign_in.dart';
+import 'version_gate.dart';
 
 class AuthProvider extends ChangeNotifier {
   static const _keyUser = 'tg_auth_user';
   final FirebaseAuth? _authOverride;
   final PlayerProfileRepository _profiles;
+  final SessionStamp? _stamp;
   StreamSubscription<User?>? _subscription;
   FirebaseAuth get _auth => _authOverride ?? FirebaseAuth.instance;
   UserModel? _currentUser;
@@ -26,9 +28,13 @@ class AuthProvider extends ChangeNotifier {
   String? _errorMessage;
   String? _profileError;
 
-  AuthProvider({FirebaseAuth? firebaseAuth, PlayerProfileRepository? profiles})
-    : _authOverride = firebaseAuth,
-      _profiles = profiles ?? FirebasePlayerProfileRepository() {
+  AuthProvider({
+    FirebaseAuth? firebaseAuth,
+    PlayerProfileRepository? profiles,
+    SessionStamp? sessionStamp,
+  }) : _authOverride = firebaseAuth,
+       _profiles = profiles ?? FirebasePlayerProfileRepository(),
+       _stamp = sessionStamp {
     _initialize();
   }
 
@@ -113,6 +119,9 @@ class AuthProvider extends ChangeNotifier {
 
   Future<void> _acceptUser(User? user) async {
     final version = ++_sessionVersion;
+    // Must precede the first database write of this account.
+    if (user != null) await _stamp?.write(user.uid);
+    if (_disposed || version != _sessionVersion) return;
     _profileError = null;
     _profileLoaded = false;
     _currentUser = user == null ? null : _fromFirebase(user);

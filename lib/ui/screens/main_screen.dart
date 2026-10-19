@@ -24,20 +24,39 @@ class MainScreen extends StatefulWidget {
   State<MainScreen> createState() => _MainScreenState();
 }
 
-class _MainScreenState extends State<MainScreen> {
+class _MainScreenState extends State<MainScreen>
+    with WidgetsBindingObserver {
   int _currentIndex = 0;
   final Set<int> _visited = {0};
   bool _hasCheckedForUpdate = false;
+  bool _updateDialogOpen = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkVersionUpdate();
     });
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // The required version can change while the app sleeps: check again.
+    if (state == AppLifecycleState.resumed) {
+      _hasCheckedForUpdate = false;
+      _checkVersionUpdate();
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
   Future<void> _checkVersionUpdate({bool isManual = false}) async {
+    if (_updateDialogOpen) return;
     if (_hasCheckedForUpdate && !isManual) return;
     _hasCheckedForUpdate = true;
 
@@ -45,6 +64,7 @@ class _MainScreenState extends State<MainScreen> {
     if (!mounted) return;
 
     if (updateInfo.hasUpdate) {
+      _updateDialogOpen = true; // the dialog cannot be closed
       AppUpdateService.showUpdateDialog(context, updateInfo);
     } else if (isManual) {
       ScaffoldMessenger.of(context).showSnackBar(

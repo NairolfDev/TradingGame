@@ -9,6 +9,7 @@ import 'logic/auth_provider.dart';
 import 'logic/notification_service.dart';
 import 'logic/portfolio_provider.dart';
 import 'logic/price_alerts_controller.dart';
+import 'logic/version_gate.dart';
 import 'logic/theme_controller.dart';
 import 'firebase_options.dart';
 import 'ui/screens/main_screen.dart';
@@ -66,7 +67,7 @@ class _TradingGameAppState extends State<TradingGameApp> {
         ChangeNotifierProvider.value(value: _theme),
         ChangeNotifierProvider(create: (_) => NotificationService()),
         ChangeNotifierProvider(create: (_) => PriceAlertsController()),
-        ChangeNotifierProvider(create: (_) => AuthProvider()),
+        ChangeNotifierProvider(create: (_) => AuthProvider(sessionStamp: const SessionStamp())),
         ChangeNotifierProxyProvider<AuthProvider, PortfolioProvider>(
           create: (_) => PortfolioProvider(
             repository: repository ?? FirebaseTradingRepository(),

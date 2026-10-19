@@ -6,6 +6,8 @@ import '../../core/constants/app_colors.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../logic/portfolio_provider.dart';
 import '../widgets/rank_badge.dart';
+import '../widgets/allocation_chart.dart';
+import '../widgets/net_worth_chart.dart';
 import '../widgets/portfolio_summary.dart';
 import '../widgets/game_fx.dart';
 import '../widgets/position_tile.dart';
@@ -220,6 +222,20 @@ class DashboardScreen extends StatelessWidget {
               ],
 
               PortfolioSummary(portfolio: provider),
+
+              const SizedBox(height: 12),
+
+              NetWorthChart(history: provider.netWorthHistory),
+
+              const SizedBox(height: 12),
+
+              AllocationChart(
+                slices: buildAllocation(
+                  cash: provider.cash,
+                  positions: provider.positions,
+                  luxuryValue: provider.totalLuxuryValue,
+                ),
+              ),
 
               const SizedBox(height: 12),
 

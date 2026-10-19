@@ -5,9 +5,40 @@ service cloud.firestore {
     function owner(uid) {
       return request.auth != null && request.auth.uid == uid;
     }
-    match /profiles/{uid} {
+
+    // Version gate: while config/app exists, a player may only write when the
+    // build stamped in sessions/{uid} is at least config/app.minBuild.
+    // Reads stay open so an outdated app can still show the update prompt.
+    function minBuild() {
+      return get(/databases/$(database)/documents/config/app).data.minBuild;
+    }
+    function currentBuild() {
+      return !exists(/databases/$(database)/documents/config/app)
+        || (exists(/databases/$(database)/documents/sessions/$(request.auth.uid))
+            && get(/databases/$(database)/documents/sessions/$(request.auth.uid)).data.build >= minBuild());
+    }
+    function writer(uid) {
+      return owner(uid) && currentBuild();
+    }
+
+    // 0. Versionsvorgabe (nur lesbar; wird von Hand/Skript gesetzt)
+    match /config/{doc} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // 0b. Build-Stempel der laufenden App
+    match /sessions/{uid} {
       allow read: if owner(uid);
       allow create, update: if owner(uid)
+        && request.resource.data.keys().hasOnly(['build'])
+        && request.resource.data.build is int
+        && (!exists(/databases/$(database)/documents/config/app)
+            || request.resource.data.build >= minBuild());
+    }
+    match /profiles/{uid} {
+      allow read: if owner(uid);
+      allow create, update: if writer(uid)
         && request.resource.data.keys().hasOnly(['displayName', 'countryCode'])
         && request.resource.data.keys().hasAll(['displayName', 'countryCode'])
         && request.resource.data.displayName is string
@@ -20,12 +51,13 @@ service cloud.firestore {
     // 1. Leaderboard: Live-Rangliste für alle Spieler (Echtzeit-Updates)
     match /leaderboard/{docId} {
       allow read: if true;
-      allow write: if owner(docId);
+      allow write: if writer(docId);
     }
 
     // 2. Benutzerprofile
     match /users/{userId} {
-      allow read, write: if owner(userId);
+      allow read: if owner(userId);
+      allow write: if writer(userId);
     }
 
     // 2b. Kursalarme: nur der Besitzer; die App wertet sie selbst aus.
@@ -45,14 +77,14 @@ service cloud.firestore {
           && d.recurring is bool && d.active is bool;
       }
       allow read, delete: if request.auth != null && resource.data.uid == request.auth.uid;
-      allow create: if request.auth != null && validAlert();
-      allow update: if request.auth != null && resource.data.uid == request.auth.uid && validAlert();
+      allow create: if request.auth != null && currentBuild() && validAlert();
+      allow update: if request.auth != null && currentBuild() && resource.data.uid == request.auth.uid && validAlert();
     }
 
     // 2c. Push-Token der Geräte (Dokument-ID = FCM-Token)
     match /deviceTokens/{token} {
       allow read, delete: if request.auth != null && resource.data.uid == request.auth.uid;
-      allow create, update: if request.auth != null
+      allow create, update: if request.auth != null && currentBuild()
         && request.resource.data.keys().hasOnly(['uid', 'platform', 'updatedAt'])
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.platform is string;
@@ -60,10 +92,12 @@ service cloud.firestore {
 
     // 3. Portfolios & Unterkollektionen für alle Online-Spieler
     match /portfolios/{userId} {
-      allow read, write: if owner(userId);
+      allow read: if owner(userId);
+      allow write: if writer(userId);
 
       match /{document=**} {
-        allow read, write: if owner(userId);
+        allow read: if owner(userId);
+        allow write: if writer(userId);
       }
     }
   }

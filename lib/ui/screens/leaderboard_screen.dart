@@ -16,24 +16,26 @@ List<LeaderboardEntry> rankLeaderboard(
   required String playerCity,
   required String playerTitle,
   required String playerBadge,
+  bool includePlayer = true,
 }) {
   final entries = [
     for (final e in base)
-      LeaderboardEntry(
-        id: e.id,
-        name: e.isPlayer ? _ownName(e.name) : e.name,
-        city: e.city,
-        title: e.title,
-        badge: e.badge,
-        avatarEmoji: e.avatarEmoji,
-        strategy: e.strategy,
-        netWorth: e.isPlayer ? playerNetWorth : e.netWorth,
-        roiPercent: e.roiPercent,
-        isPlayer: e.isPlayer,
-        luxuryCount: e.luxuryCount,
-      ),
+      if (includePlayer || !e.isPlayer)
+        LeaderboardEntry(
+          id: e.id,
+          name: e.isPlayer ? _ownName(e.name) : e.name,
+          city: e.city,
+          title: e.title,
+          badge: e.badge,
+          avatarEmoji: e.avatarEmoji,
+          strategy: e.strategy,
+          netWorth: e.isPlayer ? playerNetWorth : e.netWorth,
+          roiPercent: e.roiPercent,
+          isPlayer: e.isPlayer,
+          luxuryCount: e.luxuryCount,
+        ),
   ];
-  if (!entries.any((e) => e.isPlayer)) {
+  if (includePlayer && !entries.any((e) => e.isPlayer)) {
     entries.add(
       LeaderboardEntry(
         id: 'player',
@@ -88,8 +90,9 @@ class LeaderboardScreen extends StatelessWidget {
       playerCity: provider.playerCountry,
       playerTitle: provider.currentRank.title,
       playerBadge: provider.currentRank.badge,
+      includePlayer: provider.isOnLeaderboard,
     );
-    final me = entries.firstWhere((e) => e.isPlayer);
+    final me = entries.where((e) => e.isPlayer).firstOrNull;
 
     Future<void> reload() async {
       await provider.reloadLeaderboard();
@@ -115,7 +118,7 @@ class LeaderboardScreen extends StatelessWidget {
           ),
         ],
       ),
-      body: entries.length < 2
+      body: entries.isEmpty || (entries.length < 2 && me != null)
           ? EmptyState(
               icon: Icons.groups_outlined,
               title: 'Noch keine Mitspieler',
@@ -130,7 +133,10 @@ class LeaderboardScreen extends StatelessWidget {
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                 children: [
-                  _MyRankCard(me: me, total: entries.length),
+                  if (me != null)
+                    _MyRankCard(me: me, total: entries.length)
+                  else
+                    const _JoinHint(),
                   const SizedBox(height: 16),
                   if (entries.length >= 3) ...[
                     _Podium(top3: entries.take(3).toList()),
@@ -164,6 +170,32 @@ class LeaderboardScreen extends StatelessWidget {
             ),
     );
   }
+}
+
+class _JoinHint extends StatelessWidget {
+  const _JoinHint();
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: AppColors.surface,
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: AppColors.cardBorder),
+    ),
+    child: Row(
+      children: [
+        Icon(Icons.lock_outline, color: AppColors.textSecondary),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            'Melde dich an und wähle einen Namen, um in der Rangliste zu erscheinen. Gäste werden nicht gelistet.',
+            style: TextStyle(color: AppColors.textSecondary, height: 1.4),
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 class _MyRankCard extends StatelessWidget {
