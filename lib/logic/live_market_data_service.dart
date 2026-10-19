@@ -36,6 +36,7 @@ class LiveMarketDataService {
   LiveMarketDataService._internal();
 
   final Map<String, LiveQuoteResult> _quoteCache = {};
+  final Map<String, DateTime> _fetchedAt = {};
   final Map<String, Map<String, List<double>>> _historicalSeriesCache = {};
 
   DateTime? _lastSyncTime;
@@ -51,6 +52,10 @@ class LiveMarketDataService {
     };
     final symbol = asset.yahooSymbol ?? etfs[asset.symbol] ?? asset.symbol;
     if (asset.type == AssetType.stock || asset.type == AssetType.etf) {
+      return symbol;
+    }
+    // Futures (gold, oil, ...) are quoted in USD and converted to EUR.
+    if (asset.type == AssetType.commodity && asset.yahooSymbol != null) {
       return symbol;
     }
     if (['.VI', '.DE', '.AS'].any(symbol.endsWith)) return symbol;
@@ -81,12 +86,20 @@ class LiveMarketDataService {
   ) async {
     final Map<String, LiveQuoteResult> updated = {};
 
-    final supported = assets
-        .where((a) => euroYahooSymbolFor(a) != null)
-        .toList();
-    for (var i = 0; i < supported.length; i += 6) {
+    // The browser relay allows about 20 requests a minute per visitor: stocks
+    // fetched in the last 90 seconds wait for the next round.
+    final supported = assets.where((a) {
+      final symbol = euroYahooSymbolFor(a);
+      if (symbol == null) return false;
+      if (!kIsWeb || a.type == AssetType.crypto) return true;
+      final at = _fetchedAt[symbol];
+      return at == null ||
+          DateTime.now().difference(at) > const Duration(seconds: 90);
+    }).toList();
+    final batch = kIsWeb ? 3 : 6;
+    for (var i = 0; i < supported.length; i += batch) {
       await Future.wait(
-        supported.skip(i).take(6).map((asset) async {
+        supported.skip(i).take(batch).map((asset) async {
           try {
             final quote = asset.type == AssetType.crypto
                 ? await _fetchCryptoQuote(asset)
@@ -109,7 +122,6 @@ class LiveMarketDataService {
   /// instrument is not quoted in EUR.
   static bool historyUnavailable(Asset asset) =>
       euroYahooSymbolFor(asset) == null ||
-      kIsWeb ||
       _noHistory.contains(asset.symbol);
 
   /// Holt historische Zeitreihen für die verschiedenen Timeframes (1D, 1W, 1M, 1Y, 3Y, ALL)
@@ -154,19 +166,35 @@ class LiveMarketDataService {
 
   static bool _positive(Object? v) => v is num && v.isFinite && v > 0;
 
-  /// Yahoo sends no CORS headers, so the browser build has no stock/ETF feed
-  /// and keeps the simulated prices. Android and desktop ask Yahoo directly.
-  Future<http.Response?> _yahooGet(
+  /// Optional own CORS relay for the browser build (a tiny Cloudflare worker
+  /// that forwards `?url=` and adds CORS headers), set with
+  /// `--dart-define=QUOTE_PROXY=https://...`.
+  static const _quoteProxy = String.fromEnvironment('QUOTE_PROXY');
+
+  /// Yahoo sends no CORS headers: Android and desktop ask it directly, the
+  /// browser goes through a relay. Without an own relay it falls back to the
+  /// public reader at r.jina.ai (limited per visitor, no key).
+  Future<String?> _yahooGet(
     String symbol,
     String interval,
     String range,
     Duration timeout,
   ) async {
-    if (kIsWeb) return null;
-    final uri = Uri.parse(
+    final target = Uri.parse(
       '$_yahooChart/${Uri.encodeComponent(symbol)}',
     ).replace(queryParameters: {'interval': interval, 'range': range});
-    return http.get(uri, headers: _yahooHeaders).timeout(timeout);
+    if (!kIsWeb) {
+      final r = await http.get(target, headers: _yahooHeaders).timeout(timeout);
+      return r.statusCode == 200 ? r.body : null;
+    }
+    final relay = _quoteProxy.isNotEmpty
+        ? Uri.parse('$_quoteProxy?url=${Uri.encodeComponent('$target')}')
+        : Uri.parse('https://r.jina.ai/$target');
+    final r = await http.get(relay).timeout(timeout);
+    if (r.statusCode != 200) return null;
+    // The reader wraps the JSON in a short text header.
+    final start = r.body.indexOf('{');
+    return start < 0 ? null : r.body.substring(start);
   }
 
   Future<Map<String, dynamic>?> _chart(
@@ -175,12 +203,27 @@ class LiveMarketDataService {
     String range,
     Duration timeout,
   ) async {
-    final response = await _yahooGet(symbol, interval, range, timeout);
-    if (response == null || response.statusCode != 200) return null;
-    final result = (jsonDecode(response.body) as Map?)?['chart']?['result'];
+    final body = await _yahooGet(symbol, interval, range, timeout);
+    if (body == null) return null;
+    final result = (jsonDecode(body) as Map?)?['chart']?['result'];
     return result is List && result.isNotEmpty
         ? result.first as Map<String, dynamic>
         : null;
+  }
+
+  final Map<String, ({DateTime at, Map<String, dynamic> meta})> _fxCache = {};
+
+  Future<Map<String, dynamic>?> _fxMeta(String fxSymbol) async {
+    final cached = _fxCache[fxSymbol];
+    if (cached != null &&
+        DateTime.now().difference(cached.at) < const Duration(minutes: 5)) {
+      return cached.meta;
+    }
+    final meta =
+        (await _chart(fxSymbol, '5m', '1d', const Duration(seconds: 8)))?['meta']
+            as Map<String, dynamic>?;
+    if (meta != null) _fxCache[fxSymbol] = (at: DateTime.now(), meta: meta);
+    return meta;
   }
 
   /// Quote in EUR: non-EUR prices use the current FX rate (a snapshot).
@@ -209,14 +252,7 @@ class LiveMarketDataService {
       if (currency != 'EUR') {
         final fxSymbol = _fxSymbols[currency];
         if (fxSymbol == null) return null;
-        final fxMeta =
-            (await _chart(
-                  fxSymbol,
-                  '5m',
-                  '1d',
-                  const Duration(seconds: 8),
-                ))?['meta']
-                as Map<String, dynamic>?;
+        final fxMeta = await _fxMeta(fxSymbol);
         final fxRate = fxMeta?['regularMarketPrice'];
         final fxTime = fxMeta?['regularMarketTime'];
         // Weekends are fine, indefinitely stale rates are not.
@@ -251,6 +287,7 @@ class LiveMarketDataService {
         usesSnapshotFx: currency != 'EUR',
       );
       _quoteCache[yahooSymbol] = result;
+      _fetchedAt[yahooSymbol] = DateTime.now();
       return result;
     } catch (error) {
       debugPrint('Kurs nicht verfügbar ($yahooSymbol): $error');

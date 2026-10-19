@@ -24,7 +24,7 @@ void main() {
     },
   );
   test(
-    'crypto uses EUR pairs, foreign stocks route to normalized proxy, futures stay unsupported',
+    'crypto uses EUR pairs, foreign stocks route to normalized proxy, metals use their USD future converted to EUR',
     () {
       expect(
         LiveMarketDataService.euroYahooSymbolFor(
@@ -36,7 +36,7 @@ void main() {
         LiveMarketDataService.euroYahooSymbolFor(
           assets.firstWhere((a) => a.symbol == 'XAU/EUR'),
         ),
-        isNull,
+        'GC=F',
       );
       expect(
         LiveMarketDataService.euroYahooSymbolFor(

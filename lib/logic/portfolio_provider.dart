@@ -1351,6 +1351,15 @@ class PortfolioProvider extends ChangeNotifier {
           _transactions.insert(0, record);
           repository.saveTransaction(record);
 
+          // Orders executed later count for the daily quests as well.
+          questService.recordTrade(
+            tradeAmount: order.totalEstimatedCost,
+            isCommodity: matchingAsset.type == AssetType.commodity,
+            leverage: order.leverage,
+            profit: 0,
+            totalPositionsCount: _positions.length,
+          );
+
           _lastAlertMessage =
               '✅ KAUF AUSGEFÜHRT: ${order.amount.toStringAsFixed(2)}x ${matchingAsset.symbol} @ ${matchingAsset.currentPrice.toStringAsFixed(2)} € eingebucht!';
           _reward(

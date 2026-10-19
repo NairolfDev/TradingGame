@@ -54,9 +54,14 @@ class LocalTradingRepository implements TradingRepository {
     }
     try {
       final list = jsonDecode(raw) as List<dynamic>;
-      return StockCatalog.merge(list
+      final saved = list
           .map((e) => Asset.fromJson(e as Map<String, dynamic>))
-          .toList());
+          .toList();
+      // Instruments added to the game after this list was saved (gold, oil,
+      // ...) would otherwise never show up for existing players.
+      final known = {for (final a in saved) a.id};
+      saved.addAll(InitialAssets.getAssets().where((a) => !known.contains(a.id)));
+      return StockCatalog.merge(saved);
     } catch (_) {
       return StockCatalog.merge(InitialAssets.getAssets());
     }

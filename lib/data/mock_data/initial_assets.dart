@@ -1317,6 +1317,7 @@ class InitialAssets {
       Asset(
         id: 'com_copper',
         symbol: 'COPPER/LB',
+        yahooSymbol: 'HG=F',
         name: 'Kupfer (Dr. Copper / Pfund)',
         type: AssetType.commodity,
         currentPrice: 4.25,
