@@ -5,6 +5,7 @@ import '../models/price_alert.dart';
 abstract class PriceAlertRepository {
   Stream<List<PriceAlert>> watch(String uid);
   Future<void> add(PriceAlert alert);
+  Future<void> update(String id, Map<String, dynamic> data);
   Future<void> remove(String id);
 }
 
@@ -28,6 +29,10 @@ class FirestorePriceAlertRepository implements PriceAlertRepository {
 
   @override
   Future<void> add(PriceAlert alert) => _col.add(alert.toCreateJson());
+
+  @override
+  Future<void> update(String id, Map<String, dynamic> data) =>
+      _col.doc(id).update(data);
 
   @override
   Future<void> remove(String id) => _col.doc(id).delete();

@@ -3,7 +3,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/utils/currency_formatter.dart';
 import '../../data/models/market_schedule.dart';
+import '../../data/models/price_alert.dart';
 import '../../data/models/reward_event.dart';
 import '../../logic/auth_provider.dart';
 import '../../logic/notification_planner.dart';
@@ -112,6 +114,36 @@ class _NotificationHostState extends State<NotificationHost>
       _boundUid = uid;
       unawaited(service.bindUser(uid));
       context.read<PriceAlertsController>().bindUser(uid);
+    }
+
+    if (uid != null) {
+      final prices = {for (final a in portfolio.assets) a.id: a.currentPrice};
+      unawaited(
+        context.read<PriceAlertsController>().check(prices).then((fired) {
+          for (final alert in fired) {
+            final word = alert.direction == AlertDirection.above
+                ? 'über'
+                : 'unter';
+            final price = CurrencyFormatter.format(alert.price);
+            final title =
+                '${alert.name.isEmpty ? alert.symbol : alert.name}: Kursalarm';
+            final detail = '${alert.symbol} liegt $word $price.';
+            if (_lifecycle == AppLifecycleState.resumed) {
+              portfolio.announce(
+                RewardEvent(
+                  kind: RewardKind.alert,
+                  title: title,
+                  detail: detail,
+                ),
+              );
+            } else {
+              unawaited(
+                service.showNow(NotificationCategory.alerts, title, detail),
+              );
+            }
+          }
+        }),
+      );
     }
 
     final pending = <MarketRegion, int>{};

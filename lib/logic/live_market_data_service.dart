@@ -38,9 +38,6 @@ class LiveMarketDataService {
   final Map<String, LiveQuoteResult> _quoteCache = {};
   final Map<String, Map<String, List<double>>> _historicalSeriesCache = {};
 
-  static const String _cloudApiBase =
-      'https://europe-west3-tradinggame-austria-prod.cloudfunctions.net/api';
-
   DateTime? _lastSyncTime;
   DateTime? get lastSyncTime => _lastSyncTime;
 
@@ -103,14 +100,17 @@ class LiveMarketDataService {
     return updated;
   }
 
-  /// Instruments for which the proxy answered HTTP 422 (no timestamp-aligned
-  /// EUR history): permanent, unlike a network error.
+  /// Instruments quoted in a non-EUR currency (no timestamp-aligned EUR
+  /// history): permanent, unlike a network error.
   static final Set<String> _noHistory = {};
 
   /// True when no EUR price history can ever be shown for [asset]: there is no
-  /// live source at all, or the proxy refused it permanently.
+  /// live source at all, the browser build cannot reach Yahoo, or the
+  /// instrument is not quoted in EUR.
   static bool historyUnavailable(Asset asset) =>
-      euroYahooSymbolFor(asset) == null || _noHistory.contains(asset.symbol);
+      euroYahooSymbolFor(asset) == null ||
+      kIsWeb ||
+      _noHistory.contains(asset.symbol);
 
   /// Holt historische Zeitreihen für die verschiedenen Timeframes (1D, 1W, 1M, 1Y, 3Y, ALL)
   Future<List<double>?> fetchHistoricalSeries(
@@ -144,44 +144,111 @@ class LiveMarketDataService {
     return null;
   }
 
-  /// All platforms use the proxy, which validates currency before EUR display.
+  static const _yahooChart =
+      'https://query1.finance.yahoo.com/v8/finance/chart';
+  static const _fxSymbols = {'USD': 'EURUSD=X', 'JPY': 'EURJPY=X'};
+  static const _yahooHeaders = {
+    'User-Agent': 'Mozilla/5.0',
+    'Accept': 'application/json',
+  };
+
+  static bool _positive(Object? v) => v is num && v.isFinite && v > 0;
+
+  /// Yahoo sends no CORS headers, so the browser build has no stock/ETF feed
+  /// and keeps the simulated prices. Android and desktop ask Yahoo directly.
+  Future<http.Response?> _yahooGet(
+    String symbol,
+    String interval,
+    String range,
+    Duration timeout,
+  ) async {
+    if (kIsWeb) return null;
+    final uri = Uri.parse(
+      '$_yahooChart/${Uri.encodeComponent(symbol)}',
+    ).replace(queryParameters: {'interval': interval, 'range': range});
+    return http.get(uri, headers: _yahooHeaders).timeout(timeout);
+  }
+
+  Future<Map<String, dynamic>?> _chart(
+    String symbol,
+    String interval,
+    String range,
+    Duration timeout,
+  ) async {
+    final response = await _yahooGet(symbol, interval, range, timeout);
+    if (response == null || response.statusCode != 200) return null;
+    final result = (jsonDecode(response.body) as Map?)?['chart']?['result'];
+    return result is List && result.isNotEmpty
+        ? result.first as Map<String, dynamic>
+        : null;
+  }
+
+  /// Quote in EUR: non-EUR prices use the current FX rate (a snapshot).
   Future<LiveQuoteResult?> _fetchYahooQuote(String yahooSymbol) async {
     try {
-      final uri = Uri.parse(
-        '$_cloudApiBase/quote',
-      ).replace(queryParameters: {'symbol': yahooSymbol});
-      final response = await http.get(uri).timeout(const Duration(seconds: 12));
-      if (response.statusCode != 200) return null;
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
-      if (data['currency'] != 'EUR' || data['timestamp'] is! num) {
+      final chart = await _chart(
+        yahooSymbol,
+        '5m',
+        '1d',
+        const Duration(seconds: 12),
+      );
+      final meta = chart?['meta'] as Map<String, dynamic>?;
+      if (meta == null) return null;
+      final price = meta['regularMarketPrice'];
+      final time = meta['regularMarketTime'];
+      final previous = meta['chartPreviousClose'] ?? meta['previousClose'];
+      final currency = meta['currency'] as String?;
+      final nowMs = DateTime.now().millisecondsSinceEpoch;
+      if (!_positive(price) || !_positive(time) || !_positive(previous)) {
         return null;
       }
-      final price = (data['currentPrice'] as num?)?.toDouble();
-      final previous = (data['previousClose'] as num?)?.toDouble();
-      if (price == null ||
-          !price.isFinite ||
-          price <= 0 ||
-          previous == null ||
-          !previous.isFinite ||
-          previous <= 0) {
-        return null;
+      final sourceMs = (time as num).toInt() * 1000;
+      if (sourceMs > nowMs + 60000) return null;
+
+      var rate = 1.0;
+      if (currency != 'EUR') {
+        final fxSymbol = _fxSymbols[currency];
+        if (fxSymbol == null) return null;
+        final fxMeta =
+            (await _chart(
+                  fxSymbol,
+                  '5m',
+                  '1d',
+                  const Duration(seconds: 8),
+                ))?['meta']
+                as Map<String, dynamic>?;
+        final fxRate = fxMeta?['regularMarketPrice'];
+        final fxTime = fxMeta?['regularMarketTime'];
+        // Weekends are fine, indefinitely stale rates are not.
+        if (!_positive(fxRate) ||
+            !_positive(fxTime) ||
+            fxMeta!['currency'] != currency ||
+            nowMs - (fxTime as num).toInt() * 1000 > 4 * 86400000) {
+          return null;
+        }
+        rate = (fxRate as num).toDouble();
       }
+      double? eur(Object? v) => _positive(v) ? (v as num) / rate : null;
+      final closes =
+          (((chart!['indicators'] as Map?)?['quote'] as List?)?.firstOrNull
+                  as Map?)?['close']
+              as List?;
       final result = LiveQuoteResult(
-        currentPrice: price,
-        previousClose: previous,
-        high: (data['high'] as num?)?.toDouble(),
-        low: (data['low'] as num?)?.toDouble(),
-        series: (data['series'] as List<dynamic>?)
-            ?.whereType<num>()
-            .map((value) => value.toDouble())
-            .where((v) => v.isFinite && v > 0)
-            .toList(),
-        sourceTimestamp: DateTime.fromMillisecondsSinceEpoch(
-          (data['timestamp'] as num).toInt(),
-        ),
-        source: data['source'] as String? ?? 'Yahoo Finance',
-        nativeCurrency: data['nativeCurrency'] as String?,
-        usesSnapshotFx: data['conversionMethod'] == 'current-fx-snapshot',
+        currentPrice: (price as num) / rate,
+        previousClose: (previous as num) / rate,
+        high: currency == 'EUR' ? eur(meta['regularMarketDayHigh']) : null,
+        low: currency == 'EUR' ? eur(meta['regularMarketDayLow']) : null,
+        series: currency == 'EUR'
+            ? closes
+                  ?.whereType<num>()
+                  .map((v) => v.toDouble())
+                  .where((v) => v.isFinite && v > 0)
+                  .toList()
+            : const [],
+        sourceTimestamp: DateTime.fromMillisecondsSinceEpoch(sourceMs),
+        source: 'Yahoo Finance',
+        nativeCurrency: currency,
+        usesSnapshotFx: currency != 'EUR',
       );
       _quoteCache[yahooSymbol] = result;
       return result;
@@ -196,15 +263,32 @@ class LiveMarketDataService {
     String timeframe,
     String assetKey,
   ) async {
+    final (range, interval) = switch (timeframe) {
+      '1D' => ('1d', '5m'),
+      '1W' => ('5d', '15m'),
+      '1M' => ('1mo', '1d'),
+      '1Y' => ('1y', '1wk'),
+      '3Y' => ('3y', '1wk'),
+      _ => ('max', '1mo'),
+    };
     try {
-      final uri = Uri.parse('$_cloudApiBase/history').replace(
-        queryParameters: {'symbol': yahooSymbol, 'timeframe': timeframe},
+      final chart = await _chart(
+        yahooSymbol,
+        interval,
+        range,
+        const Duration(seconds: 10),
       );
-      final response = await http.get(uri).timeout(const Duration(seconds: 10));
-      if (response.statusCode == 422) _noHistory.add(assetKey);
-      if (response.statusCode != 200) return null;
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
-      final series = (data['series'] as List<dynamic>?)
+      if (chart == null) return null;
+      // Only EUR history is shown: no timestamp-aligned FX history exists.
+      if ((chart['meta'] as Map?)?['currency'] != 'EUR') {
+        _noHistory.add(assetKey);
+        return null;
+      }
+      final closes =
+          (((chart['indicators'] as Map?)?['quote'] as List?)?.firstOrNull
+                  as Map?)?['close']
+              as List?;
+      final series = closes
           ?.whereType<num>()
           .map((v) => v.toDouble())
           .where((v) => v.isFinite && v > 0)

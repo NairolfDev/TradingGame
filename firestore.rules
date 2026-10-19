@@ -28,7 +28,7 @@ service cloud.firestore {
       allow read, write: if owner(userId);
     }
 
-    // 2b. Kursalarme: nur der Besitzer; der Server (Admin SDK) wertet sie aus.
+    // 2b. Kursalarme: nur der Besitzer; die App wertet sie selbst aus.
     match /priceAlerts/{alertId} {
       function validAlert() {
         let d = request.resource.data;

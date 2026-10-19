@@ -22,6 +22,10 @@ class _FakeRepo implements PriceAlertRepository {
     _stream.add(List.of(saved));
   }
 
+  final updates = <(String, Map<String, dynamic>)>[];
+  @override
+  Future<void> update(String id, Map<String, dynamic> data) async =>
+      updates.add((id, data));
   @override
   Future<void> remove(String id) async {}
 }

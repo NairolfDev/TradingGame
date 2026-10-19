@@ -8,17 +8,29 @@ void main() {
   final assets = InitialAssets.getAssets();
   final btc = assets.firstWhere((a) => a.symbol == 'BTC');
   final eth = assets.firstWhere((a) => a.symbol == 'ETH');
+  final sol = assets.firstWhere((a) => a.symbol == 'SOL');
 
-  Future<List<double>?> fetchWith(int status, dynamic asset) =>
+  String chart(String currency) =>
+      '{"chart":{"result":[{"meta":{"currency":"$currency"},'
+      '"indicators":{"quote":[{"close":[1.0,null,2.0]}]}}]}}';
+
+  Future<List<double>?> fetchWith(int status, dynamic asset, [String? body]) =>
       http.runWithClient(
         () => LiveMarketDataService().fetchHistoricalSeries(asset, '1M'),
-        () => MockClient((_) async => http.Response('{}', status)),
+        () => MockClient((_) async => http.Response(body ?? '{}', status)),
       );
 
-  test('HTTP 422 marks the history as permanently unavailable', () async {
-    expect(LiveMarketDataService.historyUnavailable(btc), isFalse);
-    expect(await fetchWith(422, btc), isNull);
-    expect(LiveMarketDataService.historyUnavailable(btc), isTrue);
+  test(
+    'a non-EUR chart marks the history as permanently unavailable',
+    () async {
+      expect(LiveMarketDataService.historyUnavailable(btc), isFalse);
+      expect(await fetchWith(200, btc, chart('USD')), isNull);
+      expect(LiveMarketDataService.historyUnavailable(btc), isTrue);
+    },
+  );
+
+  test('a EUR chart returns its closes without gaps', () async {
+    expect(await fetchWith(200, sol, chart('EUR')), [1.0, 2.0]);
   });
 
   test('a temporary failure (503) does not', () async {

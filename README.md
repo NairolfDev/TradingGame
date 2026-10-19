@@ -2,7 +2,7 @@
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 [![Flutter](https://img.shields.io/badge/Flutter-3.41.0-02569B?logo=flutter)](https://flutter.dev)
-[![Firebase](https://img.shields.io/badge/Firebase-Hosting%20%7C%20Functions-FFCA28?logo=firebase)](https://tradinggame-live.web.app)
+[![Firebase](https://img.shields.io/badge/Firebase-Hosting%20%7C%20Firestore-FFCA28?logo=firebase)](https://tradinggame-live.web.app)
 [![Platforms](https://img.shields.io/badge/Platforms-Android%20%7C%20Windows%20%7C%20Linux%20%7C%20macOS%20%7C%20Web-brightgreen)](#)
 [![Release Pipeline](https://img.shields.io/badge/CI%2FCD-GitHub%20Actions-2088FF?logo=github-actions)](.github/workflows/ci_cd.yml)
 
@@ -39,7 +39,6 @@ Folgende Dateien und sensible Muster sind bereits in der [.gitignore](.gitignore
 - `android/app/google-services.json` (Produktions-Schlüssel)
 - `service-account-key.json` / Service-Account-Tokens
 - `.env`, `.env.local`, `.env.production`
-- `functions/node_modules/`
 
 Wenn du dein eigenes Deployment aufsetzt, nutze **GitHub Secrets** (z. B. `FIREBASE_SERVICE_ACCOUNT_TRADINGGAME_AUSTRIA_PROD`) in den GitHub Actions Pipelines.
 
@@ -104,14 +103,11 @@ Wie in professionellen Trading- und Broker-Apps (TradingView, Bloomberg, Trade R
 
 ---
 
-### 5. ☁️ Firebase Cloud Functions Backend (`/api/...`)
-Im Verzeichnis `functions/` befindet sich das serverseitige Node.js/Express Backend:
-- `/api/health`: Healthcheck-Endpunkt.
-- `/api/time`: Synchronisierte Server-Zeit zur Verhinderung von Client-Uhren-Manipulation.
-- `/api/markets`: Offizielle Marktöffnungszeiten und Preisfeed.
-- `/api/leaderboard`: Globales Endlos-Ranking.
-- `/api/loans/validate`: Server-seitige Validierung von Kreditkonditionen und Insolvenzsperren.
-- Alle Routen werden transparent via Firebase Hosting Rewrites von `https://tradinggame-live.web.app/api/...` geroutet.
+### 5. ☁️ Kein eigenes Backend (Firebase Free Tier)
+Es gibt keine Cloud Functions. Die App spricht direkt mit Firestore (abgesichert über `firestore.rules`)
+und holt Kurse direkt bei Binance/CoinGecko (Krypto) und Yahoo Finance (Aktien/ETFs; nur Android/Desktop,
+der Browser blockiert Yahoo per CORS und nutzt dort simulierte Kurse). Kursalarme prüft die App selbst,
+solange sie läuft.
 
 ---
 

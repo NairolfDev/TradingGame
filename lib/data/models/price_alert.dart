@@ -1,7 +1,7 @@
 enum AlertDirection { above, below }
 
-/// A price alert; evaluated on the server every minute (works when the app is
-/// closed). Stored in the top-level `priceAlerts` collection.
+/// A price alert; evaluated by the app while it runs (no server). Stored in
+/// the top-level `priceAlerts` collection.
 class PriceAlert {
   final String id;
   final String uid;
@@ -13,6 +13,7 @@ class PriceAlert {
   final double price;
   final bool recurring;
   final bool active;
+  final bool armed;
   final DateTime? lastTriggeredAt;
 
   const PriceAlert({
@@ -26,10 +27,11 @@ class PriceAlert {
     required this.price,
     required this.recurring,
     required this.active,
+    this.armed = true,
     this.lastTriggeredAt,
   });
 
-  /// Fields written by the client; the server owns `armed`/`lastTriggeredAt`.
+  /// Fields written by the client when it creates an alert.
   Map<String, dynamic> toCreateJson() => {
     'uid': uid,
     'assetId': assetId,
@@ -58,12 +60,20 @@ class PriceAlert {
         price: (json['price'] as num?)?.toDouble() ?? 0,
         recurring: json['recurring'] as bool? ?? false,
         active: json['active'] as bool? ?? false,
+        armed: json['armed'] != false,
         lastTriggeredAt: json['lastTriggeredAt'] is num
             ? DateTime.fromMillisecondsSinceEpoch(
                 (json['lastTriggeredAt'] as num).toInt(),
               )
             : null,
       );
+
+  /// A recurring alert fires once, then re-arms only after the price crossed
+  /// back, so it cannot spam while the price hovers around the threshold.
+  ({bool trigger, bool armed}) evaluate(double currentPrice) {
+    final hit = firesAt(currentPrice);
+    return armed ? (trigger: hit, armed: !hit) : (trigger: false, armed: !hit);
+  }
 
   /// Whether the alert would fire immediately at [currentPrice]; used to warn
   /// the user instead of creating a pointless alert.

@@ -318,7 +318,7 @@ class SettingsScreen extends StatelessWidget {
                         ),
                         SizedBox(width: 4),
                         Text(
-                          'Firestore & Functions',
+                          'Firestore',
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.bold,

@@ -49,12 +49,9 @@ Das Spiel unterstützt den Handel verschiedener Anlageklassen:
    - `orders/{orderId}`: Historie aller Kauf-/Verkaufsorders.
    - `market_prices/{symbol}`: Aktuelle Kurse, Kerzen-Charts (OHLCV), 24h-Änderung.
    - `leaderboard`: Denormalisierte Rangliste für ultraschnelle Abfragen & Pagination.
-3. **Cloud Functions (Node.js / JavaScript / TypeScript)**:
-   - Server-seitige Orderausführung (Validierung von Cash, Kursen und Hebeln zur Betrugsprävention).
-   - Periodische Ticker-Updates & Zinskupon-Gutschriften für Anleihen via Scheduled Functions.
-   - Leaderboard-Aggregator (Berechnung der Ränge).
-4. **Firebase Security Rules**:
-   - Manipulationssicher: Guthaben und Bestände können nur via Cloud Functions manipuliert werden.
+3. **Kein Backend (seit 1.9.0, Free Tier)**: Orders, Kredite, Kursalarme und Rangliste laufen im Client und
+   schreiben direkt in Firestore. Die Security Rules begrenzen nur, *wer* schreiben darf (Besitzer), nicht
+   *was* (Guthaben ist client-seitig änderbar; für ein Spiel ohne Echtgeld akzeptiert).
 
 ---
 

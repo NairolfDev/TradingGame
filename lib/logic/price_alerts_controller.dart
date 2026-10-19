@@ -86,6 +86,39 @@ class PriceAlertsController extends ChangeNotifier {
     }
   }
 
+  final _inFlight = <String>{};
+
+  /// Checks the active alerts against [prices] (EUR, by asset id), stores the
+  /// new state and returns the alerts that fired just now.
+  Future<List<PriceAlert>> check(Map<String, double> prices) async {
+    final fired = <PriceAlert>[];
+    for (final alert in _alerts) {
+      final price = prices[alert.assetId];
+      if (!alert.active || price == null || !price.isFinite || price <= 0) {
+        continue;
+      }
+      if (_inFlight.contains(alert.id)) continue;
+      final result = alert.evaluate(price);
+      if (!result.trigger && result.armed == alert.armed) continue;
+      _inFlight.add(alert.id);
+      try {
+        await _repo.update(alert.id, {
+          'armed': result.armed,
+          if (result.trigger) ...{
+            'lastTriggeredAt': DateTime.now().millisecondsSinceEpoch,
+            if (!alert.recurring) 'active': false,
+          },
+        });
+        if (result.trigger) fired.add(alert);
+      } catch (_) {
+        // Offline or rules hiccup: the next price update tries again.
+      } finally {
+        _inFlight.remove(alert.id);
+      }
+    }
+    return fired;
+  }
+
   Future<bool> remove(String id) async {
     try {
       await _repo.remove(id);
