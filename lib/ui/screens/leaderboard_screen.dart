@@ -1,187 +1,155 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../data/models/leaderboard_entry.dart';
-import '../../data/models/leaderboard_timeframe.dart';
 import '../../logic/portfolio_provider.dart';
+import '../widgets/empty_state.dart';
 
-class LeaderboardScreen extends StatefulWidget {
-  const LeaderboardScreen({super.key});
-
-  @override
-  State<LeaderboardScreen> createState() => _LeaderboardScreenState();
-}
-
-class _LeaderboardScreenState extends State<LeaderboardScreen> {
-  final LeaderboardTimeframe _selectedTimeframe = LeaderboardTimeframe.allTime;
-
-  @override
-  Widget build(BuildContext context) {
-    final provider = context.watch<PortfolioProvider>();
-    final baseEntries = provider.leaderboard;
-
-    // Zeitfenster-spezifische ROI- und Rendite-Berechnung
-    final entries = baseEntries.map((e) {
-      final adjustedRoi = e.roiPercent;
-      final adjustedNetWorth = e.isPlayer ? provider.netWorth : e.netWorth;
-
-      return LeaderboardEntry(
+/// Entries sorted by net worth with ranks 1..n. The player's own row shows the
+/// live net worth; if the player is not listed yet, a row is added.
+List<LeaderboardEntry> rankLeaderboard(
+  List<LeaderboardEntry> base, {
+  required double playerNetWorth,
+  required double playerRoiPercent,
+  required String playerCity,
+  required String playerTitle,
+  required String playerBadge,
+}) {
+  final entries = [
+    for (final e in base)
+      LeaderboardEntry(
         id: e.id,
-        name: e.name,
+        name: e.isPlayer ? _ownName(e.name) : e.name,
         city: e.city,
         title: e.title,
         badge: e.badge,
         avatarEmoji: e.avatarEmoji,
         strategy: e.strategy,
-        netWorth: adjustedNetWorth,
-        roiPercent: adjustedRoi,
+        netWorth: e.isPlayer ? playerNetWorth : e.netWorth,
+        roiPercent: e.roiPercent,
         isPlayer: e.isPlayer,
         luxuryCount: e.luxuryCount,
-        rank: e.rank,
-      );
-    }).toList();
-
-    // Sortieren nach berechnetem Net Worth
-    entries.sort((a, b) => b.netWorth.compareTo(a.netWorth));
-    for (int i = 0; i < entries.length; i++) {
-      entries[i].rank = i + 1;
-    }
-
-    final playerEntry = entries.firstWhere(
-      (e) => e.isPlayer,
-      orElse: () => LeaderboardEntry(
+      ),
+  ];
+  if (!entries.any((e) => e.isPlayer)) {
+    entries.add(
+      LeaderboardEntry(
         id: 'player',
         name: 'Du',
-        city: provider.playerCountry,
-        title: provider.currentRank.title,
-        badge: provider.currentRank.badge,
+        city: playerCity,
+        title: playerTitle,
+        badge: playerBadge,
         avatarEmoji: '😎',
         strategy: 'Multi-Asset',
-        netWorth: provider.netWorth,
-        roiPercent: provider.totalRoiPercent * 100,
+        netWorth: playerNetWorth,
+        roiPercent: playerRoiPercent,
         isPlayer: true,
-        rank: 1,
       ),
     );
+  }
+  entries.sort((a, b) => b.netWorth.compareTo(a.netWorth));
+  for (var i = 0; i < entries.length; i++) {
+    entries[i].rank = i + 1;
+  }
+  return entries;
+}
+
+/// The repository labels the player's row "Du (Name)"; the row gets a "Du"
+/// chip instead, so only the name stays.
+String _ownName(String name) {
+  final m = RegExp(r'^Du \((.+)\)$').firstMatch(name);
+  return m?.group(1) ?? name;
+}
+
+String _roiText(double roi, {int digits = 2}) =>
+    '${roi >= 0 ? '+' : '−'}${roi.abs().toStringAsFixed(digits)} %';
+
+Color _medal(int rank) => switch (rank) {
+  1 => AppColors.gold,
+  2 => AppColors.accent,
+  3 => AppColors.warning,
+  _ => AppColors.textSecondary,
+};
+
+Color _roiColor(double roi) => roi >= 0 ? AppColors.profit : AppColors.loss;
+
+class LeaderboardScreen extends StatelessWidget {
+  const LeaderboardScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final provider = context.watch<PortfolioProvider>();
+    final entries = rankLeaderboard(
+      provider.leaderboard,
+      playerNetWorth: provider.netWorth,
+      playerRoiPercent: provider.totalRoiPercent * 100,
+      playerCity: provider.playerCountry,
+      playerTitle: provider.currentRank.title,
+      playerBadge: provider.currentRank.badge,
+    );
+    final me = entries.firstWhere((e) => e.isPlayer);
+
+    Future<void> reload() async {
+      await provider.reloadLeaderboard();
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            duration: Duration(seconds: 2),
+            content: Text('Rangliste aktualisiert.'),
+          ),
+        );
+    }
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Börsenspiel Rangliste'),
+        title: const Text('Rangliste'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh, size: 20),
-            tooltip: 'Live aus Cloud aktualisieren',
-            onPressed: () async {
-              await provider.reloadLeaderboard();
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    duration: Duration(seconds: 1),
-                    content: Text(
-                      'Rangliste live aus Firebase synchronisiert!',
-                    ),
-                  ),
-                );
-              }
-            },
-          ),
-          Container(
-            margin: const EdgeInsets.only(right: 12),
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: AppColors.profit.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: AppColors.profit.withValues(alpha: 0.4),
-              ),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.wifi, size: 13, color: AppColors.profit),
-                SizedBox(width: 4),
-                Text(
-                  'Rangliste',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.profit,
-                  ),
-                ),
-              ],
-            ),
+            icon: const Icon(Icons.refresh),
+            tooltip: 'Rangliste aktualisieren',
+            onPressed: reload,
           ),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        children: [
-          const Padding(
-            padding: EdgeInsets.only(bottom: 12),
-            child: Text(
-              'Gesamtrendite seit Spielstart. Für kürzere Zeiträume liegen noch keine historischen Ranglistendaten vor.',
-            ),
-          ),
-
-          // Podium für Top 3
-          if (entries.length >= 3) ...[
-            _buildPodium(entries.sublist(0, 3)),
-            const SizedBox(height: 16),
-          ],
-
-          // Dein Rang Pinned Card
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  AppColors.primary.withValues(alpha: 0.2),
-                  AppColors.surfaceElevated,
-                ],
-              ),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.primary, width: 1.5),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: AppColors.primary,
-                    shape: BoxShape.circle,
-                  ),
-                  alignment: Alignment.center,
-                  child: Text(
-                    '#${playerEntry.rank}',
-                    style: TextStyle(
-                      color: AppColors.onPrimary,
-                      fontWeight: FontWeight.w900,
-                      fontSize: 14,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+      body: entries.length < 2
+          ? EmptyState(
+              icon: Icons.groups_outlined,
+              title: 'Noch keine Mitspieler',
+              message:
+                  'Sobald weitere angemeldete Spieler handeln, erscheinen sie hier.',
+              actionLabel: 'Aktualisieren',
+              onAction: reload,
+            )
+          : RefreshIndicator(
+              onRefresh: reload,
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                children: [
+                  _MyRankCard(me: me, total: entries.length),
+                  const SizedBox(height: 16),
+                  if (entries.length >= 3) ...[
+                    _Podium(top3: entries.take(3).toList()),
+                    const SizedBox(height: 16),
+                  ],
+                  Row(
                     children: [
-                      Row(
-                        children: [
-                          Text(
-                            playerEntry.name,
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.textPrimary,
-                            ),
+                      Expanded(
+                        child: Text(
+                          'Gesamtrendite seit Spielstart',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textPrimary,
                           ),
-                          const SizedBox(width: 6),
-                          Text(playerEntry.badge),
-                        ],
+                        ),
                       ),
                       Text(
-                        '${playerEntry.title} • ${playerEntry.city}',
+                        '${entries.length} Spieler',
                         style: TextStyle(
                           fontSize: 12,
                           color: AppColors.textSecondary,
@@ -189,195 +157,188 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                       ),
                     ],
                   ),
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      CurrencyFormatter.format(playerEntry.netWorth),
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w900,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    Text(
-                      '${playerEntry.roiPercent >= 0 ? "+" : ""}${playerEntry.roiPercent.toStringAsFixed(2)}% ROI',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: playerEntry.roiPercent >= 0
-                            ? AppColors.profit
-                            : AppColors.loss,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+                  const SizedBox(height: 8),
+                  for (final e in entries) _Tile(entry: e),
+                ],
+              ),
             ),
-          ),
+    );
+  }
+}
 
-          const SizedBox(height: 16),
+class _MyRankCard extends StatelessWidget {
+  final LeaderboardEntry me;
+  final int total;
+  const _MyRankCard({required this.me, required this.total});
 
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Rangliste • ${_selectedTimeframe.displayName}',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              Text(
-                '${entries.length} Teilnehmer',
-                style: TextStyle(fontSize: 12, color: AppColors.textMuted),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-
-          // Liste aller Teilnehmer
-          ...entries.map((entry) => _buildLeaderboardTile(entry)),
-
-          if (entries.length <= 1) ...[
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: AppColors.primary.withValues(alpha: 0.3),
-                ),
-              ),
-              child: Row(
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      container: true,
+      label:
+          'Dein Rang: Platz ${me.rank} von $total, ${CurrencyFormatter.format(me.netWorth)}',
+      excludeSemantics: true,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.primary, width: 1.5),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.public, color: AppColors.primary, size: 28),
-                  SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Echtes Cloud-Multiplayer-Ranking',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                        SizedBox(height: 2),
-                        Text(
-                          'Keine Fake-Bots! Sobald weitere Spieler online handeln, siehst du sie hier in Echtzeit synchronisiert.',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ],
+                  Text(
+                    'Dein Rang',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  Text(
+                    'Platz ${me.rank} von $total',
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  Text(
+                    '${me.title} · ${me.city}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
                     ),
                   ),
                 ],
               ),
             ),
+            const SizedBox(width: 12),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  CurrencyFormatter.format(me.netWorth),
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+                Text(
+                  _roiText(me.roiPercent),
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: _roiColor(me.roiPercent),
+                  ),
+                ),
+              ],
+            ),
           ],
-          const SizedBox(height: 24),
-        ],
+        ),
       ),
     );
   }
+}
 
-  Widget _buildPodium(List<LeaderboardEntry> top3) {
+class _Podium extends StatelessWidget {
+  final List<LeaderboardEntry> top3;
+  const _Podium({required this.top3});
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+      padding: const EdgeInsets.fromLTRB(8, 16, 8, 0),
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: AppColors.cardBorder),
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          _buildPodiumColumn(top3[1], 2, const Color(0xFFC0C0C0), 105),
-          _buildPodiumColumn(top3[0], 1, AppColors.gold, 130),
-          _buildPodiumColumn(top3[2], 3, const Color(0xFFCD7F32), 90),
+          Expanded(child: _PodiumColumn(entry: top3[1], height: 96)),
+          Expanded(child: _PodiumColumn(entry: top3[0], height: 124)),
+          Expanded(child: _PodiumColumn(entry: top3[2], height: 80)),
         ],
       ),
     );
   }
+}
 
-  Widget _buildPodiumColumn(
-    LeaderboardEntry entry,
-    int place,
-    Color medalColor,
-    double podiumHeight,
-  ) {
-    return SizedBox(
-      width: 90,
+class _PodiumColumn extends StatelessWidget {
+  final LeaderboardEntry entry;
+  final double height;
+  const _PodiumColumn({required this.entry, required this.height});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _medal(entry.rank);
+    return Semantics(
+      label:
+          'Platz ${entry.rank}: ${entry.name}, ${CurrencyFormatter.format(entry.netWorth)}',
+      excludeSemantics: true,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(entry.avatarEmoji, style: const TextStyle(fontSize: 28)),
           const SizedBox(height: 4),
-          Text(
-            entry.name,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: entry.isPlayer ? FontWeight.w900 : FontWeight.bold,
-              color: entry.isPlayer ? AppColors.primary : AppColors.textPrimary,
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: Text(
+              entry.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                color: entry.isPlayer
+                    ? AppColors.primary
+                    : AppColors.textPrimary,
+              ),
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
           ),
           Text(
             CurrencyFormatter.formatCompact(entry.netWorth),
-            style: TextStyle(
-              fontSize: 12,
-              color: AppColors.textSecondary,
-              fontWeight: FontWeight.w600,
-            ),
+            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
           ),
           const SizedBox(height: 8),
           Container(
-            width: 85,
-            height: podiumHeight,
+            height: height,
+            margin: const EdgeInsets.symmetric(horizontal: 4),
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  medalColor.withValues(alpha: 0.35),
-                  AppColors.surfaceElevated,
-                ],
-              ),
+              color: color.withValues(alpha: 0.18),
               borderRadius: const BorderRadius.vertical(
                 top: Radius.circular(12),
               ),
-              border: Border.all(color: medalColor.withValues(alpha: 0.6)),
+              border: Border.all(color: color.withValues(alpha: 0.7)),
             ),
             alignment: Alignment.center,
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  place == 1 ? '🥇 1.' : (place == 2 ? '🥈 2.' : '🥉 3.'),
+                  '${entry.rank}',
                   style: TextStyle(
-                    fontSize: 16,
+                    fontSize: 24,
                     fontWeight: FontWeight.w900,
-                    color: medalColor,
+                    color: color,
                   ),
                 ),
-                const SizedBox(height: 2),
                 Text(
-                  '${entry.roiPercent >= 0 ? "+" : ""}${entry.roiPercent.toStringAsFixed(1)}%',
+                  _roiText(entry.roiPercent, digits: 1),
                   style: TextStyle(
                     fontSize: 12,
-                    color: AppColors.profit,
                     fontWeight: FontWeight.bold,
+                    color: _roiColor(entry.roiPercent),
                   ),
                 ),
               ],
@@ -387,103 +348,138 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
       ),
     );
   }
+}
 
-  Widget _buildLeaderboardTile(LeaderboardEntry entry) {
-    final isTop3 = entry.rank <= 3;
-    final medal = entry.rank == 1
-        ? '🥇'
-        : (entry.rank == 2
-              ? '🥈'
-              : (entry.rank == 3 ? '🥉' : '#${entry.rank}'));
+class _Tile extends StatelessWidget {
+  final LeaderboardEntry entry;
+  const _Tile({required this.entry});
 
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 4),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: entry.isPlayer
-            ? AppColors.primary.withValues(alpha: 0.08)
-            : AppColors.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: entry.isPlayer
-              ? AppColors.primary.withValues(alpha: 0.5)
-              : AppColors.cardBorder,
+  @override
+  Widget build(BuildContext context) {
+    final me = entry.isPlayer;
+    return Semantics(
+      container: true,
+      label:
+          'Platz ${entry.rank}: ${entry.name}${me ? ' (du)' : ''}, ${CurrencyFormatter.format(entry.netWorth)}, ${_roiText(entry.roiPercent)}',
+      excludeSemantics: true,
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: me
+              ? AppColors.primary.withValues(alpha: 0.08)
+              : AppColors.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: me
+                ? AppColors.primary.withValues(alpha: 0.6)
+                : AppColors.cardBorder,
+          ),
         ),
-      ),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 32,
-            child: Text(
-              medal,
-              style: TextStyle(
-                fontSize: isTop3 ? 18 : 13,
-                fontWeight: FontWeight.bold,
-                color: AppColors.textSecondary,
+        child: Row(
+          children: [
+            SizedBox(
+              width: 34,
+              child: Text(
+                '${entry.rank}',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: entry.rank <= 3 ? 18 : 14,
+                  fontWeight: FontWeight.w900,
+                  color: _medal(entry.rank),
+                ),
               ),
             ),
-          ),
-          const SizedBox(width: 8),
-          Text(entry.avatarEmoji, style: const TextStyle(fontSize: 22)),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+            const SizedBox(width: 6),
+            Text(entry.avatarEmoji, style: const TextStyle(fontSize: 22)),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          entry.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                            color: me
+                                ? AppColors.primary
+                                : AppColors.textPrimary,
+                          ),
+                        ),
+                      ),
+                      if (me) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 1,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            'Du',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.onPrimary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  Text(
+                    '${entry.title} · ${entry.city}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 120),
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerRight,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(
-                      entry.name,
+                      CurrencyFormatter.format(entry.netWorth),
                       style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: entry.isPlayer
-                            ? FontWeight.w900
-                            : FontWeight.bold,
-                        color: entry.isPlayer
-                            ? AppColors.primary
-                            : AppColors.textPrimary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textPrimary,
+                        fontFeatures: const [FontFeature.tabularFigures()],
                       ),
                     ),
-                    const SizedBox(width: 4),
-                    Text(entry.badge),
+                    Text(
+                      _roiText(entry.roiPercent),
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: _roiColor(entry.roiPercent),
+                      ),
+                    ),
                   ],
                 ),
-                Text(
-                  '${entry.strategy} • ${entry.city}',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textSecondary,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
+              ),
             ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                CurrencyFormatter.format(entry.netWorth),
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              Text(
-                '${entry.roiPercent >= 0 ? "+" : ""}${entry.roiPercent.toStringAsFixed(2)}% ROI',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: entry.roiPercent >= 0
-                      ? AppColors.profit
-                      : AppColors.loss,
-                ),
-              ),
-            ],
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
