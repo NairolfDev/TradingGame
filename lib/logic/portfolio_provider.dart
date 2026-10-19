@@ -34,6 +34,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../data/models/savings_plan.dart';
 import 'savings_plan_service.dart';
 import '../data/repositories/public_portfolio_repository.dart';
+import '../data/repositories/reward_ledger.dart';
 import 'public_portfolio.dart';
 import 'automation_service.dart';
 import 'achievement_service.dart';
@@ -537,7 +538,11 @@ class PortfolioProvider extends ChangeNotifier {
     await automationService.initialize();
 
     // Initialisiere Gamification Achievements
-    await achievementService.initialize();
+    await achievementService.initialize(
+      profileId: _activeUid == 'local_player' ? 'local' : _activeUid,
+      ledger: _ledger,
+    );
+    await _syncClaimedQuests();
     achievementService.onAchievementUnlocked = (ach) {
       _cash += ach.cashReward;
       repository.saveCashBalance(_cash);
@@ -643,6 +648,11 @@ class PortfolioProvider extends ChangeNotifier {
                 latest == null || date.isAfter(latest) ? date : latest,
           );
       await _initializeQuests();
+      await achievementService.initialize(
+        profileId: _activeUid == 'local_player' ? 'local' : _activeUid,
+        ledger: _ledger,
+      );
+      await _syncClaimedQuests();
       await netWorthHistory.load(_activeUid);
       await _loadPortfolioPublic();
       if (version != _accountVersion) return;
@@ -2249,7 +2259,41 @@ class PortfolioProvider extends ChangeNotifier {
   }
 
   // --- 1. DAILY QUESTS & REWARDS ---
-  void claimDailyQuest(String questId) {
+  /// Rewards are booked per account in Firestore, so they pay out once even
+  /// when the same account plays on several devices.
+  RewardLedger get _ledger =>
+      repository is FirebaseTradingRepository && _activeUid != 'local_player'
+      ? FirestoreRewardLedger(_activeUid)
+      : LocalRewardLedger();
+
+  Future<void> _syncClaimedQuests() async {
+    final day = questService.dayKey;
+    final ledger = _ledger;
+    for (final q in questService.quests.where((q) => q.isClaimed)) {
+      await ledger.claim('quest:$day:${q.id}');
+    }
+    final paid = await ledger.claimed();
+    questService.markClaimed([
+      for (final k in paid)
+        if (k.startsWith('quest:$day:')) k.substring('quest:$day:'.length),
+    ]);
+  }
+
+  Future<void> claimDailyQuest(String questId) async {
+    if (!questService.canClaim(questId)) return;
+    final result = await _ledger.claim('quest:${questService.dayKey}:$questId');
+    if (result == ClaimResult.alreadyClaimed) {
+      questService.markClaimed([questId]);
+      _lastAlertMessage = 'Diese Belohnung wurde heute schon abgeholt.';
+      notifyListeners();
+      return;
+    }
+    if (result == ClaimResult.failed) {
+      _lastAlertMessage =
+          'Keine Verbindung: Belohnung bitte später noch einmal abholen.';
+      notifyListeners();
+      return;
+    }
     questService.claimQuest(questId, (cashReward, prestigeReward) {
       _cash += cashReward;
       repository.saveCashBalance(_cash);

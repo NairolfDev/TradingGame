@@ -132,6 +132,27 @@ class QuestService {
     return false;
   }
 
+  /// UTC day of the current quest set, part of the reward key.
+  String get dayKey {
+    _refreshDay();
+    return _day!.substring(0, 10);
+  }
+
+  bool canClaim(String questId) {
+    _refreshDay();
+    final q = _quests.where((q) => q.id == questId).firstOrNull;
+    return q != null && q.isCompleted && !q.isClaimed;
+  }
+
+  /// Marks quests as claimed that another device already paid out today.
+  void markClaimed(Iterable<String> questIds) {
+    _refreshDay();
+    for (final q in _quests) {
+      if (questIds.contains(q.id)) q.isClaimed = true;
+    }
+    _save();
+  }
+
   int get completedCount => _quests.where((q) => q.isCompleted).length;
   int get totalCount => _quests.length;
 }
