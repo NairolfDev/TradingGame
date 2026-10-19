@@ -54,6 +54,20 @@ service cloud.firestore {
       allow write: if writer(docId);
     }
 
+    // 1b. Öffentliche Portfolios (Copy-Trading): jeder liest, nur der Besitzer schreibt
+    match /publicPortfolios/{docId} {
+      allow read: if true;
+      allow delete: if owner(docId);
+      allow create, update: if writer(docId)
+        && request.resource.data.keys().hasOnly(['uid', 'name', 'title', 'avatarEmoji',
+             'netWorth', 'roiPercent', 'winRatePercent', 'riskStyle', 'allocation', 'updatedAt'])
+        && request.resource.data.uid == docId
+        && request.resource.data.name is string
+        && request.resource.data.name.size() >= 2 && request.resource.data.name.size() <= 48
+        && request.resource.data.allocation is map
+        && request.resource.data.allocation.size() <= 8;
+    }
+
     // 2. Benutzerprofile
     match /users/{userId} {
       allow read: if owner(userId);

@@ -318,24 +318,55 @@ class LiveMarketDataService {
         const Duration(seconds: 10),
       );
       if (chart == null) return null;
-      // Only EUR history is shown: no timestamp-aligned FX history exists.
-      if ((chart['meta'] as Map?)?['currency'] != 'EUR') {
+      final currency = (chart['meta'] as Map?)?['currency'];
+      final points = _closes(chart);
+      if (points.isEmpty) return null;
+      if (currency == 'EUR') return [for (final p in points) p.v];
+
+      // Other currencies are converted point by point with the EUR rate that
+      // was valid at that time (the latest rate not after the timestamp), so
+      // the curve never mixes today's rate into old prices.
+      final fxSymbol = _fxSymbols[currency];
+      if (fxSymbol == null) {
         _noHistory.add(assetKey);
         return null;
       }
-      final closes =
-          (((chart['indicators'] as Map?)?['quote'] as List?)?.firstOrNull
-                  as Map?)?['close']
-              as List?;
-      final series = closes
-          ?.whereType<num>()
-          .map((v) => v.toDouble())
-          .where((v) => v.isFinite && v > 0)
-          .toList();
-      return series == null || series.isEmpty ? null : series;
+      final fxChart = await _chart(
+        fxSymbol,
+        interval,
+        range,
+        const Duration(seconds: 10),
+      );
+      final fx = fxChart == null ? <({int t, double v})>[] : _closes(fxChart);
+      if (fx.isEmpty) return null;
+      final converted = <double>[];
+      var j = -1;
+      for (final p in points) {
+        while (j + 1 < fx.length && fx[j + 1].t <= p.t) {
+          j++;
+        }
+        if (j >= 0) converted.add(p.v / fx[j].v);
+      }
+      return converted.length < 2 ? null : converted;
     } catch (_) {
       return null;
     }
+  }
+
+  /// Time/close pairs of a Yahoo chart; gaps and invalid values are dropped.
+  List<({int t, double v})> _closes(Map<String, dynamic> chart) {
+    final stamps = chart['timestamp'] as List?;
+    final closes =
+        (((chart['indicators'] as Map?)?['quote'] as List?)?.firstOrNull
+                as Map?)?['close']
+            as List?;
+    if (stamps == null || closes == null) return const [];
+    final n = stamps.length < closes.length ? stamps.length : closes.length;
+    return [
+      for (var i = 0; i < n; i++)
+        if (stamps[i] is num && _positive(closes[i]))
+          (t: (stamps[i] as num).toInt(), v: (closes[i] as num).toDouble()),
+    ];
   }
 
   /// Realtime Live-Quote für Krypto (Binance 24hr API, Fallback auf CoinGecko)

@@ -120,21 +120,37 @@ void main() {
   testWidgets('social trading shows an honest empty state with large text', (
     tester,
   ) async {
+    SharedPreferences.setMockInitialValues({});
     await tester.binding.setSurfaceSize(const Size(375, 667));
     addTearDown(() => tester.binding.setSurfaceSize(null));
+    late PortfolioProvider portfolio;
+    await tester.runAsync(() async {
+      portfolio = PortfolioProvider(repository: LocalTradingRepository());
+      while (portfolio.isLoading) {
+        await Future<void>.delayed(const Duration(milliseconds: 5));
+      }
+      portfolio.marketEngine.stop();
+      portfolio.newsService.dispose();
+    });
+    addTearDown(portfolio.dispose);
     await tester.pumpWidget(
-      MaterialApp(
-        builder: (context, child) => MediaQuery(
-          data: MediaQuery.of(
-            context,
-          ).copyWith(textScaler: const TextScaler.linear(2)),
-          child: child!,
+      ChangeNotifierProvider.value(
+        value: portfolio,
+        child: MaterialApp(
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(
+              context,
+            ).copyWith(textScaler: const TextScaler.linear(2)),
+            child: child!,
+          ),
+          home: const SocialTradingScreen(),
         ),
-        home: const SocialTradingScreen(),
       ),
     );
     expect(find.text('Noch keine öffentlichen Portfolios'), findsOneWidget);
-    expect(find.text('Jetzt kopieren'), findsNothing);
+    expect(find.text('Portfolio kopieren'), findsNothing);
     expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump();
   });
 }

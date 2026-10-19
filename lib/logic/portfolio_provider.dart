@@ -33,6 +33,8 @@ import 'dart:math';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../data/models/savings_plan.dart';
 import 'savings_plan_service.dart';
+import '../data/repositories/public_portfolio_repository.dart';
+import 'public_portfolio.dart';
 import 'automation_service.dart';
 import 'achievement_service.dart';
 import 'live_market_data_service.dart';
@@ -190,7 +192,87 @@ class PortfolioProvider extends ChangeNotifier {
   List<DailyQuest> get dailyQuests => questService.quests;
   int get loginStreakDays => questService.loginStreakDays;
   // No public portfolio feed is available yet.
-  List<CopyTrader> get copyTraders => const [];
+  // --- Öffentliches Portfolio (Copy-Trading-Feed) ---
+  static const _keyPortfolioPublic = 'tg_portfolio_public_';
+  bool _portfolioPublic = false;
+  DateTime? _lastPublish;
+  List<CopyTrader> _publicTraders = const [];
+  StreamSubscription<List<CopyTrader>>? _publicSubscription;
+
+  /// Public portfolios of other players.
+  List<CopyTrader> get copyTraders =>
+      [for (final t in _publicTraders) if (t.id != _activeUid) t];
+
+  /// True when this player's portfolio is listed in the copy-trading feed.
+  bool get isPortfolioPublic => _portfolioPublic && _isOnLeaderboard;
+
+  Future<void> _loadPortfolioPublic() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _portfolioPublic =
+          prefs.getBool('$_keyPortfolioPublic$_activeUid') ?? false;
+    } catch (_) {
+      _portfolioPublic = false;
+    }
+  }
+
+  void _listenPublicPortfolios() {
+    _publicSubscription?.cancel();
+    try {
+      _publicSubscription = FirestorePublicPortfolioRepository().watch().listen(
+        (list) {
+          _publicTraders = list;
+          notifyListeners();
+        },
+        onError: (Object _) {},
+      );
+    } catch (_) {}
+  }
+
+  /// Only signed-in, named players can publish (same rule as the leaderboard).
+  Future<bool> setPortfolioPublic(bool value) async {
+    if (value && !_isOnLeaderboard) return false;
+    _portfolioPublic = value;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('$_keyPortfolioPublic$_activeUid', value);
+    } catch (_) {}
+    try {
+      if (value) {
+        await _publishPortfolio(force: true);
+      } else {
+        await FirestorePublicPortfolioRepository().unpublish(_activeUid);
+      }
+    } catch (_) {
+      // Offline: the next sync publishes or the document stays until then.
+    }
+    notifyListeners();
+    return true;
+  }
+
+  Future<void> _publishPortfolio({bool force = false}) async {
+    if (!isPortfolioPublic) return;
+    final now = DateTime.now();
+    if (!force &&
+        _lastPublish != null &&
+        now.difference(_lastPublish!) < const Duration(seconds: 60)) {
+      return;
+    }
+    _lastPublish = now;
+    final name = _playerProfile?.displayName ?? 'Trader';
+    await FirestorePublicPortfolioRepository().publish(
+      buildPublicPortfolio(
+        uid: _activeUid,
+        name: name,
+        title: currentRank.title,
+        netWorth: netWorth,
+        roiPercent: totalRoiPercent * 100,
+        positions: _positions,
+        transactions: _transactions,
+      ),
+    );
+  }
+
   double get totalAnnualDividends =>
       DividendService.calculateAnnualDividendRunRate(_positions, _assets);
   double get monthlyPassiveIncome =>
@@ -486,6 +568,8 @@ class PortfolioProvider extends ChangeNotifier {
 
     // Echte Live-Börsenkurse im Hintergrund abrufen & Auth-Änderungen überwachen
     _listenToAuthChanges();
+    await _loadPortfolioPublic();
+    _listenPublicPortfolios();
     _startLiveMarketRefresh();
 
     _isLoading = false;
@@ -559,6 +643,7 @@ class PortfolioProvider extends ChangeNotifier {
           );
       await _initializeQuests();
       await netWorthHistory.load(_activeUid);
+      await _loadPortfolioPublic();
       if (version != _accountVersion) return;
       _updatePositionsWithCurrentAssetPrices();
     } catch (e) {
@@ -592,6 +677,11 @@ class PortfolioProvider extends ChangeNotifier {
         ..._positions.map((p) => p.assetId),
         ...pendingOrders.map((p) => p.assetId),
       };
+      // The ticker shows the first 10 instruments when nothing is watchlisted:
+      // they need quotes too, or it reads "Kein Kurs" next to real prices.
+      if (!_assets.any((a) => a.isWatchlisted)) {
+        wanted.addAll(_assets.take(10).map((a) => a.id));
+      }
       // Dashboard starts with a small default page; never refresh the whole catalog.
       if (wanted.isEmpty) wanted.addAll(_assets.take(20).map((a) => a.id));
       final quotes = await liveDataService.refreshQuotesForAssets(
@@ -2147,6 +2237,7 @@ class PortfolioProvider extends ChangeNotifier {
     }
 
     repository.saveLeaderboard(_leaderboard, forceCloud: forceCloud);
+    unawaited(_publishPortfolio().catchError((_) {}));
   }
 
   Future<void> reloadLeaderboard() async {
@@ -2183,17 +2274,29 @@ class PortfolioProvider extends ChangeNotifier {
     }
     if (_cash < allocatedAmount || allocatedAmount < 500) return false;
 
+    // Only instruments with a live price can be bought; the weights of the
+    // rest are spread over them so the whole amount is invested.
+    final priced = <Asset, double>{};
+    for (final e in trader.portfolioAllocation.entries) {
+      final asset = _assets.where((a) => a.symbol == e.key).firstOrNull;
+      if (asset != null && asset.currentPrice.isFinite && asset.currentPrice > 0) {
+        priced[asset] = e.value;
+      }
+    }
+    final weightSum = priced.values.fold<double>(0, (s, w) => s + w);
+    if (priced.isEmpty || weightSum <= 0) {
+      _lastAlertMessage =
+          'Kopieren nicht möglich: Für dieses Portfolio liegen keine Kurse vor.';
+      notifyListeners();
+      return false;
+    }
+
     _cash -= allocatedAmount;
     await repository.saveCashBalance(_cash);
 
-    for (final entry in trader.portfolioAllocation.entries) {
-      final symbol = entry.key;
-      final weight = entry.value;
-      final sliceAmount = allocatedAmount * weight;
-
-      final matchingAssets = _assets.where((a) => a.symbol == symbol);
-      if (matchingAssets.isEmpty) continue;
-      final asset = matchingAssets.first;
+    for (final entry in priced.entries) {
+      final asset = entry.key;
+      final sliceAmount = allocatedAmount * entry.value / weightSum;
 
       final shares = sliceAmount / asset.currentPrice;
 
@@ -2484,6 +2587,7 @@ class PortfolioProvider extends ChangeNotifier {
     _rewards.close();
     _authSubscription?.cancel();
     _leaderboardSubscription?.cancel();
+    _publicSubscription?.cancel();
     _liveMarketRefreshTimer?.cancel();
     marketEngine.stop();
     newsService.dispose();

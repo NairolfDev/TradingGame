@@ -158,6 +158,36 @@ class SettingsScreen extends StatelessWidget {
 
           const SizedBox(height: 24),
 
+          // 2b. ÖFFENTLICHES PORTFOLIO (COPY-TRADING)
+          _buildSectionHeader('ÖFFENTLICHES PORTFOLIO'),
+          const SizedBox(height: 10),
+          _buildCard(
+            child: SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              activeTrackColor: AppColors.primary,
+              title: Text(
+                'Mein Portfolio im Copy-Trading zeigen',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              subtitle: Text(
+                provider.isOnLeaderboard
+                    ? 'Andere Spieler sehen deinen Namen, dein Ergebnis und die Gewichte deiner Wertpapiere (keine Stückzahlen, kein Bargeld) und können sie kopieren. Jederzeit wieder abschaltbar.'
+                    : 'Melde dich an und wähle einen Namen, um dein Portfolio öffentlich zu machen. Gäste können das nicht.',
+                style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+              ),
+              value: provider.isPortfolioPublic,
+              onChanged: provider.isOnLeaderboard
+                  ? (v) => provider.setPortfolioPublic(v)
+                  : null,
+            ),
+          ),
+
+          const SizedBox(height: 24),
+
           // 3. SPARPLÄNE (DCA)
           _buildSectionHeader('🏦 AUTOMATISIERTE SPARPLÄNE (DCA)'),
           const SizedBox(height: 10),
