@@ -54,8 +54,10 @@ class LiveMarketDataService {
     if (asset.type == AssetType.stock || asset.type == AssetType.etf) {
       return symbol;
     }
-    // Futures (gold, oil, ...) are quoted in USD and converted to EUR.
-    if (asset.type == AssetType.commodity && asset.yahooSymbol != null) {
+    // Futures (gold, oil, ...) are quoted in USD and converted to EUR; leverage
+    // CFDs follow the quote of their underlying.
+    if ((asset.type == AssetType.commodity || asset.type == AssetType.cfd) &&
+        asset.yahooSymbol != null) {
       return symbol;
     }
     if (['.VI', '.DE', '.AS'].any(symbol.endsWith)) return symbol;

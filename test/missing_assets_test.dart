@@ -30,4 +30,21 @@ void main() {
     );
     expect(LiveMarketDataService.euroYahooSymbolFor(gold), 'GC=F');
   });
+
+  test('leverage CFDs follow their underlying, also in saved lists', () async {
+    final old = InitialAssets.getAssets()
+        .map((a) => a.type == AssetType.cfd ? a.copyWith(yahooSymbol: '') : a)
+        .map(
+          (a) => a.type == AssetType.cfd
+              ? Asset.fromJson({...a.toJson(), 'yahooSymbol': null})
+              : a,
+        )
+        .toList();
+    SharedPreferences.setMockInitialValues({
+      'tg_assets': jsonEncode(old.map((a) => a.toJson()).toList()),
+    });
+    final loaded = await LocalTradingRepository().getAssets();
+    final atx = loaded.firstWhere((a) => a.symbol == 'ATX-20X');
+    expect(LiveMarketDataService.euroYahooSymbolFor(atx), '^ATX');
+  });
 }

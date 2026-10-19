@@ -15,7 +15,10 @@ void main() {
   testWidgets(
     'pending buy waits for a quote and fills its budget at the new price',
     (tester) async {
-      SharedPreferences.setMockInitialValues({});
+      // Without routing delay a pre-order fills as soon as the market opens.
+      SharedPreferences.setMockInitialValues({
+        'tg_is_realistic_order_delay': false,
+      });
       final repository = LocalTradingRepository();
       final stock = (await repository.getAssets()).firstWhere(
         (a) => a.type == AssetType.stock,

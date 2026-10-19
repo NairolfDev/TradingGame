@@ -1228,6 +1228,23 @@ class PortfolioProvider extends ChangeNotifier {
     return true;
   }
 
+  String _venueFor(String symbol) {
+    final sym = symbol.toUpperCase();
+    if (sym.endsWith('.VI')) return 'Wiener Börse (WBAG)';
+    if (sym.endsWith('.DE') || sym.endsWith('.AS')) return 'Deutsche Börse XETRA';
+    if (sym.contains('=F')) return 'CME Globex';
+    if (sym == 'BTC' || sym == 'ETH' || sym == 'SOL') {
+      return 'Crypto Liquidity Pool';
+    }
+    return 'NASDAQ / NYSE';
+  }
+
+  @visibleForTesting
+  Future<void> processPendingOrdersForTest(List<PendingOrder> add) async {
+    _pendingOrders.addAll(add);
+    await _checkAndExecutePendingOrders();
+  }
+
   /// Prüft bei Marktöffnung und Ablauf der Ausführungszeit (5-15 Min.), ob anstehende Orders ausgeführt werden
   bool _executingPendingOrders = false;
   Future<void> _checkAndExecutePendingOrders() async {
@@ -1253,6 +1270,25 @@ class PortfolioProvider extends ChangeNotifier {
 
         // Börsenöffnungszeiten prüfen
         if (!isAssetMarketOpen(matchingAsset)) continue;
+
+        // Vorab-Orders (Börse war zu) werden zur Öffnung zu normalen Orders:
+        // sie bekommen die Routing-Zeit statt sofort ausgeführt zu werden.
+        if (order.isPreOrder && _isRealisticOrderDelay) {
+          final minutes = 5 + Random().nextInt(11);
+          order.scheduledExecutionTime = now.add(Duration(minutes: minutes));
+          order.executionReason = 'Im Orderbuch';
+          order.brokerVenue = _venueFor(matchingAsset.symbol);
+          changes = true;
+          _reward(
+            RewardEvent(
+              kind: RewardKind.alert,
+              title: 'Börse offen: Vorab-Order aktiv',
+              detail:
+                  '${matchingAsset.symbol} läuft jetzt als normale Order, Ausführung in ~$minutes Min.',
+            ),
+          );
+          continue;
+        }
 
         // Realistische Verzögerung prüfen (5-15 Minuten)
         if (order.scheduledExecutionTime != null &&

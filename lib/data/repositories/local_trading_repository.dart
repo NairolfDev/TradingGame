@@ -59,8 +59,15 @@ class LocalTradingRepository implements TradingRepository {
           .toList();
       // Instruments added to the game after this list was saved (gold, oil,
       // ...) would otherwise never show up for existing players.
+      final defaults = {for (final a in InitialAssets.getAssets()) a.id: a};
+      for (var i = 0; i < saved.length; i++) {
+        final d = defaults[saved[i].id];
+        if (saved[i].yahooSymbol == null && d?.yahooSymbol != null) {
+          saved[i] = saved[i].copyWith(yahooSymbol: d!.yahooSymbol);
+        }
+      }
       final known = {for (final a in saved) a.id};
-      saved.addAll(InitialAssets.getAssets().where((a) => !known.contains(a.id)));
+      saved.addAll(defaults.values.where((a) => !known.contains(a.id)));
       return StockCatalog.merge(saved);
     } catch (_) {
       return StockCatalog.merge(InitialAssets.getAssets());

@@ -32,9 +32,12 @@ class PendingOrder {
   final double? collateral;
   final double? averageBuyPrice;
   final DateTime createdAt;
-  final DateTime? scheduledExecutionTime;
-  final String? executionReason;
-  final String? brokerVenue;
+  DateTime? scheduledExecutionTime; // null = Vorab-Order (Börse geschlossen)
+  String? executionReason;
+  String? brokerVenue;
+
+  /// Placed while the exchange was closed; becomes a normal order at the open.
+  bool get isPreOrder => scheduledExecutionTime == null;
   PendingOrderStatus status;
   DateTime? executedAt;
   double? executedPrice;

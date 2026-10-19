@@ -949,6 +949,7 @@ class InitialAssets {
       Asset(
         id: 'cfd_btc_50x',
         symbol: 'BTC-50X',
+        yahooSymbol: 'BTC-EUR',
         name: 'Bitcoin 50x Ultra Hebel CFD',
         type: AssetType.cfd,
         currentPrice: 67450.00,
@@ -964,6 +965,7 @@ class InitialAssets {
       Asset(
         id: 'cfd_eth_30x',
         symbol: 'ETH-30X',
+        yahooSymbol: 'ETH-EUR',
         name: 'Ethereum 30x Turbo Hebel',
         type: AssetType.cfd,
         currentPrice: 3420.00,
@@ -979,6 +981,7 @@ class InitialAssets {
       Asset(
         id: 'cfd_spx_50x',
         symbol: 'SPX-50X',
+        yahooSymbol: '^GSPC',
         name: 'S&P 500 50x Ultra Hebel CFD',
         type: AssetType.cfd,
         currentPrice: 5820.00,
@@ -994,6 +997,7 @@ class InitialAssets {
       Asset(
         id: 'cfd_dax_30x',
         symbol: 'DAX-30X',
+        yahooSymbol: '^GDAXI',
         name: 'DAX 40 30x Turbo Hebel',
         type: AssetType.cfd,
         currentPrice: 19450.00,
@@ -1009,6 +1013,7 @@ class InitialAssets {
       Asset(
         id: 'cfd_atx_20x',
         symbol: 'ATX-20X',
+        yahooSymbol: '^ATX',
         name: 'ATX Wien 20x Long/Short Hebel',
         type: AssetType.cfd,
         currentPrice: 3820.00,
@@ -1024,6 +1029,7 @@ class InitialAssets {
       Asset(
         id: 'cfd_gold_25x',
         symbol: 'XAU-25X',
+        yahooSymbol: 'GC=F',
         name: 'Gold (Feingold) 25x Hebel CFD',
         type: AssetType.cfd,
         currentPrice: 2680.00,
@@ -1039,6 +1045,7 @@ class InitialAssets {
       Asset(
         id: 'cfd_brent_20x',
         symbol: 'OIL-20X',
+        yahooSymbol: 'BZ=F',
         name: 'Brent Crude Rohöl 20x Hebel',
         type: AssetType.cfd,
         currentPrice: 74.80,
