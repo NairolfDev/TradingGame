@@ -30,6 +30,8 @@ class PlannedNotification {
 
 const _scheduledRegions = [
   MarketRegion.viennaEurope,
+  MarketRegion.londonLse,
+  MarketRegion.futures24x5,
   MarketRegion.usWallStreet,
   MarketRegion.asiaTokyoHongKong,
 ];

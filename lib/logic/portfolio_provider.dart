@@ -1160,21 +1160,17 @@ class PortfolioProvider extends ChangeNotifier {
 
     final isOpen = isAssetMarketOpen(asset);
 
-    if (!isOpen) {
-      _lastAlertMessage =
-          'Börse für ${asset.symbol} ist geschlossen. Verkäufe können nur während der Handelszeiten abgewickelt werden.';
-      notifyListeners();
-      return false;
-    }
-
     if (sellAmount > position.amount) {
       _lastAlertMessage = 'Verkaufsmenge übersteigt den Bestand!';
       notifyListeners();
       return false;
     }
 
+    // Börse zu: Vorab-Verkaufsorder. Sie wird zur Öffnung zur normalen Order.
+    final preOrder = !isOpen;
+
     // WENN REALISTISCHER MODUS AKTIV: 5-15 MINUTEN BÖRSEN-ROUTING
-    if (_isRealisticOrderDelay) {
+    if (_isRealisticOrderDelay || preOrder) {
       String venue = 'Wiener Börse (WBAG)';
       final sym = asset.symbol.toUpperCase();
       if (sym.endsWith('.VI') ||
@@ -1201,7 +1197,9 @@ class PortfolioProvider extends ChangeNotifier {
       }
 
       final delayMinutes = 5 + Random().nextInt(11);
-      final scheduledTime = DateTime.now().add(Duration(minutes: delayMinutes));
+      final scheduledTime = preOrder
+          ? null
+          : DateTime.now().add(Duration(minutes: delayMinutes));
 
       // Reduziere Position temporär (Sperre für Verkauf)
       if (sellAmount >= position.amount) {
@@ -1237,15 +1235,16 @@ class PortfolioProvider extends ChangeNotifier {
         collateral: position.isLeveraged ? (position.collateral * ratio) : null,
         averageBuyPrice: position.averageBuyPrice,
         scheduledExecutionTime: scheduledTime,
-        executionReason: 'Im Orderbuch',
-        brokerVenue: venue,
+        executionReason: preOrder ? 'Wartet auf Börsenöffnung' : 'Im Orderbuch',
+        brokerVenue: preOrder ? null : venue,
       );
 
       _pendingOrders.insert(0, pendingOrder);
       await repository.savePendingOrders(_pendingOrders);
 
-      _lastAlertMessage =
-          '📡 Verkaufsorder an $venue übermittelt! Geschätzte Ausführung: in ~$delayMinutes Min.';
+      _lastAlertMessage = preOrder
+          ? 'Börse geschlossen: Vorab-Verkaufsorder für ${asset.symbol} vorgemerkt. Sie läuft zur Öffnung als normale Order.'
+          : '📡 Verkaufsorder an $venue übermittelt! Geschätzte Ausführung: in ~$delayMinutes Min.';
       notifyListeners();
       return true;
     }

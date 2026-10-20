@@ -29,7 +29,7 @@ void main() {
     'a chart in an unsupported currency marks the history as permanently unavailable',
     () async {
       expect(LiveMarketDataService.historyUnavailable(btc), isFalse);
-      expect(await fetchWith(200, btc, chart('GBp')), isNull);
+      expect(await fetchWith(200, btc, chart('CHF')), isNull);
       expect(LiveMarketDataService.historyUnavailable(btc), isTrue);
     },
   );

@@ -202,7 +202,13 @@ class LiveMarketDataService {
 
   static const _yahooChart =
       'https://query1.finance.yahoo.com/v8/finance/chart';
-  static const _fxSymbols = {'USD': 'EURUSD=X', 'JPY': 'EURJPY=X'};
+  static const _fxSymbols = {
+    'USD': 'EURUSD=X',
+    'JPY': 'EURJPY=X',
+    'GBP': 'EURGBP=X',
+    'GBp': 'EURGBP=X', // pence: 100 per pound
+  };
+  static double _fxScale(String? currency) => currency == 'GBp' ? 100 : 1;
   static const _yahooHeaders = {
     'User-Agent': 'Mozilla/5.0',
     'Accept': 'application/json',
@@ -344,11 +350,11 @@ class LiveMarketDataService {
         // Weekends are fine, indefinitely stale rates are not.
         if (!_positive(fxRate) ||
             !_positive(fxTime) ||
-            fxMeta!['currency'] != currency ||
+            fxMeta!['currency'] != currency?.toUpperCase() ||
             nowMs - (fxTime as num).toInt() * 1000 > 4 * 86400000) {
           return null;
         }
-        rate = (fxRate as num).toDouble();
+        rate = (fxRate as num).toDouble() * _fxScale(currency);
       }
       double? eur(Object? v) => _positive(v) ? (v as num) / rate : null;
       final closes =
@@ -431,10 +437,12 @@ class LiveMarketDataService {
         }
         // Before the first FX bar of the range (e.g. Friday's close seen on
         // Monday morning) the earliest rate is used if it is under 4 days off.
-        final rate = j >= 0
+        final raw = j >= 0
             ? fx[j].v
             : (fx.first.t - p.t < 4 * 86400 ? fx.first.v : null);
-        if (rate != null) converted.add((t: p.t, v: p.v / rate));
+        if (raw != null) {
+          converted.add((t: p.t, v: p.v / (raw * _fxScale(currency as String?))));
+        }
       }
       return converted.length < 2 ? null : converted;
     } catch (_) {

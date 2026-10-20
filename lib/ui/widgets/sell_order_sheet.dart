@@ -65,7 +65,6 @@ class _SellOrderSheetState extends State<SellOrderSheet> {
         !_busy &&
         !provider.isLoading &&
         hasQuote &&
-        marketOpen &&
         amount.isFinite &&
         amount > 0 &&
         amount <= quantity;
@@ -112,7 +111,7 @@ class _SellOrderSheetState extends State<SellOrderSheet> {
                 ),
                 if (!marketOpen)
                   const Text(
-                    'Markt geschlossen. Verkauf während der Handelszeiten möglich.',
+                    'Markt geschlossen: Der Verkauf wird als Vorab-Order vorgemerkt und läuft zur Öffnung als normale Order.',
                   ),
                 const SizedBox(height: 16),
                 OrderEntry(
@@ -182,7 +181,11 @@ class _SellOrderSheetState extends State<SellOrderSheet> {
                             setState(() => _busy = false);
                           }
                         },
-                  child: const Text('Verkauf verbindlich bestätigen'),
+                  child: Text(
+                    marketOpen
+                        ? 'Verkauf verbindlich bestätigen'
+                        : 'Vorab-Verkaufsorder erstellen',
+                  ),
                 ),
               ],
             ),
