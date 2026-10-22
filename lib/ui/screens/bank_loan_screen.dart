@@ -5,7 +5,6 @@ import '../widgets/motion_safe.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../data/models/loan_model.dart';
-import '../../data/models/transaction.dart';
 import '../../logic/portfolio_provider.dart';
 import '../../logic/auth_provider.dart';
 import '../../logic/bank_hours.dart';
@@ -855,80 +854,68 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
             }),
           ],
 
-          if (provider.isInsolvent || provider.isUnderCreditLockout) ...[
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Privatinsolvenz & Sofort-Neustart',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  if (provider.canTakeRecoveryLoan) ...[
                     const Text(
-                      'Privatinsolvenz & Neustart',
+                      'Du bist insolvent. Du kannst sofort einen Notfall-Sanierungskredit beantragen oder direkt einen regulären Bankkredit aufnehmen.',
+                    ),
+                    const SizedBox(height: 16),
+                    FilledButton.icon(
+                      icon: const Icon(Icons.handshake_outlined),
+                      label: const Text('Sanierungskredit: 10.000 €'),
+                      onPressed: () async {
+                        final success = await provider.takeSanierungsKredit();
+                        if (success && context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Sanierungskredit ausgezahlt.'),
+                            ),
+                          );
+                        }
+                      },
+                    ),
+                  ] else ...[
+                    Text(
+                      'Du kannst jederzeit sofort Privatinsolvenz anmelden, um alle offenen Positionen glattzustellen. Ohne Wartezeit – du kannst danach sofort wieder neue Kredite aufnehmen!',
                       style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
+                        color: AppColors.textSecondary,
+                        height: 1.5,
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    if (provider.isUnderCreditLockout)
-                      Text(
-                        'Kreditsperre: noch ${provider.creditLockoutTimeRemaining.inDays} Tage, '
-                        '${provider.creditLockoutTimeRemaining.inHours % 24} Stunden und '
-                        '${provider.creditLockoutTimeRemaining.inMinutes % 60} Minuten. '
-                        'Der Sanierungskredit ist nach Ablauf der Sperre verfügbar.',
-                        style: TextStyle(
-                          color: AppColors.textSecondary,
-                          height: 1.5,
-                        ),
-                      )
-                    else if (provider.recoveryLoanWaitsForBank)
-                      Text(
-                        BankHours.closedMessage,
-                        style: TextStyle(
-                          color: AppColors.textSecondary,
-                          height: 1.5,
-                        ),
-                      )
-                    else if (provider.canTakeRecoveryLoan) ...[
-                      const Text(
-                        'Die Kreditsperre ist abgelaufen. Du kannst einen Sanierungskredit beantragen.',
-                      ),
-                      const SizedBox(height: 16),
-                      FilledButton.icon(
-                        icon: const Icon(Icons.handshake_outlined),
-                        label: const Text('Sanierungskredit: 10.000 €'),
-                        onPressed: () async {
-                          final success = await provider.takeSanierungsKredit();
-                          if (success && context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Sanierungskredit ausgezahlt.'),
-                              ),
-                            );
-                          }
-                        },
-                      ),
-                    ] else ...[
-                      Text(
-                        'Bei Zahlungsunfähigkeit kannst du Privatinsolvenz anmelden. Danach gilt eine Kreditsperre von fünf Tagen.',
-                        style: TextStyle(
-                          color: AppColors.textSecondary,
-                          height: 1.5,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      OutlinedButton.icon(
-                        icon: const Icon(Icons.gavel_outlined),
-                        label: const Text('Privatinsolvenz anmelden'),
-                        onPressed: () => provider.declareInsolvency(),
-                      ),
-                    ],
+                    const SizedBox(height: 16),
+                    OutlinedButton.icon(
+                      icon: const Icon(Icons.gavel_outlined),
+                      label: const Text('Sofort Privatinsolvenz anmelden'),
+                      onPressed: () async {
+                        await provider.declareInsolvency();
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Privatinsolvenz durchgeführt. Positionen liquidiert, bereit zum Weiterspielen!'),
+                            ),
+                          );
+                        }
+                      },
+                    ),
                   ],
-                ),
+                ],
               ),
             ),
-            const SizedBox(height: 20),
-          ],
+          ),
+          const SizedBox(height: 20),
 
           // 3. NEUEN KREDIT AUFNEHMEN (INTERACTIVE LOAN CALCULATOR)
           Container(
@@ -958,10 +945,7 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                         ),
                       ],
                     ),
-                    if (provider.transactions
-                        .where((t) => t.type == TransactionType.loanPayout)
-                        .isEmpty)
-                      Container(
+                    Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 8,
                           vertical: 3,
@@ -974,7 +958,7 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                           ),
                         ),
                         child: Text(
-                          '1. Kredit: Max. 25.000 €',
+                          'Rating: ${rating.grade}',
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
@@ -1017,14 +1001,7 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                 ),
                 Builder(
                   builder: (context) {
-                    final hasTakenLoan = provider.transactions.any(
-                      (t) => t.type == TransactionType.loanPayout,
-                    );
-                    final double maxLimit = hasTakenLoan
-                        ? rating.maxBorrowLimit
-                        : (rating.maxBorrowLimit < 25000.0
-                              ? rating.maxBorrowLimit
-                              : 25000.0);
+                    final double maxLimit = rating.maxBorrowLimit;
                     final double effectiveAmount = _requestedAmount.clamp(
                       5000.0,
                       maxLimit,
@@ -1188,13 +1165,9 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                     child: Text(
                       !provider.isBankOpen
                           ? 'Bank geschlossen · wieder ab Montag'
-                          : provider.isUnderCreditLockout
-                          ? '5-Tage-Kreditsperre aktiv (${provider.creditLockoutTimeRemaining.inDays}T ${provider.creditLockoutTimeRemaining.inHours % 24}h)'
-                          : (provider.isLoanOnCooldown
-                                ? 'Abkühlphase: 24 h Sperre (noch ${provider.loanCooldownRemaining.inHours}h)'
-                                : (!provider.canTakeLoan
-                                      ? 'Bereits ein Bankkredit aktiv'
-                                      : 'Kredit über ${CurrencyFormatter.format(_requestedAmount)} jetzt beantragen')),
+                          : (!provider.canTakeLoan
+                                ? 'Kredit derzeit nicht verfügbar'
+                                : 'Kredit über ${CurrencyFormatter.format(_requestedAmount)} jetzt beantragen'),
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 13,

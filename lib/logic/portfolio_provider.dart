@@ -333,14 +333,6 @@ class PortfolioProvider extends ChangeNotifier {
 
   bool get canTakeLoan {
     if (!isBankOpen) return false;
-    if (_isInsolvent) return false;
-    if (isUnderCreditLockout) return false;
-    if (isLoanOnCooldown) return false;
-    // Maximal 1 aktiver Bankkredit neben dem Startkredit
-    final bankLoans = activeLoans
-        .where((l) => !l.id.startsWith('initial_start_loan_'))
-        .length;
-    if (bankLoans >= 1) return false;
     return true;
   }
 
@@ -415,6 +407,7 @@ class PortfolioProvider extends ChangeNotifier {
       totalDebt: totalDebt,
       realizedLosses: totalLosses,
       liquidationsCount: liquidations,
+      activeLoansCount: activeLoans.length,
     );
   }
 
@@ -1890,9 +1883,7 @@ class PortfolioProvider extends ChangeNotifier {
   // --- KREDIT & SCHULDEN SYSTEM ---
   Future<void> declareInsolvency() async {
     _isInsolvent = true;
-    _insolvencyLockoutUntil = DateTime.now().add(
-      const Duration(days: 5),
-    ); // 5 echte Tage = 120h
+    _insolvencyLockoutUntil = null; // Keine Kreditsperre: man kann sofort weiterspielen und Kredite aufnehmen!
 
     // Notverkauf aller Positionen
     for (final pos in List<Position>.from(_positions)) {
@@ -1937,13 +1928,13 @@ class PortfolioProvider extends ChangeNotifier {
       price: 0,
       totalAmount: 0,
       timestamp: DateTime.now(),
-      note: '5 Tage Kreditsperre verhängt. Sanierungsverfahren eingeleitet.',
+      note: 'Privatinsolvenz angemeldet. Sofortiger Neustart und Kreditaufnahme möglich!',
     );
     _transactions.insert(0, record);
     await repository.saveTransaction(record);
 
     _lastAlertMessage =
-        '🚨 PRIVATINSOLVENZ ANGEMELDET! 5 Tage Kreditsperre aktiv.';
+        '🚨 Privatinsolvenz angemeldet! Alle Positionen liquidiert. Du kannst sofort einen neuen Kredit aufnehmen!';
     _updateLeaderboard(forceCloud: true);
     notifyListeners();
   }
@@ -1965,34 +1956,8 @@ class PortfolioProvider extends ChangeNotifier {
       notifyListeners();
       return false;
     }
-    // Erste Kreditaufnahme ist bankenseitig auf maximal 25.000 € gedeckelt
-    final previousBankLoans = _transactions.where(
-      (t) => t.type == TransactionType.loanPayout,
-    );
-    if (previousBankLoans.isEmpty && principal > 25000.0) {
-      _lastAlertMessage =
-          '⚠️ Der erste Bankkredit ist bankenseitig auf maximal 25.000 € begrenzt!';
-      notifyListeners();
-      return false;
-    }
-
-    if (isUnderCreditLockout) {
-      final rem = creditLockoutTimeRemaining;
-      _lastAlertMessage =
-          '🚨 Kreditsperre aktiv! Du musst noch ${rem.inDays} Tage und ${rem.inHours % 24} Stunden warten.';
-      notifyListeners();
-      return false;
-    }
-
     if (!canTakeLoan) {
-      if (isLoanOnCooldown) {
-        final rem = loanCooldownRemaining;
-        _lastAlertMessage =
-            '⏳ Kredit-Abkühlphase: Nach jedem Kredit gilt eine 24-Stunden-Sperre (noch ${rem.inHours}h ${rem.inMinutes % 60}m)!';
-      } else {
-        _lastAlertMessage =
-            '⚠️ Du hast bereits einen aktiven Bankkredit! Tilge diesen zuerst ab.';
-      }
+      _lastAlertMessage = 'Kreditaufnahme derzeit nicht möglich.';
       notifyListeners();
       return false;
     }
@@ -2056,9 +2021,6 @@ class PortfolioProvider extends ChangeNotifier {
 
   bool get _recoveryLoanReady =>
       _isInsolvent &&
-      _insolvencyLockoutUntil != null &&
-      !isUnderCreditLockout &&
-      !isLoanOnCooldown &&
       !activeLoans.any((l) => l.id.startsWith('sanierung_loan_'));
 
   bool get canTakeRecoveryLoan => _recoveryLoanReady && isBankOpen;

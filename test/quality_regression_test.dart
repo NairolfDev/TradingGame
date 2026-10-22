@@ -186,11 +186,12 @@ void main() {
   );
 
   test(
-    'declared insolvency blocks recovery during the five day lockout',
+    'declared insolvency allows instant recovery loan without lockout',
     () async {
+      portfolio.bankClock = () => DateTime(2026, 10, 14);
       await portfolio.declareInsolvency();
-      expect(portfolio.canTakeRecoveryLoan, isFalse);
-      expect(await portfolio.takeSanierungsKredit(), isFalse);
+      expect(portfolio.canTakeRecoveryLoan, isTrue);
+      expect(await portfolio.takeSanierungsKredit(), isTrue);
     },
   );
 }
