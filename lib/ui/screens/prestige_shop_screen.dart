@@ -80,12 +80,14 @@ class _PrestigeShopScreenState extends State<PrestigeShopScreen> {
                         children: [
                           const Text('💎', style: TextStyle(fontSize: 12)),
                           const SizedBox(width: 4),
-                          Text(
-                            '${provider.totalPrestigePoints} Prestige',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.gold,
+                          Flexible(
+                            child: Text(
+                              '${provider.totalPrestigePoints} Prestige',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.gold,
+                              ),
                             ),
                           ),
                         ],
@@ -97,7 +99,7 @@ class _PrestigeShopScreenState extends State<PrestigeShopScreen> {
                 RankBadge(rank: rank),
                 const SizedBox(height: 4),
                 Text(
-                  'Verwende deine Börsengewinne, um dir Luxusgüter zu gönnen und in der High Society aufzusteigen!',
+                  'Verwende deine Börsengewinne, um dir Luxusgüter zu gönnen und in der High Society aufzusteigen! Prestige erhöht zudem direkt deinen Bank-Kreditrahmen (bis unendlich) und senkt deine Kreditzinsen drastisch.',
                   style: TextStyle(
                     fontSize: 12,
                     color: AppColors.textSecondary,
@@ -166,10 +168,13 @@ class _PrestigeShopScreenState extends State<PrestigeShopScreen> {
               scrollDirection: Axis.horizontal,
               children: [
                 _buildShopChip('Alle', null),
+                _buildShopChip('☕ Lifestyle', LuxuryCategory.lifestyle),
                 _buildShopChip('⌚ Uhren', LuxuryCategory.watch),
                 _buildShopChip('🏎️ Sportwagen', LuxuryCategory.vehicle),
                 _buildShopChip('🏛️ Penthouses', LuxuryCategory.realEstate),
                 _buildShopChip('🛥️ Yachten & Jets', LuxuryCategory.exclusive),
+                if (LuxuryCategory.values.length > 5)
+                  _buildShopChip('👑 Imperium', LuxuryCategory.values.last),
               ],
             ),
           ),
@@ -298,7 +303,11 @@ class _PrestigeShopScreenState extends State<PrestigeShopScreen> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                Row(
+                Wrap(
+                  alignment: WrapAlignment.spaceBetween,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 8,
+                  runSpacing: 4,
                   children: [
                     Container(
                       padding: const EdgeInsets.symmetric(
@@ -318,7 +327,6 @@ class _PrestigeShopScreenState extends State<PrestigeShopScreen> {
                         ),
                       ),
                     ),
-                    const Spacer(),
                     Text(
                       CurrencyFormatter.format(item.price),
                       style: TextStyle(

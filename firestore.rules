@@ -12,9 +12,9 @@ service cloud.firestore {
     function minBuild() {
       return exists(/databases/$(database)/documents/config/app)
         && get(/databases/$(database)/documents/config/app).data.minBuild is int
-        && get(/databases/$(database)/documents/config/app).data.minBuild > 26
+        && get(/databases/$(database)/documents/config/app).data.minBuild > 27
         ? get(/databases/$(database)/documents/config/app).data.minBuild
-        : 26;
+        : 27;
     }
     function currentBuild() {
       return !exists(/databases/$(database)/documents/config/app)

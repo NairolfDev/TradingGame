@@ -195,12 +195,22 @@ class PortfolioProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  int _bonusPrestigePoints = 0;
+
   Future<void> _loadTaxState() async {
     final prefs = await SharedPreferences.getInstance();
     _isTaxModeEnabled = prefs.getBool('tg_tax_mode_$_profileKey') ?? false;
     _taxLossCarryforward =
         prefs.getDouble('tg_tax_loss_pot_$_profileKey') ?? 0.0;
     _totalTaxPaid = prefs.getDouble('tg_tax_paid_$_profileKey') ?? 0.0;
+    _bonusPrestigePoints = prefs.getInt('tg_bonus_prestige_$_profileKey') ?? 0;
+  }
+
+  Future<void> _addBonusPrestige(int points) async {
+    if (points <= 0) return;
+    _bonusPrestigePoints += points;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('tg_bonus_prestige_$_profileKey', _bonusPrestigePoints);
   }
 
   Future<void> _saveTaxState() async {
@@ -342,6 +352,8 @@ class PortfolioProvider extends ChangeNotifier {
       DividendService.calculateAnnualDividendRunRate(_positions, _assets);
   double get monthlyPassiveIncome =>
       DividendService.calculateMonthlyPassiveIncome(_positions, _assets);
+  double get dailyPassiveIncome =>
+      DividendService.calculateDailyDividendPayout(_positions, _assets);
   List<DividendScheduleItem> get dividendSchedule =>
       DividendService.getDividendSchedule(_positions, _assets);
 
@@ -465,12 +477,15 @@ class PortfolioProvider extends ChangeNotifier {
     final liquidations = _transactions
         .where((t) => t.type == TransactionType.liquidation)
         .length;
+    final paidLoansCount = _loans.where((l) => l.isPaid).length;
     return CreditRatingService.evaluateRating(
       netWorth: netWorth,
       totalDebt: totalDebt,
       realizedLosses: totalLosses,
       liquidationsCount: liquidations,
       activeLoansCount: activeLoans.length,
+      prestigePoints: totalPrestigePoints,
+      paidLoansCount: paidLoansCount,
     );
   }
 
@@ -535,9 +550,14 @@ class PortfolioProvider extends ChangeNotifier {
   }
 
   int get totalPrestigePoints {
-    int sum = 0;
+    int sum = _bonusPrestigePoints;
     for (final item in _luxuryItems) {
       sum += item.ownedCount * item.prestigePoints;
+    }
+    for (final ach in achievementService.achievements) {
+      if (ach.isUnlocked) {
+        sum += ach.prestigeReward;
+      }
     }
     return sum;
   }
@@ -2096,6 +2116,7 @@ class PortfolioProvider extends ChangeNotifier {
         prestige: item.prestigePoints,
       ),
     );
+    _checkAllAchievements();
     _updateLeaderboard(forceCloud: true);
     notifyListeners();
     return true;
@@ -2394,6 +2415,7 @@ class PortfolioProvider extends ChangeNotifier {
     _lastAlertMessage = loan.isPaid
         ? '🎉 Bravo! Kredit "${loan.title}" vollständig zurückgezahlt!'
         : 'Kreditrate über ${actualRepay.toStringAsFixed(2)} € erfolgreich geleistet.';
+    _checkAllAchievements();
     _updateLeaderboard(forceCloud: true);
     notifyListeners();
     return true;
@@ -2524,18 +2546,38 @@ class PortfolioProvider extends ChangeNotifier {
     }
     questService.claimQuest(questId, (cashReward, prestigeReward) {
       _cash += cashReward;
+      unawaited(_addBonusPrestige(prestigeReward));
+      double totalCashAwarded = cashReward;
+      int totalPrestigeAwarded = prestigeReward;
+
+      if (questService.isAllDailyQuestsCompleted &&
+          !questService.isDailySweepBonusClaimed) {
+        questService.claimDailySweepBonus((bonusCash, bonusPrestige) {
+          _cash += bonusCash;
+          unawaited(_addBonusPrestige(bonusPrestige));
+          totalCashAwarded += bonusCash;
+          totalPrestigeAwarded += bonusPrestige;
+        });
+      }
+
       repository.saveCashBalance(_cash);
-      _lastAlertMessage =
-          '🎁 Belohnung abgeholt: +${cashReward.toStringAsFixed(0)} € & +$prestigeReward Prestige!';
+      _lastAlertMessage = totalCashAwarded > cashReward
+          ? '🎁 Alle 3 Tages-Quests geschafft! +${totalCashAwarded.toStringAsFixed(0)} € & +$totalPrestigeAwarded Prestige (inkl. Tages-Meisterbonus)!'
+          : '🎁 Belohnung abgeholt: +${cashReward.toStringAsFixed(0)} € & +$prestigeReward Prestige!';
       _reward(
         RewardEvent(
           kind: RewardKind.quest,
-          title: 'Belohnung abgeholt',
-          detail: 'Tägliche Aufgabe erledigt',
-          cash: cashReward.toDouble(),
-          prestige: prestigeReward,
+          title: totalCashAwarded > cashReward
+              ? 'Alle 3 Tages-Quests gemeistert!'
+              : 'Belohnung abgeholt',
+          detail: totalCashAwarded > cashReward
+              ? 'Inklusive Tages-Meisterbonus (3/3)'
+              : 'Tägliche Aufgabe erledigt',
+          cash: totalCashAwarded,
+          prestige: totalPrestigeAwarded,
         ),
       );
+      _checkAllAchievements();
       _updateLeaderboard(forceCloud: true);
       notifyListeners();
     });
@@ -2644,21 +2686,24 @@ class PortfolioProvider extends ChangeNotifier {
     return true;
   }
 
-  // --- 4. DIVIDENDEN & PASSIVES EINKOMMEN ---
-  bool get canClaimMonthlyDividends {
+  // --- 4. DIVIDENDEN & PASSIVES EINKOMMEN (TÄGLICHE AUSSCHÜTTUNG) ---
+  bool get canClaimDailyDividends {
     final now = DateTime.now();
-    return monthlyPassiveIncome > 0 &&
+    return dailyPassiveIncome > 0 &&
         !_transactions.any(
           (t) =>
               t.type == TransactionType.dividendPayout &&
               t.timestamp.year == now.year &&
-              t.timestamp.month == now.month,
+              t.timestamp.month == now.month &&
+              t.timestamp.day == now.day,
         );
   }
 
+  bool get canClaimMonthlyDividends => canClaimDailyDividends;
+
   void payoutSimulatedDividends() {
-    if (!canClaimMonthlyDividends) return;
-    final grossPayout = monthlyPassiveIncome;
+    if (!canClaimDailyDividends) return;
+    final grossPayout = dailyPassiveIncome;
     if (grossPayout <= 0) return;
 
     final tax = _applyCapitalGainsTax(grossPayout);
@@ -2670,19 +2715,20 @@ class PortfolioProvider extends ChangeNotifier {
     final record = TransactionRecord(
       id: _uuid.v4(),
       symbol: 'DIV',
-      name: 'Monatliche Dividendenausschüttung',
+      name: 'Tägliche Dividendenausschüttung',
       type: TransactionType.dividendPayout,
       amount: 1,
       price: payout,
       totalAmount: payout,
       realizedPnL: payout,
       timestamp: DateTime.now(),
-      note: 'Passives Einkommen aus Aktien- und ETF-Dividenden',
+      note: 'Täglicher Cashflow aus Aktien- und ETF-Dividenden',
     );
     _transactions.insert(0, record);
     repository.saveTransaction(record);
     _lastAlertMessage =
-        '💵 Dividenden gutgeschrieben: +${payout.toStringAsFixed(2)} €!';
+        '💵 Tages-Dividende gutgeschrieben: +${payout.toStringAsFixed(2)} €!';
+    _checkAllAchievements();
     _updateLeaderboard(forceCloud: true);
     notifyListeners();
   }
@@ -2885,6 +2931,14 @@ class PortfolioProvider extends ChangeNotifier {
       hasSettledSanierungskredit: hasSanierungSettled,
       hasTradedOffMarketCrypto: hasOffMarketCrypto,
       uniqueAssetTypesCount: _positions.map((p) => p.type).toSet().length,
+      paidLoansCount: _loans.where((l) => l.isPaid).length,
+      loginStreakDays: questService.loginStreakDays,
+      hasDividendPayout: _transactions.any(
+        (t) => t.type == TransactionType.dividendPayout,
+      ),
+      hasActiveSavingsPlanOrMultiBot:
+          savingsPlanService.activePlans.isNotEmpty ||
+          automationService.unlockedSlotsCount >= 2,
     );
   }
 
@@ -2917,8 +2971,18 @@ class PortfolioProvider extends ChangeNotifier {
   static String _qty(double v) =>
       v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(4);
 
+  bool _disposed = false;
+
+  @override
+  void notifyListeners() {
+    if (_disposed) return;
+    super.notifyListeners();
+  }
+
   @override
   void dispose() {
+    _disposed = true;
+    achievementService.onAchievementUnlocked = null;
     _rewards.close();
     _authSubscription?.cancel();
     _leaderboardSubscription?.cancel();

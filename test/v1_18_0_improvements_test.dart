@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:trading_game/data/mock_data/initial_assets.dart';
 import 'package:trading_game/data/models/asset.dart';
 import 'package:trading_game/data/models/automation_order.dart';
+import 'package:trading_game/data/models/position.dart';
 import 'package:trading_game/data/models/savings_plan.dart';
 import 'package:trading_game/data/repositories/local_trading_repository.dart';
 import 'package:trading_game/logic/automation_service.dart';
@@ -214,10 +215,72 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    test('VersionConfig enforces minBuild 26 as required version', () {
-      const config = VersionConfig(minBuild: 26, version: '1.18.0');
-      expect(config.blocks(25), isTrue);
-      expect(config.blocks(26), isFalse);
+    test('VersionConfig enforces minBuild 27 as required version (v1.20.0)', () {
+      const config = VersionConfig(minBuild: 27, version: '1.20.0');
+      expect(config.blocks(26), isTrue);
+      expect(config.blocks(27), isFalse);
+    });
+
+    test('v1.20.0: Prestige scales bank loan limits infinitely and lowers interest rates', () async {
+      SharedPreferences.setMockInitialValues({});
+      final provider = PortfolioProvider(repository: LocalTradingRepository());
+      while (provider.isLoading) {
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      }
+      provider.marketEngine.stop();
+      provider.newsService.dispose();
+
+      final baseRating = provider.creditRating;
+      final baseLimit = baseRating.maxBorrowLimit;
+      final baseRate = baseRating.baseInterestRate;
+
+      // Grant high prestige via luxury items
+      provider.luxuryItems.first.ownedCount = 1000;
+      final highPrestigeRating = provider.creditRating;
+
+      expect(highPrestigeRating.maxBorrowLimit, greaterThan(baseLimit + 500000));
+      expect(highPrestigeRating.baseInterestRate, lessThan(baseRate));
+
+      provider.dispose();
+    });
+
+    test('v1.20.0: Daily dividends pay out 1/365th of annual dividend once per day', () async {
+      SharedPreferences.setMockInitialValues({});
+      final provider = PortfolioProvider(repository: LocalTradingRepository());
+      while (provider.isLoading) {
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      }
+      provider.marketEngine.stop();
+      provider.newsService.dispose();
+
+      final asset = provider.assets.first.copyWith(
+        dividendYield: 0.073,
+        currentPrice: 100.0,
+      );
+      provider.assets[0] = asset;
+      provider.positions.add(
+        Position(
+          id: 'div_daily_pos',
+          assetId: asset.id,
+          symbol: asset.symbol,
+          name: asset.name,
+          type: asset.type,
+          amount: 100,
+          averageBuyPrice: 100.0,
+          currentPrice: 100.0,
+        ),
+      );
+      expect(provider.dailyPassiveIncome, closeTo(2.0, 0.01));
+      expect(provider.canClaimDailyDividends, isTrue);
+
+      final cashBefore = provider.cash;
+      final expectedDaily = provider.dailyPassiveIncome;
+      provider.payoutSimulatedDividends();
+      // Cash increases by daily dividend + 500 € from unlocking 'div_first' achievement!
+      expect(provider.cash, greaterThanOrEqualTo(cashBefore + expectedDaily));
+      expect(provider.canClaimDailyDividends, isFalse);
+
+      provider.dispose();
     });
   });
 }

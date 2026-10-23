@@ -48,6 +48,7 @@ class InitialAssets {
         priceHistory: [71.0, 71.8, 72.5, 72.8, 73.5],
         volatility: 0.017,
         description: 'Österreichs führender Ökostrom-Erzeuger aus Wasserkraft.',
+        dividendYield: 0.048,
         category: 'ATX / Versorger',
       ),
       Asset(
@@ -62,6 +63,7 @@ class InitialAssets {
         priceHistory: [23.2, 23.7, 24.0, 24.1, 24.6],
         volatility: 0.024,
         description: 'Weltweit führender stahlbasierter Technologie- und Industriegüterkonzern aus Linz.',
+        dividendYield: 0.045,
         category: 'ATX / Industrie',
       ),
       Asset(
@@ -76,6 +78,7 @@ class InitialAssets {
         priceHistory: [55.5, 56.3, 57.0, 57.5, 58.2],
         volatility: 0.019,
         description: 'Internationaler Technologiekonzern für Industrieanlagen und Turbinen.',
+        dividendYield: 0.042,
         category: 'ATX / Anlagenbau',
       ),
       Asset(
@@ -90,6 +93,7 @@ class InitialAssets {
         priceHistory: [63.0, 64.2, 65.0, 65.8, 66.4],
         volatility: 0.016,
         description: 'Eine der profitabelsten Universalbanken Österreichs.',
+        dividendYield: 0.068,
         category: 'ATX / Finanzen',
       ),
       Asset(
@@ -104,6 +108,7 @@ class InitialAssets {
         priceHistory: [30.1, 30.8, 31.0, 31.2, 31.8],
         volatility: 0.021,
         description: 'Größter Ziegelproduzent der Welt und Marktführer für Rohrsysteme.',
+        dividendYield: 0.035,
         category: 'ATX / Baustoffe',
       ),
       Asset(
@@ -132,6 +137,7 @@ class InitialAssets {
         priceHistory: [28.8, 29.0, 29.2, 29.3, 29.5],
         volatility: 0.014,
         description: 'Österreichs führender Logistik- und Postdienstleister mit stabiler Dividende.',
+        dividendYield: 0.062,
         category: 'ATX / Logistik',
       ),
       Asset(
@@ -146,6 +152,7 @@ class InitialAssets {
         priceHistory: [27.0, 27.4, 27.7, 27.9, 28.2],
         volatility: 0.018,
         description: 'Spezialist für hochwertige Büroimmobilien in Zentraleuropa.',
+        dividendYield: 0.046,
         category: 'ATX / Immobilien',
       ),
 
@@ -164,6 +171,7 @@ class InitialAssets {
         priceHistory: [205.0, 208.5, 210.0, 212.0, 215.5],
         volatility: 0.018,
         description: 'Europas wertvollster Softwarekonzern für Unternehmenslösungen & Cloud.',
+        dividendYield: 0.015,
         category: 'DAX / Tech',
       ),
       Asset(
@@ -178,6 +186,7 @@ class InitialAssets {
         priceHistory: [178.0, 180.2, 181.5, 182.5, 184.2],
         volatility: 0.016,
         description: 'Globaler Industriegigant für Automatisierung, Digitalisierung und Schienenverkehr.',
+        dividendYield: 0.028,
         category: 'DAX / Industrie',
       ),
       Asset(
@@ -206,6 +215,7 @@ class InitialAssets {
         priceHistory: [290.0, 292.0, 294.0, 295.5, 298.0],
         volatility: 0.012,
         description: 'Einer der weltweit größten Versicherungskonzerne und Vermögensverwalter.',
+        dividendYield: 0.052,
         category: 'DAX / Finanzen',
       ),
       Asset(
@@ -1440,6 +1450,7 @@ class InitialAssets {
         priceHistory: [92.0, 92.8, 93.5, 94.1, 94.6],
         volatility: 0.008,
         description: 'Breite Streuung über mehr als 1.500 Unternehmen aus 23 Industrieländern.',
+        dividendYield: 0.022,
         category: 'ETF / Weltweit',
       ),
       Asset(
@@ -1454,6 +1465,7 @@ class InitialAssets {
         priceHistory: [95.0, 96.2, 97.0, 97.4, 98.2],
         volatility: 0.010,
         description: 'Die 500 führenden börsennotierten US-Unternehmen.',
+        dividendYield: 0.025,
         category: 'ETF / USA',
       ),
       Asset(
@@ -1468,6 +1480,7 @@ class InitialAssets {
         priceHistory: [36.8, 37.2, 37.8, 38.1, 38.4],
         volatility: 0.012,
         description: 'Direkte Abbildung des österreichischen Leitindex (Wiener Börse).',
+        dividendYield: 0.038,
         category: 'ETF / Österreich',
       ),
       Asset(
@@ -1482,6 +1495,7 @@ class InitialAssets {
         priceHistory: [153.0, 155.0, 156.2, 157.1, 158.4],
         volatility: 0.011,
         description: 'Die 40 größten deutschen Standardwerte im Deutschen Aktienindex.',
+        dividendYield: 0.028,
         category: 'ETF / Deutschland',
       ),
       Asset(

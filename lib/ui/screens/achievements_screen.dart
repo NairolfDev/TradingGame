@@ -228,6 +228,29 @@ class AchievementsScreen extends StatelessWidget {
                         : AppColors.textMuted,
                   ),
                 ),
+                if (!ach.isUnlocked && ach.progress > 0) ...[
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: GameProgressBar(
+                          value: ach.progress.clamp(0.0, 1.0),
+                          color: AppColors.gold,
+                          height: 5,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '${(ach.progress.clamp(0.0, 1.0) * 100).toInt()}%',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.accentGold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
                 const SizedBox(height: 8),
                 Row(
                   children: [

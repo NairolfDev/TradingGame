@@ -94,65 +94,219 @@ class AchievementService {
     required bool hasSettledSanierungskredit,
     required bool hasTradedOffMarketCrypto,
     int uniqueAssetTypesCount = 0,
+    int paidLoansCount = 0,
+    int loginStreakDays = 1,
+    bool hasDividendPayout = false,
+    bool hasActiveSavingsPlanOrMultiBot = false,
   }) async {
     if (_checking) return;
     _checking = true;
     try {
       bool hasAnyNewUnlock = false;
+      bool hasAnyProgressChange = false;
 
       for (int i = 0; i < _achievements.length; i++) {
         final ach = _achievements[i];
         if (ach.isUnlocked) continue;
 
         bool shouldUnlock = false;
+        double newProgress = 0.0;
 
         switch (ach.id) {
+          // 1. Original 15
           case 'trade_first':
+            newProgress = (totalTradesCount / 1.0).clamp(0.0, 1.0);
             if (totalTradesCount >= 1) shouldUnlock = true;
             break;
           case 'green_wave':
+            newProgress = (winningStreakCount / 3.0).clamp(0.0, 1.0);
             if (winningStreakCount >= 3) shouldUnlock = true;
             break;
           case 'hundred_k':
+            newProgress = (netWorth > 0 ? netWorth / 100000.0 : 0.0).clamp(0.0, 1.0);
             if (netWorth >= 100000.0) shouldUnlock = true;
             break;
           case 'millionaire':
+            newProgress = (netWorth > 0 ? netWorth / 1000000.0 : 0.0).clamp(0.0, 1.0);
             if (netWorth >= 1000000.0) shouldUnlock = true;
             break;
           case 'diversified_portfolio':
+            newProgress = (uniqueAssetTypesCount / 4.0).clamp(0.0, 1.0);
             if (uniqueAssetTypesCount >= 4) shouldUnlock = true;
             break;
           case 'high_leverage':
+            newProgress = hasWonHighLeverage ? 1.0 : 0.0;
             if (hasWonHighLeverage) shouldUnlock = true;
             break;
           case 'debt_free':
+            newProgress = (!hasDebt && totalTradesCount >= 2) ? 1.0 : (!hasDebt ? 0.5 : 0.0);
             if (!hasDebt && totalTradesCount >= 2) shouldUnlock = true;
             break;
           case 'good_taste':
+            newProgress = (ownedLuxuryCount / 1.0).clamp(0.0, 1.0);
             if (ownedLuxuryCount >= 1) shouldUnlock = true;
             break;
           case 'prestige_king':
+            newProgress = (totalPrestigePoints / 1000.0).clamp(0.0, 1.0);
             if (totalPrestigePoints >= 1000) shouldUnlock = true;
             break;
           case 'dividend_lord':
+            newProgress = (monthlyPassiveIncome / 500.0).clamp(0.0, 1.0);
             if (monthlyPassiveIncome >= 500.0) shouldUnlock = true;
             break;
           case 'copy_master':
+            newProgress = hasCopyTrade ? 1.0 : 0.0;
             if (hasCopyTrade) shouldUnlock = true;
             break;
           case 'comeback_kid':
+            newProgress = hasSettledSanierungskredit ? 1.0 : 0.0;
             if (hasSettledSanierungskredit) shouldUnlock = true;
             break;
           case 'night_owl':
+            newProgress = hasTradedOffMarketCrypto ? 1.0 : 0.0;
             if (hasTradedOffMarketCrypto) shouldUnlock = true;
             break;
           case 'bot_engineer':
+            newProgress = hasBotOrderTriggered ? 1.0 : 0.0;
             if (hasBotOrderTriggered) shouldUnlock = true;
             break;
           case 'top_10_global':
+            newProgress = (leaderboardRank > 0 && leaderboardRank <= 10) ? 1.0 : 0.0;
             if (leaderboardRank > 0 && leaderboardRank <= 10) {
               shouldUnlock = true;
             }
+            break;
+
+          // 2. Trading Count (5 Achievements)
+          case 'trades_10':
+            newProgress = (totalTradesCount / 10.0).clamp(0.0, 1.0);
+            if (totalTradesCount >= 10) shouldUnlock = true;
+            break;
+          case 'trades_25':
+            newProgress = (totalTradesCount / 25.0).clamp(0.0, 1.0);
+            if (totalTradesCount >= 25) shouldUnlock = true;
+            break;
+          case 'trades_50':
+            newProgress = (totalTradesCount / 50.0).clamp(0.0, 1.0);
+            if (totalTradesCount >= 50) shouldUnlock = true;
+            break;
+          case 'trades_100':
+            newProgress = (totalTradesCount / 100.0).clamp(0.0, 1.0);
+            if (totalTradesCount >= 100) shouldUnlock = true;
+            break;
+          case 'trades_250':
+            newProgress = (totalTradesCount / 250.0).clamp(0.0, 1.0);
+            if (totalTradesCount >= 250) shouldUnlock = true;
+            break;
+
+          // 3. Win Streaks (3 Achievements)
+          case 'streak_5':
+            newProgress = (winningStreakCount / 5.0).clamp(0.0, 1.0);
+            if (winningStreakCount >= 5) shouldUnlock = true;
+            break;
+          case 'streak_10':
+            newProgress = (winningStreakCount / 10.0).clamp(0.0, 1.0);
+            if (winningStreakCount >= 10) shouldUnlock = true;
+            break;
+          case 'streak_15':
+            newProgress = (winningStreakCount / 15.0).clamp(0.0, 1.0);
+            if (winningStreakCount >= 15) shouldUnlock = true;
+            break;
+
+          // 4. Wealth Milestones (8 Achievements)
+          case 'wealth_50k':
+            newProgress = (netWorth > 0 ? netWorth / 50000.0 : 0.0).clamp(0.0, 1.0);
+            if (netWorth >= 50000.0) shouldUnlock = true;
+            break;
+          case 'wealth_250k':
+            newProgress = (netWorth > 0 ? netWorth / 250000.0 : 0.0).clamp(0.0, 1.0);
+            if (netWorth >= 250000.0) shouldUnlock = true;
+            break;
+          case 'wealth_500k':
+            newProgress = (netWorth > 0 ? netWorth / 500000.0 : 0.0).clamp(0.0, 1.0);
+            if (netWorth >= 500000.0) shouldUnlock = true;
+            break;
+          case 'wealth_2_5m':
+            newProgress = (netWorth > 0 ? netWorth / 2500000.0 : 0.0).clamp(0.0, 1.0);
+            if (netWorth >= 2500000.0) shouldUnlock = true;
+            break;
+          case 'wealth_10m':
+            newProgress = (netWorth > 0 ? netWorth / 10000000.0 : 0.0).clamp(0.0, 1.0);
+            if (netWorth >= 10000000.0) shouldUnlock = true;
+            break;
+          case 'wealth_50m':
+            newProgress = (netWorth > 0 ? netWorth / 50000000.0 : 0.0).clamp(0.0, 1.0);
+            if (netWorth >= 50000000.0) shouldUnlock = true;
+            break;
+          case 'wealth_100m':
+            newProgress = (netWorth > 0 ? netWorth / 100000000.0 : 0.0).clamp(0.0, 1.0);
+            if (netWorth >= 100000000.0) shouldUnlock = true;
+            break;
+          case 'wealth_1b':
+            newProgress = (netWorth > 0 ? netWorth / 1000000000.0 : 0.0).clamp(0.0, 1.0);
+            if (netWorth >= 1000000000.0) shouldUnlock = true;
+            break;
+
+          // 5. Dividends (4 Achievements)
+          case 'div_first':
+            newProgress = (hasDividendPayout || monthlyPassiveIncome > 0) ? 1.0 : 0.0;
+            if (hasDividendPayout || monthlyPassiveIncome > 0) shouldUnlock = true;
+            break;
+          case 'div_100_mo':
+            newProgress = (monthlyPassiveIncome / 100.0).clamp(0.0, 1.0);
+            if (monthlyPassiveIncome >= 100.0) shouldUnlock = true;
+            break;
+          case 'div_2500_mo':
+            newProgress = (monthlyPassiveIncome / 2500.0).clamp(0.0, 1.0);
+            if (monthlyPassiveIncome >= 2500.0) shouldUnlock = true;
+            break;
+          case 'div_10000_mo':
+            newProgress = (monthlyPassiveIncome / 10000.0).clamp(0.0, 1.0);
+            if (monthlyPassiveIncome >= 10000.0) shouldUnlock = true;
+            break;
+
+          // 6. Luxury & Prestige (7 Achievements)
+          case 'luxury_3':
+            newProgress = (ownedLuxuryCount / 3.0).clamp(0.0, 1.0);
+            if (ownedLuxuryCount >= 3) shouldUnlock = true;
+            break;
+          case 'luxury_5':
+            newProgress = (ownedLuxuryCount / 5.0).clamp(0.0, 1.0);
+            if (ownedLuxuryCount >= 5) shouldUnlock = true;
+            break;
+          case 'luxury_10':
+            newProgress = (ownedLuxuryCount / 10.0).clamp(0.0, 1.0);
+            if (ownedLuxuryCount >= 10) shouldUnlock = true;
+            break;
+          case 'luxury_20':
+            newProgress = (ownedLuxuryCount / 20.0).clamp(0.0, 1.0);
+            if (ownedLuxuryCount >= 20) shouldUnlock = true;
+            break;
+          case 'prestige_10k':
+            newProgress = (totalPrestigePoints / 10000.0).clamp(0.0, 1.0);
+            if (totalPrestigePoints >= 10000) shouldUnlock = true;
+            break;
+          case 'prestige_100k':
+            newProgress = (totalPrestigePoints / 100000.0).clamp(0.0, 1.0);
+            if (totalPrestigePoints >= 100000) shouldUnlock = true;
+            break;
+          case 'prestige_1m':
+            newProgress = (totalPrestigePoints / 1000000.0).clamp(0.0, 1.0);
+            if (totalPrestigePoints >= 1000000) shouldUnlock = true;
+            break;
+
+          // 7. Banking, Quests & Automation (3 Achievements)
+          case 'loans_repaid_3':
+            newProgress = (paidLoansCount / 3.0).clamp(0.0, 1.0);
+            if (paidLoansCount >= 3) shouldUnlock = true;
+            break;
+          case 'streak_login_7':
+            newProgress = (loginStreakDays / 7.0).clamp(0.0, 1.0);
+            if (loginStreakDays >= 7) shouldUnlock = true;
+            break;
+          case 'savings_plan_active':
+            newProgress = hasActiveSavingsPlanOrMultiBot ? 1.0 : 0.0;
+            if (hasActiveSavingsPlanOrMultiBot) shouldUnlock = true;
             break;
         }
 
@@ -169,10 +323,13 @@ class AchievementService {
           if (result == ClaimResult.granted) {
             onAchievementUnlocked?.call(_achievements[i]);
           }
+        } else if ((ach.progress - newProgress).abs() > 0.0001) {
+          _achievements[i] = ach.copyWith(progress: newProgress);
+          hasAnyProgressChange = true;
         }
       }
 
-      if (hasAnyNewUnlock) {
+      if (hasAnyNewUnlock || hasAnyProgressChange) {
         await _saveAchievements();
       }
     } finally {

@@ -174,14 +174,34 @@ class QuestsScreen extends StatelessWidget {
                     color: AppColors.textPrimary,
                   ),
                 ),
-                Text(
-                  'Reset: 24h',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textSecondary,
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.gold.withAlpha(30),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppColors.gold.withAlpha(80)),
+                  ),
+                  child: Text(
+                    'Reset: 24h',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.gold,
+                    ),
                   ),
                 ),
               ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Jeden Tag 3 neue Aufgaben aus dem großen Quest-Pool',
+              style: TextStyle(
+                fontSize: 12,
+                color: AppColors.textSecondary,
+              ),
             ),
             const SizedBox(height: 12),
 
@@ -358,6 +378,110 @@ class QuestsScreen extends StatelessWidget {
                 ),
               );
             }),
+
+            // 4. Tages-Meisterbonus (3/3 Quests erledigt) Card
+            Builder(
+              builder: (context) {
+                final completedCount =
+                    quests.where((q) => q.isCompleted).length;
+                final allDone = completedCount >= 3;
+                final ratio = quests.isNotEmpty
+                    ? (completedCount / quests.length).clamp(0.0, 1.0)
+                    : 0.0;
+
+                return Container(
+                  margin: const EdgeInsets.only(top: 8, bottom: 20),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        AppColors.gold.withAlpha(allDone ? 60 : 25),
+                        AppColors.surfaceElevated,
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: AppColors.gold.withAlpha(allDone ? 180 : 70),
+                      width: allDone ? 1.5 : 1.0,
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              Text(
+                                allDone ? '👑' : '🎯',
+                                style: const TextStyle(fontSize: 20),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Tages-Meisterbonus (3/3 Quests)',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                            ],
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: allDone
+                                  ? AppColors.gold.withAlpha(50)
+                                  : AppColors.surface,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: allDone
+                                    ? AppColors.gold
+                                    : AppColors.cardBorder,
+                              ),
+                            ),
+                            child: Text(
+                              '$completedCount / 3 erledigt',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: allDone
+                                    ? AppColors.gold
+                                    : AppColors.textSecondary,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      GameProgressBar(
+                        value: ratio,
+                        color: AppColors.gold,
+                        height: 6,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        allDone
+                            ? '🎉 Glückwunsch! Alle 3 Tages-Quests abgeschlossen – Extra-Cash & Prestige-Bonus gesichert!'
+                            : 'Schließe heute alle 3 täglichen Quests ab, um einen automatischen Extra-Cash & Prestige-Bonus zu erhalten!',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: allDone
+                              ? AppColors.gold
+                              : AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
           ],
         ),
       ),

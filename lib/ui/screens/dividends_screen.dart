@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
+import '../../logic/dividend_service.dart';
 import '../../logic/portfolio_provider.dart';
 
 class DividendsScreen extends StatelessWidget {
@@ -12,6 +13,10 @@ class DividendsScreen extends StatelessWidget {
     final portfolio = context.watch<PortfolioProvider>();
     final annualDividends = portfolio.totalAnnualDividends;
     final monthlyIncome = portfolio.monthlyPassiveIncome;
+    final dailyIncome = DividendService.calculateDailyDividendPayout(
+      portfolio.positions,
+      portfolio.assets,
+    );
     final schedule = portfolio.dividendSchedule;
 
     return Scaffold(
@@ -77,18 +82,18 @@ class DividendsScreen extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Jährliche Ausschüttung:',
+                              'Täglicher Cashflow:',
                               style: TextStyle(
                                 color: AppColors.textSecondary,
                                 fontSize: 12,
                               ),
                             ),
                             Text(
-                              '${annualDividends.toStringAsFixed(2)} €',
+                              '+${dailyIncome.toStringAsFixed(2)} € / Tag',
                               style: TextStyle(
-                                fontSize: 22,
+                                fontSize: 17,
                                 fontWeight: FontWeight.bold,
-                                color: AppColors.textPrimary,
+                                color: AppColors.profit,
                               ),
                             ),
                           ],
@@ -96,10 +101,10 @@ class DividendsScreen extends StatelessWidget {
                       ),
                       Container(
                         width: 1,
-                        height: 40,
+                        height: 38,
                         color: AppColors.textPrimary.withValues(alpha: 0.24),
                       ),
-                      const SizedBox(width: 16),
+                      const SizedBox(width: 12),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -114,12 +119,32 @@ class DividendsScreen extends StatelessWidget {
                             Text(
                               '${monthlyIncome.toStringAsFixed(2)} €',
                               style: TextStyle(
-                                fontSize: 22,
+                                fontSize: 17,
                                 fontWeight: FontWeight.bold,
                                 color: AppColors.profit,
                               ),
                             ),
                           ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Text(
+                        'Jährliche Ausschüttung: ',
+                        style: TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 12,
+                        ),
+                      ),
+                      Text(
+                        '${annualDividends.toStringAsFixed(2)} € p.a.',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textPrimary,
                         ),
                       ),
                     ],
@@ -135,7 +160,7 @@ class DividendsScreen extends StatelessWidget {
                                 SnackBar(
                                   backgroundColor: AppColors.profit,
                                   content: Text(
-                                    '💵 Dividendenausschüttung über ${monthlyIncome.toStringAsFixed(2)} € verbucht!',
+                                    '💵 Tägliche Dividende über ${dailyIncome > 0 ? dailyIncome.toStringAsFixed(2) : monthlyIncome.toStringAsFixed(2)} € verbucht!',
                                   ),
                                 ),
                               );
@@ -144,9 +169,12 @@ class DividendsScreen extends StatelessWidget {
                       icon: const Icon(Icons.currency_exchange, size: 18),
                       label: Text(
                         portfolio.canClaimMonthlyDividends
-                            ? 'Monats-Dividenden ausschütten'
-                            : 'Keine offene Ausschüttung',
-                        style: const TextStyle(fontWeight: FontWeight.bold),
+                            ? 'Tägliche Dividende ausschütten (+${dailyIncome.toStringAsFixed(2)} €)'
+                            : 'Heute bereits ausgeschüttet (Nächste morgen)',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
                       ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.profit,
@@ -156,6 +184,15 @@ class DividendsScreen extends StatelessWidget {
                           borderRadius: BorderRadius.circular(10),
                         ),
                       ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    '💡 Dividenden können ab sofort jeden Tag als täglicher Cashflow direkt auf dein Verrechnungskonto gebucht werden.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 12,
                     ),
                   ),
                 ],

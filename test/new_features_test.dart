@@ -48,7 +48,7 @@ void main() {
       final questService = QuestService();
       await questService.initialize();
 
-      expect(questService.quests.length, 5);
+      expect(questService.quests.length, 3);
       expect(questService.loginStreakDays, greaterThanOrEqualTo(1));
 
       final firstQuest = questService.quests.first;

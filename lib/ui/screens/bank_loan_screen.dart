@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -267,7 +268,7 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                       ),
                       child: Text(
                         'Jetzt ${CurrencyFormatter.format(payAmount)} zurückzahlen',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 14,
                         ),
@@ -294,6 +295,114 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
       ),
       child: Text(label, style: const TextStyle(fontSize: 12)),
+    );
+  }
+
+  void _showCustomAmountDialog(BuildContext context, double maxLimit) {
+    final controller = TextEditingController(
+      text: _requestedAmount.clamp(5000.0, maxLimit).toInt().toString(),
+    );
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: AppColors.cardBorder),
+        ),
+        title: Row(
+          children: [
+            Icon(Icons.edit, color: AppColors.accent, size: 20),
+            const SizedBox(width: 8),
+            const Text(
+              'Wunschbetrag eingeben',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Betrag zwischen 5.000 € und ${CurrencyFormatter.format(maxLimit)}:',
+              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              autofocus: true,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: AppColors.textPrimary,
+              ),
+              decoration: InputDecoration(
+                suffixText: '€',
+                filled: true,
+                fillColor: AppColors.surfaceElevated,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(color: AppColors.cardBorder),
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Abbrechen', style: TextStyle(fontSize: 13)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final cleaned = controller.text
+                  .replaceAll('€', '')
+                  .replaceAll(' ', '')
+                  .replaceAll('.', '')
+                  .replaceAll(',', '.')
+                  .trim();
+              final val = double.tryParse(cleaned);
+              if (val != null) {
+                setState(() {
+                  _requestedAmount = val.clamp(5000.0, maxLimit);
+                });
+              }
+              Navigator.pop(ctx);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.accent,
+              foregroundColor: AppColors.onPrimary,
+            ),
+            child: const Text('Übernehmen', style: TextStyle(fontSize: 13)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuickAmountChip(String label, double amount, double maxLimit) {
+    final target = amount.clamp(5000.0, maxLimit);
+    final isSelected = (_requestedAmount - target).abs() < 1.0;
+    return ChoiceChip(
+      label: Text(label),
+      selected: isSelected,
+      onSelected: (_) {
+        setState(() {
+          _requestedAmount = target;
+        });
+      },
+      selectedColor: AppColors.accent.withValues(alpha: 0.25),
+      backgroundColor: AppColors.surfaceElevated,
+      side: BorderSide(
+        color: isSelected ? AppColors.accent : AppColors.cardBorder,
+      ),
+      labelStyle: TextStyle(
+        fontSize: 12,
+        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+        color: isSelected ? AppColors.accent : AppColors.textSecondary,
+      ),
     );
   }
 
@@ -333,12 +442,15 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
     }
 
     final rating = provider.creditRating;
+    final maxLimit = max(5000.0, rating.maxBorrowLimit);
+    final safeAmount = _requestedAmount.clamp(5000.0, maxLimit);
+
     final interest = CreditRatingService.calculateLoanInterest(
-      principal: _requestedAmount,
+      principal: safeAmount,
       durationDays: _selectedDurationDays,
       interestRate: rating.baseInterestRate,
     );
-    final totalRepay = _requestedAmount + interest;
+    final totalRepay = safeAmount + interest;
 
     showDialog(
       context: context,
@@ -363,7 +475,7 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Auszahlung auf Depot: +${CurrencyFormatter.format(_requestedAmount)}',
+              'Auszahlung auf Depot: +${CurrencyFormatter.format(safeAmount)}',
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 16,
@@ -375,8 +487,14 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
             _buildDetailRow('Bonitätseinstufung:', rating.grade),
             _buildDetailRow(
               'Zinssatz (p.a.):',
-              '${(rating.baseInterestRate * 100).toStringAsFixed(1)}%',
+              '${(rating.baseInterestRate * 100).toStringAsFixed(2)}%',
             ),
+            if (rating.prestigeRateDiscount > 0)
+              _buildDetailRow(
+                'Prestige-Zinsvorteil:',
+                '- ${(rating.prestigeRateDiscount * 100).toStringAsFixed(2)}%',
+                valueColor: AppColors.profit,
+              ),
             _buildDetailRow(
               'Errechnete Zinsen:',
               CurrencyFormatter.format(interest),
@@ -404,7 +522,7 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
             onPressed: () async {
               Navigator.pop(ctx);
               final success = await provider.takeLoan(
-                principal: _requestedAmount,
+                principal: safeAmount,
                 durationDays: _selectedDurationDays,
               );
               if (context.mounted && success) {
@@ -412,7 +530,7 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                   SnackBar(
                     backgroundColor: AppColors.surfaceElevated,
                     content: Text(
-                      '🎉 ${CurrencyFormatter.format(_requestedAmount)} wurden deinem Cash-Guthaben gutgeschrieben!',
+                      '🎉 ${CurrencyFormatter.format(safeAmount)} wurden deinem Cash-Guthaben gutgeschrieben!',
                       style: TextStyle(color: AppColors.profit),
                     ),
                   ),
@@ -466,13 +584,15 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
     final ratingColor = _getRatingColor(rating.grade);
     final activeLoans = provider.activeLoans;
     final paidLoans = provider.loans.where((l) => l.isPaid).toList();
+    final maxLimit = max(5000.0, rating.maxBorrowLimit);
+    final safeRequestedAmount = _requestedAmount.clamp(5000.0, maxLimit);
 
     final calcInterest = CreditRatingService.calculateLoanInterest(
-      principal: _requestedAmount,
+      principal: safeRequestedAmount,
       durationDays: _selectedDurationDays,
       interestRate: rating.baseInterestRate,
     );
-    final calcTotalRepay = _requestedAmount + calcInterest;
+    final calcTotalRepay = safeRequestedAmount + calcInterest;
 
     return Scaffold(
       appBar: AppBar(
@@ -538,24 +658,51 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                         color: AppColors.textSecondary,
                       ),
                     ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: ratingColor.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: ratingColor),
-                      ),
-                      child: Text(
-                        'Score: ${rating.score}/100',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: ratingColor,
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: AppColors.primary.withValues(alpha: 0.5),
+                            ),
+                          ),
+                          child: Text(
+                            '${provider.totalPrestigePoints} Prestige',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.primary,
+                            ),
+                          ),
                         ),
-                      ),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: ratingColor.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: ratingColor),
+                          ),
+                          child: Text(
+                            'Bonität: ${rating.score}/100',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: ratingColor,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -583,9 +730,87 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 14),
-                Divider(color: AppColors.cardBorder, height: 1),
                 const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceElevated.withValues(alpha: 0.8),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppColors.cardBorder),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.all_inclusive,
+                            size: 16,
+                            color: AppColors.accent,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Max. Kreditrahmen:',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Text(
+                        CurrencyFormatter.format(rating.maxBorrowLimit),
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.accent,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (rating.prestigeRateDiscount > 0) ...[
+                  const SizedBox(height: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.profit.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: AppColors.profit.withValues(alpha: 0.4),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.trending_down,
+                          size: 14,
+                          color: AppColors.profit,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          '- ${(rating.prestigeRateDiscount * 100).toStringAsFixed(2)}% Prestige-Zinsvorteil',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.profit,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 10),
+                Divider(color: AppColors.cardBorder, height: 1),
+                const SizedBox(height: 10),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -600,7 +825,7 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                           ),
                         ),
                         Text(
-                          '${(rating.baseInterestRate * 100).toStringAsFixed(1)}% p.a.',
+                          '${(rating.baseInterestRate * 100).toStringAsFixed(2)}% p.a.',
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
@@ -727,7 +952,7 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                             children: [
                               Text(
                                 isStartLoan ? '⭐' : '💳',
-                                style: const TextStyle(fontSize: 16),
+                                style: TextStyle(fontSize: 16),
                               ),
                               const SizedBox(width: 8),
                               Expanded(
@@ -904,7 +1129,9 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                              content: Text('Privatinsolvenz durchgeführt. Positionen liquidiert, bereit zum Weiterspielen!'),
+                              content: Text(
+                                'Privatinsolvenz durchgeführt. Positionen liquidiert, bereit zum Weiterspielen!',
+                              ),
                             ),
                           );
                         }
@@ -946,26 +1173,26 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                       ],
                     ),
                     Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 3,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.accent.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: AppColors.accent.withValues(alpha: 0.5),
-                          ),
-                        ),
-                        child: Text(
-                          'Rating: ${rating.grade}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.accent,
-                          ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.accent.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: AppColors.accent.withValues(alpha: 0.5),
                         ),
                       ),
+                      child: Text(
+                        'Rating: ${rating.grade}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.accent,
+                        ),
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 6),
@@ -978,7 +1205,7 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                 ),
                 const SizedBox(height: 18),
 
-                // Amount Slider
+                // Amount Header & Display
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -990,7 +1217,7 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                       ),
                     ),
                     Text(
-                      CurrencyFormatter.format(_requestedAmount),
+                      CurrencyFormatter.format(safeRequestedAmount),
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w900,
@@ -999,32 +1226,58 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                     ),
                   ],
                 ),
-                Builder(
-                  builder: (context) {
-                    final double maxLimit = rating.maxBorrowLimit;
-                    final double effectiveAmount = _requestedAmount.clamp(
-                      5000.0,
-                      maxLimit,
-                    );
-                    return Slider(
-                      value: effectiveAmount,
-                      min: 5000.0,
-                      max: maxLimit > 5000.0 ? maxLimit : 5000.0,
-                      divisions: maxLimit > 5000.0
-                          ? ((maxLimit - 5000.0) / 5000.0).round().clamp(1, 50)
-                          : 1,
-                      activeColor: AppColors.accent,
-                      inactiveColor: AppColors.cardBorder,
-                      onChanged: (val) {
-                        setState(() {
-                          _requestedAmount = val;
-                        });
-                      },
-                    );
+                Slider(
+                  value: safeRequestedAmount,
+                  min: 5000.0,
+                  max: maxLimit > 5000.0 ? maxLimit : 5000.0,
+                  divisions: maxLimit > 5000.0 ? 100 : 1,
+                  activeColor: AppColors.accent,
+                  inactiveColor: AppColors.cardBorder,
+                  onChanged: (val) {
+                    setState(() {
+                      _requestedAmount = val;
+                    });
                   },
                 ),
+                const SizedBox(height: 8),
 
-                const SizedBox(height: 14),
+                // Quick Amount Chips & Custom Input
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    _buildQuickAmountChip('5.000 €', 5000.0, maxLimit),
+                    if (maxLimit >= 25000.0)
+                      _buildQuickAmountChip('25.000 €', 25000.0, maxLimit),
+                    if (maxLimit >= 100000.0)
+                      _buildQuickAmountChip('100.000 €', 100000.0, maxLimit),
+                    _buildQuickAmountChip('50% Limit', maxLimit * 0.5, maxLimit),
+                    _buildQuickAmountChip('Max. Limit', maxLimit, maxLimit),
+                    OutlinedButton.icon(
+                      onPressed: () => _showCustomAmountDialog(context, maxLimit),
+                      icon: const Icon(Icons.edit_note, size: 16),
+                      label: const Text('Eigenen Betrag eingeben'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.accent,
+                        side: BorderSide(
+                          color: AppColors.accent.withValues(alpha: 0.5),
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        textStyle: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 16),
 
                 // Duration Selector Chips
                 Text(
@@ -1088,15 +1341,21 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                     children: [
                       _buildCalcRow(
                         'Sofortige Auszahlung ins Depot:',
-                        '+${CurrencyFormatter.format(_requestedAmount)}',
+                        '+${CurrencyFormatter.format(safeRequestedAmount)}',
                         AppColors.profit,
                         isBold: true,
                       ),
                       _buildCalcRow(
                         'Dein Bonitäts-Zinssatz:',
-                        '${(rating.baseInterestRate * 100).toStringAsFixed(1)}% p.a.',
+                        '${(rating.baseInterestRate * 100).toStringAsFixed(2)}% p.a.',
                         ratingColor,
                       ),
+                      if (rating.prestigeRateDiscount > 0)
+                        _buildCalcRow(
+                          'Prestige-Zinsvorteil:',
+                          '- ${(rating.prestigeRateDiscount * 100).toStringAsFixed(2)}%',
+                          AppColors.profit,
+                        ),
                       _buildCalcRow(
                         'Errechnete Zinskosten ($_selectedDurationDays Tage):',
                         '+${CurrencyFormatter.format(calcInterest)}',
@@ -1167,8 +1426,8 @@ class _BankLoanScreenState extends State<BankLoanScreen> {
                           ? 'Bank geschlossen · wieder ab Montag'
                           : (!provider.canTakeLoan
                                 ? 'Kredit derzeit nicht verfügbar'
-                                : 'Kredit über ${CurrencyFormatter.format(_requestedAmount)} jetzt beantragen'),
-                      style: const TextStyle(
+                                : 'Kredit über ${CurrencyFormatter.format(safeRequestedAmount)} jetzt beantragen'),
+                      style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 13,
                       ),

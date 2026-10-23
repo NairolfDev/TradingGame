@@ -3,7 +3,8 @@ enum LuxuryCategory {
   watch,
   vehicle,
   realEstate,
-  exclusive;
+  exclusive,
+  empire;
 
   String get displayName {
     switch (this) {
@@ -17,6 +18,8 @@ enum LuxuryCategory {
         return 'Immobilien & Penthouses';
       case LuxuryCategory.exclusive:
         return 'Jets, Yachten & Inseln';
+      case LuxuryCategory.empire:
+        return 'Imperium & Legenden';
     }
   }
 }

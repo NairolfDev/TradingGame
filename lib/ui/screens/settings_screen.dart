@@ -506,7 +506,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       builder: (context, snap) {
                         final versionText = (snap.hasData && snap.data != null)
                             ? 'v${snap.data!.version} (Build ${snap.data!.buildNumber})'
-                            : 'v1.18.0 (Build 26)';
+                            : 'v1.20.0 (Build 27)';
                         return Text(
                           versionText,
                           style: TextStyle(

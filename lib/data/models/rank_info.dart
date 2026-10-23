@@ -90,6 +90,36 @@ class RankInfo {
       description:
           'Die weltweiten Börsen tanzen nach deiner Pfeife. Unantastbar.',
     ),
+    RankInfo(
+      level: 8,
+      title: 'Globaler Tycoon',
+      minNetWorth: 15000000.0,
+      badge: '🌍',
+      symbol: Icons.public,
+      color: Color(0xFF00E5FF),
+      description:
+          'Multimillionär mit globalem Einfluss auf den Finanzmärkten.',
+    ),
+    RankInfo(
+      level: 9,
+      title: 'Börsen-Imperator',
+      minNetWorth: 100000000.0,
+      badge: '🏛️',
+      symbol: Icons.account_balance_outlined,
+      color: Color(0xFFFFD54F),
+      description:
+          'Neunstelliges Imperium. Selbst Großbanken bitten dich um Liquidität.',
+    ),
+    RankInfo(
+      level: 10,
+      title: 'Welt-Souverän',
+      minNetWorth: 1000000000.0,
+      badge: '🌌',
+      symbol: Icons.auto_awesome_outlined,
+      color: Color(0xFFFF4081),
+      description:
+          'Euro-Milliardär. Du hast das Börsenspiel auf höchster Stufe gemeistert.',
+    ),
   ];
 
   static RankInfo getRankForNetWorth(double netWorth) {

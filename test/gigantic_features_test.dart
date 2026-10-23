@@ -214,7 +214,7 @@ void main() {
   group('Gigantic Update: 5. Gamification Achievements System Tests', () {
     test('15 Achievements are configured with titles, emojis, and dual rewards', () {
       final list = InitialAchievements.getAchievements();
-      expect(list.length, 15);
+      expect(list.length, 45);
       expect(list.any((a) => a.id == 'trade_first'), isTrue);
       expect(list.any((a) => a.id == 'hundred_k'), isTrue);
       expect(list.any((a) => a.id == 'millionaire'), isTrue);

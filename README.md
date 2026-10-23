@@ -1,13 +1,13 @@
 # 📈 Trading Game – Open-Source Multi-Asset Trading Simulator
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-v1.18.0%2B26-orange.svg)](#)
+[![Version](https://img.shields.io/badge/Version-v1.20.0%2B27-orange.svg)](#)
 [![Flutter](https://img.shields.io/badge/Flutter-3.41.0-02569B?logo=flutter)](https://flutter.dev)
 [![Firebase](https://img.shields.io/badge/Firebase-Hosting%20%7C%20Firestore-FFCA28?logo=firebase)](https://tradinggame-live.web.app)
 [![Platforms](https://img.shields.io/badge/Platforms-Android%20%7C%20Windows%20%7C%20Linux%20%7C%20macOS%20%7C%20Web-brightgreen)](#)
 [![Release Pipeline](https://img.shields.io/badge/CI%2FCD-GitHub%20Actions-2088FF?logo=github-actions)](.github/workflows/ci_cd.yml)
 
-Ein realistisches, persistentes, kompetitives und plattformübergreifendes Finanz- & Börsenspiel entwickelt mit **Flutter**, **Firebase** und **Inno Setup** (Version **v1.18.0+26**).
+Ein realistisches, persistentes, kompetitives und plattformübergreifendes Finanz- & Börsenspiel entwickelt mit **Flutter**, **Firebase** und **Inno Setup** (Version **v1.20.0+27**).
 
 Tritt an weltweiten Märkten an, meistere Hebelzertifikate bis 50x, manage Kredite und Bonitätsratings, überlebe drohende Insolvenzen und steige im ewigen **Endlos-Leaderboard** an die Spitze auf!
 
@@ -45,7 +45,7 @@ Wenn du dein eigenes Deployment aufsetzt, nutze **GitHub Secrets** (z. B. `FIREB
 
 ---
 
-## 🌟 Hauptfeatures (v1.18.0+26)
+## 🌟 Hauptfeatures (v1.20.0+27)
 
 ### 1. 📊 Interaktive Pro Broker-Charts, Technische Indikatoren & Orderbuch
 Wie in professionellen Trading- und Broker-Apps (TradingView, Bloomberg, Trade Republic):
@@ -69,61 +69,59 @@ Wie in professionellen Trading- und Broker-Apps (TradingView, Bloomberg, Trade R
 
 ---
 
-### 3. 🌍 Gigantisches Multi-Asset-Universum
-- 🥇 **Edelmetalle & Industrielle Rohstoffe**:
-  - **Gold** (`XAU/EUR`) – Krisenwährung Nummer 1.
-  - **Silber** (`XAG/EUR`) – Hohe industrielle und monetäre Nachfrage.
-  - **Platin** (`XPT/EUR`) & **Palladium** (`XPD/EUR`) – Seltene Katalysator-Edelmetalle.
-  - **Brent Rohöl** (`BRENT`) – Globaler Energiemarkt.
-  - **Kupfer** (`COPPER`) – Das Barometer der Weltwirtschaft.
-  - **Lithium** (`LITHIUM`) & **Uran** (`URANIUM`) – Batterierohstoffe und Atomenergie.
-  - **Kaffee Arabica** (`COFFEE`) – Weichrohstoff mit hoher Volatilität.
-- 🏛️ **Staats- und Unternehmensanleihen (Bonds)**:
-  - Republik Österreich 10J Bundesanleihe (`BUND10Y-AT`, 2.90 % Kupon).
-  - US-Treasury 10J (`US10Y`, 4.25 % Kupon).
-  - Schweizer Eidgenossenschaft 10J (`CONFED10Y`, 0.85 % Kupon – Höchste Stabilität).
-  - UK Gilt 10J (`UK10Y`, 4.10 % Kupon).
-  - Apple Corporate Bond (`AAPL-CORP`, 3.85 % Kupon).
-  - Siemens Green Bond (`GREEN-BOND`, 3.20 % Kupon).
-  - Emerging Markets High Yield Bond (`EM-HIGH-YIELD`, 7.80 % Kupon).
-- 📈 **Internationale & Lokale Aktien**: OMV Wien, Erste Group Bank, Rheinmetall, Apple, Nvidia, Tesla u. v. m.
+### 3. 💵 Tägliche Dividenden & Kontinuierlicher Cashflow (Daily Dividends)
+- **Täglicher Dividenden-Cashflow**: Dividendenerträge werden realitätsnah auf Tagesbasis ermittelt (`calculateDailyDividendPayout`) und können **jeden Kalendertag** direkt auf das Barkonto gebucht werden.
+- **Breite Dividendenabdeckung**: Realistische Ausschüttungsrenditen für heimische ATX-Titel (OMV Wien 7,2 %, BAWAG 6,8 %, Post AG 6,2 %, Erste Group 5,5 %, Verbund 4,8 %, voestalpine 4,5 %, CA Immo 4,6 %, Andritz 4,2 %, Wienerberger 3,5 %), DAX-Werte (Allianz 5,2 %, Siemens 2,8 %, SAP 1,5 %) und globale Index-ETFs (MSCI World, S&P 500, ATX ETF, DAX ETF).
+- **Ausschüttungs-Kalender**: Übersichtliche Prognosen über anstehende Quartalsausschüttungen und Ex-Tage.
+
+---
+
+### 4. 🏦 Unbegrenzte Prestige-Bankkredite (`5.000 € – ∞`) & VIP-Niedrigzinsen
+- **Prestige-gestützter Kreditrahmen**: Jeder Prestige-Punkt, jede erfolgreiche Kredittilgung und steigendes Eigenkapital erweitern deinen maximalen Kreditrahmen ohne Obergrenze (`5.000 € bis unendlich`).
+- **Drastische Zinsvorteile (bis 0,8 % p.a.)**: Mit wachsendem Prestige sinken die Kreditzinsen schrittweise um bis zu 75 % des Basiszinses herab auf den VIP-Mindestzins von **0,8 % p.a.**
+- **Interaktiver Kreditrechner**: Schnellauswahl-Chips (`5.000 €`, `25.000 €`, `100.000 €`, `50 % Limit`, `Max. Limit`) sowie freie Wunscheingabe via Dialog.
+- **Sofortige Planinsolvenz & Sanierungskredit**: Möglichkeit des sofortigen Neustarts bei schwerer Überschuldung mit Notfall-Bailout.
+
+---
+
+### 5. 🏆 45 Gamification-Erfolge & Live-Fortschrittsbalken
+- **45 Trophäen & Auszeichnungen**: Deckt alle Facetten des Börsenspiels ab – vom ersten Trade über Krypto-Nächte, Hebel-Triumphe, passive Dividendenströme bis zum 10-Milliarden-Imperium.
+- **Live-Fortschritt**: Jeder gesperrte Erfolg visualisiert den aktuellen prozentualen Fortschrittsbalken in Echtzeit.
+- **Duale Belohnungen**: Jeder freigeschaltete Erfolg schüttet Ingame-Cash und Prestige-Punkte aus.
+
+---
+
+### 6. 💎 48 Luxusgüter in 6 Prestigeklassen
+- **Vom Espresso bis zum Imperium**: 48 Statussymbole gegliedert in `Lifestyle` (ab 180 € Einstieg), `Luxusuhren`, `Sportwagen & Supercars`, `Immobilien & Penthouses`, `Jets & Yachten` und `Imperium`.
+- **Prestige & Status**: Der Gesamtwert und die Prestige-Punkte fließen direkt in Rang, Kreditrahmen und Leaderboard ein.
+
+---
+
+### 7. 📜 30 Tägliche Quests & Tages-Meisterbonus
+- **Großer rotierender Quest-Pool**: Jeden Tag erhalten Trader 3 zufällige Missionen mit unterschiedlichen Handelszielen.
+- **Tages-Meisterbonus (3/3 erledigt)**: Schließt ein Trader alle 3 Tages-Quests ab, schaltet sich ein zusätzlicher Meisterbonus mit Extra-Cash und Prestige frei.
+- **Login-Streak**: 7-Tage-Streak-System mit fortlaufenden Treuebelohnungen.
+
+---
+
+### 8. 🌍 Gigantisches Multi-Asset-Universum
+- 🥇 **Edelmetalle & Industrielle Rohstoffe**: Gold (`XAU/EUR`), Silber (`XAG/EUR`), Platin (`XPT/EUR`), Palladium (`XPD/EUR`), Brent Rohöl (`BRENT`), Kupfer (`COPPER`), Lithium (`LITHIUM`), Uran (`URANIUM`), Kaffee (`COFFEE`).
+- 🏛️ **Staats- und Unternehmensanleihen (Bonds)**: Republik Österreich 10J (`BUND10Y-AT`), US-Treasury 10J (`US10Y`), Eidgenossenschaft 10J (`CONFED10Y`), UK Gilt (`UK10Y`), Corporate Bonds (Apple, Siemens Green Bond, EM High Yield).
+- 📈 **Internationale & Lokale Aktien**: ATX, DAX, US-Tech und globale Standardwerte.
 - 🪙 **Kryptowährungen (24/7)**: Bitcoin (BTC), Ethereum (ETH), Solana (SOL), Dogecoin (DOGE).
-- 🧺 **Index-ETFs**: iShares Core MSCI World, Vanguard S&P 500, ATX Prime ETF.
-- ⚡ **CFDs & Hebelprodukte bis 50x**: Handele Long & Short mit Hebelwirkung, Echtzeit-Liquidationspreisen und automatischem Margin-Closeout.
+- 🧺 **Index-ETFs**: iShares Core MSCI World, Vanguard S&P 500, ATX Prime ETF, DAX ETF.
+- ⚡ **CFDs & Hebelprodukte bis 50x**: Long & Short mit Hebelwirkung und Echtzeit-Margin-Closeout.
 
 ---
 
-### 4. 📰 Datengetriebene Marktnachrichten (Market News)
-- **Echtzeit-Nachrichtenfeed**: Datenbasierte Wirtschaftsnachrichten, Zinsentscheide und geopolitische News.
-- **Marktreaktionen**: Nachrichtenereignisse beeinflussen Marktstimmung und Volatilität für ein dynamisches, lebendiges Marktumfeld.
-
----
-
-### 5. 🇦🇹 Optionale 27,5 % KESt-Steuersimulation & Verlustverrechnung
+### 9. 🇦🇹 Optionale 27,5 % KESt-Steuersimulation & Verlustverrechnung
 - **Österreichische Kapitalertragsteuer (KESt)**: Auf Wunsch zuschaltbare 27,5 % Versteuerung auf realisierte Gewinne und Zinserträge.
 - **Automatischer Verlustverrechnungstopf (Loss Carryforward)**: Realisierte Kursverluste werden fortlaufend gutgeschrieben und mit künftigen Gewinnen steuermindernd verrechnet.
 
 ---
 
-### 6. 🏦 Sofortige Planinsolvenz & Progressives Bonitätsrating-System
-- **25.000 € Startkredit**: Verfügbar zu Beginn mit 60 Tagen Tilgungsfrist.
-- **Progressives Bonitätsrating (Rating AAA bis D)**: Dein Zinssatz und Kreditrahmen passen sich dynamisch deiner Trading-Performance, deinem Eigenkapital und deinem Risiko an.
-- **Anti-Spam Cooldown**: Nach jeder Kreditaufnahme greift eine **24-stündige Abklingzeit**, bevor eine weitere Kreditanfrage gestellt werden kann.
-- 🚨 **Sofortige Planinsolvenz & Kreditsperre (120 Stunden / 5 echte Tage)**:
-  - Fällt dein Portfolio ins Minus (`NetWorth < -10.000 €` und `Cash <= 0`), tritt sofort die gerichtliche Planinsolvenz ein.
-  - Das Insolvenzgericht verhängt eine **strikte 5-tägige Kreditsperre (Echtzeit-Kalendertage)** mit sekundengenauem Live-Countdown.
-  - Erst nach Ablauf der 120 Stunden erhältst du Zugang zu einem Sanierungs-Notkredit (Rating D mit Risikoaufschlag).
-
----
-
-### 7. 🏆 Saisonale Bestenlisten (Leaderboard) & Copy-Trading
-- **Saisonale Bestenlisten**: Ranglisten filtern nach **All-Time**, **Weekly (Wöchentlich)** und **Monthly (Monatlich)** mit Live-Synchronisation.
-- **Öffentliche Portfolios & Copy-Trading**: Verfolge die Portfolios und Erfolgsstrategien führender Trader weltweit.
-
----
-
-### 8. 💻 Windows Installer & Auto-Update
-- **Inno Setup Installer Script**: In `windows/installer.iss` definiert (Version **1.18.0**).
+### 10. 💻 Windows Installer & Auto-Update
+- **Inno Setup Installer Script**: In `windows/installer.iss` definiert (Version **1.20.0**).
 - Erstellt eine offizielle `TradingGame-Setup.exe`:
   - Startmenü- und Desktop-Icons.
   - Clean Uninstaller in den Windows-Einstellungen.
@@ -132,8 +130,8 @@ Wie in professionellen Trading- und Broker-Apps (TradingView, Bloomberg, Trade R
 
 ---
 
-### 9. 🔒 Version-Gating & Backend-Sicherheit (Build 26+)
-- **Hard Version-Floor**: Clients müssen mindestens Build `26` aufweisen. Firestore Security Rules erzwingen serverseitig Schema-Validierung und schließen veraltete Builds vom Schreibzugriff auf das Leaderboard und die Portfolios aus.
+### 11. 🔒 Version-Gating & Backend-Sicherheit (Build 27+)
+- **Hard Version-Floor**: Clients müssen mindestens Build `27` aufweisen. Firestore Security Rules erzwingen serverseitig Schema-Validierung und schließen veraltete Builds vom Schreibzugriff auf das Leaderboard und die Portfolios aus.
 - **Schlankes Serverless-Backend**: Direkte Kommunikation mit Firestore, gesichert durch strenge Regeln (`firestore.rules`). Kursfeeds über Binance/CoinGecko und Yahoo Finance.
 
 ---
@@ -216,7 +214,7 @@ Das Repository enthält eine vollautomatisierte Pipeline in `.github/workflows/c
     - 📱 `android-apk` (Universal Release APK)
     - 🌐 `web-build` (Web Release)
     - 💻 `windows-release` (Windows Binary + Inno Setup `TradingGame-Setup.exe`)
-- **Bei Git-Tagging (z.B. `git tag v1.1.0 && git push origin v1.1.0`):**
+- **Bei Git-Tagging (z.B. `git tag v1.20.0 && git push origin v1.20.0`):**
   - Automatisches Erstellen eines **GitHub Releases** mit beigefügtem Windows-Installer (`TradingGame-Setup.exe`), Android APK und vollständigen Release-Notes.
   - Automatisches Deployment der Web-App auf Firebase Hosting (`tradinggame-live`).
 

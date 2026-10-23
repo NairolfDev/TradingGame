@@ -7,6 +7,7 @@ class DividendScheduleItem {
   final double dividendYieldPercent;
   final double projectedPayout;
   final DateTime nextExDate;
+  final double dailyPayout;
 
   const DividendScheduleItem({
     required this.assetSymbol,
@@ -14,6 +15,7 @@ class DividendScheduleItem {
     required this.dividendYieldPercent,
     required this.projectedPayout,
     required this.nextExDate,
+    this.dailyPayout = 0.0,
   });
 }
 
@@ -45,6 +47,13 @@ class DividendService {
     return calculateAnnualDividendRunRate(positions, assets) / 12.0;
   }
 
+  static double calculateDailyDividendPayout(
+    List<Position> positions,
+    List<Asset> assets,
+  ) {
+    return calculateAnnualDividendRunRate(positions, assets) / 365.0;
+  }
+
   static List<DividendScheduleItem> getDividendSchedule(
     List<Position> positions,
     List<Asset> assets,
@@ -64,6 +73,7 @@ class DividendService {
         final positionValue = pos.amount * asset.currentPrice;
         final annualPayout = positionValue * asset.dividendYield!;
         final quarterPayout = annualPayout / 4.0;
+        final dailyPayout = annualPayout / 365.0;
 
         list.add(DividendScheduleItem(
           assetSymbol: asset.symbol,
@@ -71,6 +81,7 @@ class DividendService {
           dividendYieldPercent: asset.dividendYield! * 100,
           projectedPayout: quarterPayout,
           nextExDate: now.add(Duration(days: (i + 1) * 7)),
+          dailyPayout: dailyPayout,
         ));
       }
     }
