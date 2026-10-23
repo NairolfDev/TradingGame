@@ -1,5 +1,7 @@
 import '../models/asset.dart';
+import '../models/automation_order.dart';
 import '../models/position.dart';
+import '../models/savings_plan.dart';
 import '../models/transaction.dart';
 import '../models/luxury_item.dart';
 import '../models/pending_order.dart';
@@ -26,7 +28,10 @@ abstract class TradingRepository {
   Future<void> savePendingOrders(List<PendingOrder> orders);
 
   Future<List<LeaderboardEntry>> getLeaderboard();
-  Future<void> saveLeaderboard(List<LeaderboardEntry> entries, {bool forceCloud = false});
+  Future<void> saveLeaderboard(
+    List<LeaderboardEntry> entries, {
+    bool forceCloud = false,
+  });
   Stream<List<LeaderboardEntry>>? streamLeaderboard() => null;
 
   Future<List<Loan>> getLoans();
@@ -38,6 +43,18 @@ abstract class TradingRepository {
     DateTime? lockoutUntil,
     DateTime? lastLoanTakenAt,
   });
+
+  Future<({int unlockedSlotsCount, List<AutomationOrder> orders})?>
+  getCloudAutomationState() async => null;
+
+  Future<void> saveCloudAutomationState({
+    required int unlockedSlotsCount,
+    required List<AutomationOrder> orders,
+  }) async {}
+
+  Future<List<SavingsPlan>?> getCloudSavingsPlans() async => null;
+
+  Future<void> saveCloudSavingsPlans(List<SavingsPlan> plans) async {}
 
   Future<void> resetGameToInitial();
 }

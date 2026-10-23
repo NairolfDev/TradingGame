@@ -12,7 +12,8 @@ class NewsService {
 
   List<NewsEvent> get newsHistory => List.unmodifiable(_newsHistory);
 
-  NewsEvent? get latestNews => _newsHistory.isNotEmpty ? _newsHistory.first : null;
+  NewsEvent? get latestNews =>
+      _newsHistory.isNotEmpty ? _newsHistory.first : null;
 
   void initialize(List<Asset> assets) {
     _newsHistory.clear();
@@ -20,9 +21,59 @@ class NewsService {
     _startDynamicNewsCycle(assets);
   }
 
+  /// Generates data-driven market bulletins from real asset price movements
+  /// without ever altering asset prices.
+  List<NewsEvent> buildMarketFeedReports(List<Asset> assets) {
+    final reports = <NewsEvent>[];
+    final valid = assets
+        .where(
+          (a) =>
+              a.currentPrice.isFinite &&
+              a.currentPrice > 0 &&
+              a.previousClose.isFinite &&
+              a.previousClose > 0 &&
+              a.change24hPercent.abs() >= 0.002,
+        )
+        .toList();
+    if (valid.isEmpty) return reports;
+
+    valid.sort(
+      (a, b) => b.change24hPercent.abs().compareTo(a.change24hPercent.abs()),
+    );
+
+    final now = DateTime.now();
+    for (final asset in valid.take(8)) {
+      final pct = asset.change24hPercent * 100;
+      final isBull = pct >= 0;
+      final sign = isBull ? '+' : '';
+      final headline = isBull
+          ? '${asset.name} (${asset.symbol}) legt $sign${pct.toStringAsFixed(2)} % zu'
+          : '${asset.name} (${asset.symbol}) gibt ${pct.toStringAsFixed(2)} % nach';
+      final rangeNote = (asset.dailyHigh > 0 && asset.dailyLow > 0)
+          ? 'Tagesspanne: ${asset.dailyLow.toStringAsFixed(2)} € – ${asset.dailyHigh.toStringAsFixed(2)} €.'
+          : '';
+      final description =
+          'Aktueller Kurs: ${asset.currentPrice.toStringAsFixed(2)} € '
+          '(Vortagesschluss: ${asset.previousClose.toStringAsFixed(2)} €). $rangeNote';
+
+      reports.add(
+        NewsEvent(
+          id: 'market_${asset.symbol}_${now.year}_${now.month}_${now.day}_${now.hour}',
+          headline: headline,
+          description: description.trim(),
+          affectedSymbol: asset.symbol,
+          priceImpact: asset.change24hPercent,
+          timestamp: now,
+          category: asset.type.displayName,
+          isBreaking: pct.abs() >= 3.0,
+        ),
+      );
+    }
+    return reports;
+  }
+
   void _startDynamicNewsCycle(List<Asset> assets) {
     _newsTimer?.cancel();
-    // Alle 90 Sekunden kann eine neue Breaking News eintreffen
     _newsTimer = Timer.periodic(const Duration(seconds: 90), (_) {
       triggerRandomBreakingNews(assets);
     });
@@ -32,7 +83,6 @@ class NewsService {
     final pool = InitialNews.getNews();
     final template = pool[_random.nextInt(pool.length)];
 
-    // Variation des Preisausschlags (-15% bis +15%)
     final sign = _random.nextBool() ? 1.0 : -1.0;
     final variation = (0.04 + _random.nextDouble() * 0.08) * sign;
 

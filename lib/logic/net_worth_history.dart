@@ -53,6 +53,38 @@ class NetWorthHistory {
     return points.where((p) => !p.time.isBefore(from)).toList();
   }
 
+  /// Percentage return over [window] (in percent, e.g. +4.5 for +4.5%) relative
+  /// to the earliest sample inside the window, or `fallbackRoiPercent` when
+  /// fewer than 2 samples exist.
+  double roiOverWindowPercent(
+    Duration window, {
+    required double currentNetWorth,
+    required double fallbackRoiPercent,
+  }) {
+    final slice = within(window);
+    if (slice.isEmpty) return fallbackRoiPercent;
+    final baseline = slice.first.value;
+    if (!baseline.isFinite || baseline <= 0 || !currentNetWorth.isFinite) {
+      return fallbackRoiPercent;
+    }
+    return ((currentNetWorth - baseline) / baseline) * 100.0;
+  }
+
+  /// Maximum peak-to-trough drawdown across recorded history in percent (0..100).
+  double get maxDrawdownPercent {
+    if (points.length < 2) return 0.0;
+    double peak = points.first.value;
+    double maxDd = 0.0;
+    for (final p in points) {
+      if (p.value > peak) peak = p.value;
+      if (peak > 0) {
+        final dd = ((peak - p.value) / peak) * 100.0;
+        if (dd > maxDd) maxDd = dd;
+      }
+    }
+    return maxDd;
+  }
+
   String encode() => jsonEncode([
     for (final p in points) [p.time.millisecondsSinceEpoch, p.value],
   ]);

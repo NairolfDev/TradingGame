@@ -10,7 +10,11 @@ service cloud.firestore {
     // build stamped in sessions/{uid} is at least config/app.minBuild.
     // Reads stay open so an outdated app can still show the update prompt.
     function minBuild() {
-      return get(/databases/$(database)/documents/config/app).data.minBuild;
+      return exists(/databases/$(database)/documents/config/app)
+        && get(/databases/$(database)/documents/config/app).data.minBuild is int
+        && get(/databases/$(database)/documents/config/app).data.minBuild > 26
+        ? get(/databases/$(database)/documents/config/app).data.minBuild
+        : 26;
     }
     function currentBuild() {
       return !exists(/databases/$(database)/documents/config/app)
@@ -51,7 +55,14 @@ service cloud.firestore {
     // 1. Leaderboard: Live-Rangliste für alle Spieler (Echtzeit-Updates)
     match /leaderboard/{docId} {
       allow read: if true;
-      allow write: if writer(docId);
+      allow delete: if owner(docId);
+      allow create, update: if writer(docId)
+        && request.resource.data.id == docId
+        && request.resource.data.name is string
+        && request.resource.data.name.size() >= 1
+        && request.resource.data.name.size() <= 64
+        && request.resource.data.netWorth is number
+        && request.resource.data.roiPercent is number;
     }
 
     // 1b. Öffentliche Portfolios (Copy-Trading): jeder liest, nur der Besitzer schreibt

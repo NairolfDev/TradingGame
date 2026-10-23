@@ -7,8 +7,8 @@ import '../../data/models/leaderboard_entry.dart';
 import '../../logic/portfolio_provider.dart';
 import '../widgets/empty_state.dart';
 
-/// Entries sorted by net worth with ranks 1..n. The player's own row shows the
-/// live net worth; if the player is not listed yet, a row is added.
+/// Entries sorted by net worth or ROI with ranks 1..n. The player's own row
+/// shows live metrics; if the player is not listed yet, a row is added.
 List<LeaderboardEntry> rankLeaderboard(
   List<LeaderboardEntry> base, {
   required double playerNetWorth,
@@ -17,6 +17,9 @@ List<LeaderboardEntry> rankLeaderboard(
   required String playerTitle,
   required String playerBadge,
   bool includePlayer = true,
+  double? playerWeeklyRoiPercent,
+  double? playerMonthlyRoiPercent,
+  String mode = 'allTime',
 }) {
   final entries = [
     for (final e in base)
@@ -30,7 +33,15 @@ List<LeaderboardEntry> rankLeaderboard(
           avatarEmoji: e.avatarEmoji,
           strategy: e.strategy,
           netWorth: e.isPlayer ? playerNetWorth : e.netWorth,
-          roiPercent: e.roiPercent,
+          roiPercent: e.isPlayer && playerRoiPercent != 0
+              ? playerRoiPercent
+              : e.roiPercent,
+          weeklyRoiPercent: e.isPlayer
+              ? (playerWeeklyRoiPercent ?? e.weeklyRoiPercent)
+              : e.weeklyRoiPercent,
+          monthlyRoiPercent: e.isPlayer
+              ? (playerMonthlyRoiPercent ?? e.monthlyRoiPercent)
+              : e.monthlyRoiPercent,
           isPlayer: e.isPlayer,
           luxuryCount: e.luxuryCount,
         ),
@@ -47,11 +58,27 @@ List<LeaderboardEntry> rankLeaderboard(
         strategy: 'Multi-Asset',
         netWorth: playerNetWorth,
         roiPercent: playerRoiPercent,
+        weeklyRoiPercent: playerWeeklyRoiPercent,
+        monthlyRoiPercent: playerMonthlyRoiPercent,
         isPlayer: true,
       ),
     );
   }
-  entries.sort((a, b) => b.netWorth.compareTo(a.netWorth));
+  if (mode == 'weekly') {
+    entries.sort((a, b) {
+      final aVal = a.weeklyRoiPercent ?? a.roiPercent;
+      final bVal = b.weeklyRoiPercent ?? b.roiPercent;
+      return bVal.compareTo(aVal);
+    });
+  } else if (mode == 'monthly') {
+    entries.sort((a, b) {
+      final aVal = a.monthlyRoiPercent ?? a.roiPercent;
+      final bVal = b.monthlyRoiPercent ?? b.roiPercent;
+      return bVal.compareTo(aVal);
+    });
+  } else {
+    entries.sort((a, b) => b.netWorth.compareTo(a.netWorth));
+  }
   for (var i = 0; i < entries.length; i++) {
     entries[i].rank = i + 1;
   }
@@ -77,8 +104,21 @@ Color _medal(int rank) => switch (rank) {
 
 Color _roiColor(double roi) => roi >= 0 ? AppColors.profit : AppColors.loss;
 
-class LeaderboardScreen extends StatelessWidget {
+double _displayRoi(LeaderboardEntry e, String mode) => switch (mode) {
+  'weekly' => e.weeklyRoiPercent ?? e.roiPercent,
+  'monthly' => e.monthlyRoiPercent ?? e.roiPercent,
+  _ => e.roiPercent,
+};
+
+class LeaderboardScreen extends StatefulWidget {
   const LeaderboardScreen({super.key});
+
+  @override
+  State<LeaderboardScreen> createState() => _LeaderboardScreenState();
+}
+
+class _LeaderboardScreenState extends State<LeaderboardScreen> {
+  String _mode = 'allTime';
 
   @override
   Widget build(BuildContext context) {
@@ -87,10 +127,13 @@ class LeaderboardScreen extends StatelessWidget {
       provider.leaderboard,
       playerNetWorth: provider.netWorth,
       playerRoiPercent: provider.totalRoiPercent * 100,
+      playerWeeklyRoiPercent: provider.weeklyRoiPercent,
+      playerMonthlyRoiPercent: provider.monthlyRoiPercent,
       playerCity: provider.playerCountry,
       playerTitle: provider.currentRank.title,
       playerBadge: provider.currentRank.badge,
       includePlayer: provider.isOnLeaderboard,
+      mode: _mode,
     );
     final me = entries.where((e) => e.isPlayer).firstOrNull;
 
@@ -133,20 +176,55 @@ class LeaderboardScreen extends StatelessWidget {
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                 children: [
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        ChoiceChip(
+                          label: const Text('Gesamt'),
+                          selected: _mode == 'allTime',
+                          onSelected: (selected) {
+                            if (selected) setState(() => _mode = 'allTime');
+                          },
+                        ),
+                        const SizedBox(width: 8),
+                        ChoiceChip(
+                          label: const Text('Wochen-Liga (7T)'),
+                          selected: _mode == 'weekly',
+                          onSelected: (selected) {
+                            if (selected) setState(() => _mode = 'weekly');
+                          },
+                        ),
+                        const SizedBox(width: 8),
+                        ChoiceChip(
+                          label: const Text('Monats-Liga (30T)'),
+                          selected: _mode == 'monthly',
+                          onSelected: (selected) {
+                            if (selected) setState(() => _mode = 'monthly');
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
                   if (me != null)
-                    _MyRankCard(me: me, total: entries.length)
+                    _MyRankCard(me: me, total: entries.length, mode: _mode)
                   else
                     const _JoinHint(),
                   const SizedBox(height: 16),
                   if (entries.length >= 3) ...[
-                    _Podium(top3: entries.take(3).toList()),
+                    _Podium(top3: entries.take(3).toList(), mode: _mode),
                     const SizedBox(height: 16),
                   ],
                   Row(
                     children: [
                       Expanded(
                         child: Text(
-                          'Gesamtrendite seit Spielstart',
+                          _mode == 'weekly'
+                              ? 'Wochen-Liga (7 Tage)'
+                              : _mode == 'monthly'
+                                  ? 'Monats-Liga (30 Tage)'
+                                  : 'Gesamtrendite seit Spielstart',
                           style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.bold,
@@ -164,7 +242,7 @@ class LeaderboardScreen extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 8),
-                  for (final e in entries) _Tile(entry: e),
+                  for (final e in entries) _Tile(entry: e, mode: _mode),
                 ],
               ),
             ),
@@ -201,10 +279,16 @@ class _JoinHint extends StatelessWidget {
 class _MyRankCard extends StatelessWidget {
   final LeaderboardEntry me;
   final int total;
-  const _MyRankCard({required this.me, required this.total});
+  final String mode;
+  const _MyRankCard({
+    required this.me,
+    required this.total,
+    this.mode = 'allTime',
+  });
 
   @override
   Widget build(BuildContext context) {
+    final roi = _displayRoi(me, mode);
     return Semantics(
       container: true,
       label:
@@ -264,11 +348,11 @@ class _MyRankCard extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  _roiText(me.roiPercent),
+                  _roiText(roi),
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
-                    color: _roiColor(me.roiPercent),
+                    color: _roiColor(roi),
                   ),
                 ),
               ],
@@ -282,7 +366,8 @@ class _MyRankCard extends StatelessWidget {
 
 class _Podium extends StatelessWidget {
   final List<LeaderboardEntry> top3;
-  const _Podium({required this.top3});
+  final String mode;
+  const _Podium({required this.top3, this.mode = 'allTime'});
 
   @override
   Widget build(BuildContext context) {
@@ -296,9 +381,15 @@ class _Podium extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          Expanded(child: _PodiumColumn(entry: top3[1], height: 96)),
-          Expanded(child: _PodiumColumn(entry: top3[0], height: 124)),
-          Expanded(child: _PodiumColumn(entry: top3[2], height: 80)),
+          Expanded(
+            child: _PodiumColumn(entry: top3[1], height: 96, mode: mode),
+          ),
+          Expanded(
+            child: _PodiumColumn(entry: top3[0], height: 124, mode: mode),
+          ),
+          Expanded(
+            child: _PodiumColumn(entry: top3[2], height: 80, mode: mode),
+          ),
         ],
       ),
     );
@@ -308,11 +399,17 @@ class _Podium extends StatelessWidget {
 class _PodiumColumn extends StatelessWidget {
   final LeaderboardEntry entry;
   final double height;
-  const _PodiumColumn({required this.entry, required this.height});
+  final String mode;
+  const _PodiumColumn({
+    required this.entry,
+    required this.height,
+    this.mode = 'allTime',
+  });
 
   @override
   Widget build(BuildContext context) {
     final color = _medal(entry.rank);
+    final roi = _displayRoi(entry, mode);
     return Semantics(
       label:
           'Platz ${entry.rank}: ${entry.name}, ${CurrencyFormatter.format(entry.netWorth)}',
@@ -366,11 +463,11 @@ class _PodiumColumn extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  _roiText(entry.roiPercent, digits: 1),
+                  _roiText(roi, digits: 1),
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
-                    color: _roiColor(entry.roiPercent),
+                    color: _roiColor(roi),
                   ),
                 ),
               ],
@@ -384,15 +481,17 @@ class _PodiumColumn extends StatelessWidget {
 
 class _Tile extends StatelessWidget {
   final LeaderboardEntry entry;
-  const _Tile({required this.entry});
+  final String mode;
+  const _Tile({required this.entry, this.mode = 'allTime'});
 
   @override
   Widget build(BuildContext context) {
     final me = entry.isPlayer;
+    final roi = _displayRoi(entry, mode);
     return Semantics(
       container: true,
       label:
-          'Platz ${entry.rank}: ${entry.name}${me ? ' (du)' : ''}, ${CurrencyFormatter.format(entry.netWorth)}, ${_roiText(entry.roiPercent)}',
+          'Platz ${entry.rank}: ${entry.name}${me ? ' (du)' : ''}, ${CurrencyFormatter.format(entry.netWorth)}, ${_roiText(roi)}',
       excludeSemantics: true,
       child: Container(
         margin: const EdgeInsets.symmetric(vertical: 4),
@@ -499,11 +598,11 @@ class _Tile extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      _roiText(entry.roiPercent),
+                      _roiText(roi),
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
-                        color: _roiColor(entry.roiPercent),
+                        color: _roiColor(roi),
                       ),
                     ),
                   ],

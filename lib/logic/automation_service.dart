@@ -6,8 +6,18 @@ import '../data/models/asset.dart';
 import '../data/models/automation_order.dart';
 
 class AutomationService {
-  static const String _keyUnlockedSlots = 'automation_unlocked_slots_v1';
-  static const String _keyOrders = 'automation_orders_v1';
+  static const String _legacyKeyUnlockedSlots = 'automation_unlocked_slots_v1';
+  static const String _legacyKeyOrders = 'automation_orders_v1';
+
+  String _profileId = 'local';
+  String get _keyUnlockedSlots =>
+      (_profileId == 'local' || _profileId.isEmpty)
+          ? _legacyKeyUnlockedSlots
+          : '${_legacyKeyUnlockedSlots}_$_profileId';
+  String get _keyOrders =>
+      (_profileId == 'local' || _profileId.isEmpty)
+          ? _legacyKeyOrders
+          : '${_legacyKeyOrders}_$_profileId';
 
   final Uuid _uuid = const Uuid();
   int _unlockedSlotsCount = 1; // Slot 1 ist von Beginn an kostenlos & frei
@@ -35,7 +45,9 @@ class AutomationService {
     return slotCosts[_unlockedSlotsCount + 1];
   }
 
-  Future<void> initialize() async {
+  Future<void> initialize({String profileId = 'local'}) async {
+    _profileId = profileId.trim().isEmpty ? 'local' : profileId;
+    _orders.clear();
     final prefs = await SharedPreferences.getInstance();
     _unlockedSlotsCount = prefs.getInt(_keyUnlockedSlots) ?? 1;
 
@@ -43,15 +55,41 @@ class AutomationService {
     if (raw != null) {
       try {
         final list = jsonDecode(raw) as List<dynamic>;
-        _orders.clear();
-        _orders.addAll(list.map((e) => AutomationOrder.fromJson(e as Map<String, dynamic>)));
+        _orders.addAll(
+          list.map((e) => AutomationOrder.fromJson(e as Map<String, dynamic>)),
+        );
       } catch (e) {
         debugPrint('Fehler beim Laden der Automation Orders: $e');
       }
     }
   }
 
-  Future<bool> unlockNextSlot(double currentCash, void Function(double cost) onDeduct) async {
+  /// Synchronizes cloud-stored state into local profile storage.
+  Future<void> applyCloudState({
+    required int unlockedSlotsCount,
+    required List<AutomationOrder> orders,
+  }) async {
+    _unlockedSlotsCount = unlockedSlotsCount.clamp(1, maxSlots);
+    _orders
+      ..clear()
+      ..addAll(orders);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_keyUnlockedSlots, _unlockedSlotsCount);
+    await _saveOrders();
+  }
+
+  Future<void> resetForProfile() async {
+    _unlockedSlotsCount = 1;
+    _orders.clear();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_keyUnlockedSlots);
+    await prefs.remove(_keyOrders);
+  }
+
+  Future<bool> unlockNextSlot(
+    double currentCash,
+    void Function(double cost) onDeduct,
+  ) async {
     final cost = nextSlotCost;
     if (cost == null || currentCash < cost) return false;
 
@@ -70,8 +108,11 @@ class AutomationService {
     required AutomationOrderType orderType,
     required double targetPrice,
     required double amount,
+    double? trailingPercent,
+    double? initialObservedPrice,
+    bool bypassSlotLimit = false,
   }) async {
-    if (activeOrders.length >= _unlockedSlotsCount) {
+    if (!bypassSlotLimit && activeOrders.length >= _unlockedSlotsCount) {
       return null; // Kein freier Slot vorhanden
     }
 
@@ -85,16 +126,36 @@ class AutomationService {
       }
     }
 
+    final validTrailing = (trailingPercent != null &&
+            trailingPercent.isFinite &&
+            trailingPercent > 0 &&
+            trailingPercent < 95)
+        ? trailingPercent
+        : null;
+    final observedHigh = initialObservedPrice != null &&
+            initialObservedPrice.isFinite &&
+            initialObservedPrice > 0
+        ? initialObservedPrice
+        : null;
+    final effectiveTarget =
+        (orderType == AutomationOrderType.trailingStop &&
+                validTrailing != null &&
+                observedHigh != null)
+            ? observedHigh * (1.0 - validTrailing / 100.0)
+            : targetPrice;
+
     final order = AutomationOrder(
       id: _uuid.v4(),
       assetId: assetId,
       symbol: symbol,
       name: name,
       orderType: orderType,
-      targetPrice: targetPrice,
+      targetPrice: effectiveTarget,
       amount: amount,
       slotIndex: chosenSlot,
       createdAt: DateTime.now(),
+      trailingPercent: validTrailing,
+      highestObservedPrice: observedHigh,
     );
 
     _orders.insert(0, order);
@@ -124,6 +185,9 @@ class AutomationService {
       );
       if (matchingAssets.isEmpty) continue;
       final matching = matchingAssets.first;
+      if (!matching.currentPrice.isFinite || matching.currentPrice <= 0) {
+        continue;
+      }
 
       bool triggered = false;
 
@@ -142,6 +206,22 @@ class AutomationService {
           break;
         case AutomationOrderType.stopLoss:
           // Verkaufe zur Schadensbegrenzung wenn Marktpreis <= Zielpreis
+          if (matching.currentPrice <= order.targetPrice) {
+            triggered = true;
+          }
+          break;
+        case AutomationOrderType.trailingStop:
+          final pct = (order.trailingPercent ?? 5.0).clamp(0.1, 90.0);
+          final prevHigh = order.highestObservedPrice ?? matching.currentPrice;
+          if (matching.currentPrice > prevHigh) {
+            order.highestObservedPrice = matching.currentPrice;
+            order.targetPrice = matching.currentPrice * (1.0 - pct / 100.0);
+            changes = true;
+          } else if (order.highestObservedPrice == null) {
+            order.highestObservedPrice = prevHigh;
+            order.targetPrice = prevHigh * (1.0 - pct / 100.0);
+            changes = true;
+          }
           if (matching.currentPrice <= order.targetPrice) {
             triggered = true;
           }

@@ -1,6 +1,6 @@
 ; Inno Setup Script for Trading Game
 #define MyAppName "Trading Game"
-#define MyAppVersion "1.0.0"
+#define MyAppVersion "1.18.0"
 #define MyAppPublisher "NairolfDev"
 #define MyAppURL "https://tradinggame-live.web.app"
 #define MyAppExeName "trading_game.exe"

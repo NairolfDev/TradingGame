@@ -1,7 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/asset.dart';
+import '../models/automation_order.dart';
 import '../models/position.dart';
+import '../models/savings_plan.dart';
 import '../models/transaction.dart';
 import '../models/luxury_item.dart';
 import '../models/pending_order.dart';
@@ -324,6 +326,8 @@ class FirebaseTradingRepository implements TradingRepository {
             strategy: data['strategy'] as String? ?? 'Multi-Asset',
             netWorth: (data['netWorth'] as num?)?.toDouble() ?? 50000.0,
             roiPercent: (data['roiPercent'] as num?)?.toDouble() ?? 0.0,
+            weeklyRoiPercent: (data['weeklyRoiPercent'] as num?)?.toDouble(),
+            monthlyRoiPercent: (data['monthlyRoiPercent'] as num?)?.toDouble(),
             isPlayer: isPlayer,
             luxuryCount: (data['luxuryCount'] as num?)?.toInt() ?? 0,
             rank: 0,
@@ -370,6 +374,10 @@ class FirebaseTradingRepository implements TradingRepository {
                 strategy: data['strategy'] as String? ?? 'Multi-Asset',
                 netWorth: (data['netWorth'] as num?)?.toDouble() ?? 50000.0,
                 roiPercent: (data['roiPercent'] as num?)?.toDouble() ?? 0.0,
+                weeklyRoiPercent:
+                    (data['weeklyRoiPercent'] as num?)?.toDouble(),
+                monthlyRoiPercent:
+                    (data['monthlyRoiPercent'] as num?)?.toDouble(),
                 isPlayer: isPlayer,
                 luxuryCount: (data['luxuryCount'] as num?)?.toInt() ?? 0,
                 rank: 0,
@@ -437,6 +445,10 @@ class FirebaseTradingRepository implements TradingRepository {
               'strategy': player.strategy,
               'netWorth': player.netWorth,
               'roiPercent': player.roiPercent,
+              if (player.weeklyRoiPercent != null)
+                'weeklyRoiPercent': player.weeklyRoiPercent,
+              if (player.monthlyRoiPercent != null)
+                'monthlyRoiPercent': player.monthlyRoiPercent,
               'luxuryCount': player.luxuryCount,
               'verified': true,
               'updatedAt': FieldValue.serverTimestamp(),
@@ -588,6 +600,85 @@ class FirebaseTradingRepository implements TradingRepository {
             }, SetOptions(merge: true));
       } catch (_) {}
     }
+  }
+
+  // --- CLOUD AUTOMATION & SAVINGS PLANS ---
+  @override
+  Future<({int unlockedSlotsCount, List<AutomationOrder> orders})?>
+  getCloudAutomationState() async {
+    if (!_isFirebaseConfigured || _currentUserId == 'local_player') return null;
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('portfolios')
+          .doc(_currentUserId)
+          .get();
+      if (!doc.exists) return null;
+      final data = doc.data();
+      if (data == null || !data.containsKey('automation')) return null;
+      final auto = data['automation'] as Map<String, dynamic>;
+      final slots = (auto['unlockedSlotsCount'] as num?)?.toInt() ?? 1;
+      final rawOrders = (auto['orders'] as List<dynamic>?) ?? const [];
+      final orders = rawOrders
+          .whereType<Map<String, dynamic>>()
+          .map(AutomationOrder.fromJson)
+          .toList();
+      return (unlockedSlotsCount: slots, orders: orders);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  @override
+  Future<void> saveCloudAutomationState({
+    required int unlockedSlotsCount,
+    required List<AutomationOrder> orders,
+  }) async {
+    if (!_isFirebaseConfigured || _currentUserId == 'local_player') return;
+    try {
+      await FirebaseFirestore.instance
+          .collection('portfolios')
+          .doc(_currentUserId)
+          .set({
+            'automation': {
+              'unlockedSlotsCount': unlockedSlotsCount,
+              'orders': orders.map((o) => o.toJson()).toList(),
+            },
+          }, SetOptions(merge: true));
+    } catch (_) {}
+  }
+
+  @override
+  Future<List<SavingsPlan>?> getCloudSavingsPlans() async {
+    if (!_isFirebaseConfigured || _currentUserId == 'local_player') return null;
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('portfolios')
+          .doc(_currentUserId)
+          .get();
+      if (!doc.exists) return null;
+      final data = doc.data();
+      if (data == null || !data.containsKey('savingsPlans')) return null;
+      final list = (data['savingsPlans'] as List<dynamic>?) ?? const [];
+      return list
+          .whereType<Map<String, dynamic>>()
+          .map(SavingsPlan.fromJson)
+          .toList();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  @override
+  Future<void> saveCloudSavingsPlans(List<SavingsPlan> plans) async {
+    if (!_isFirebaseConfigured || _currentUserId == 'local_player') return;
+    try {
+      await FirebaseFirestore.instance
+          .collection('portfolios')
+          .doc(_currentUserId)
+          .set({
+            'savingsPlans': plans.map((p) => p.toJson()).toList(),
+          }, SetOptions(merge: true));
+    } catch (_) {}
   }
 
   // --- RESET GAME ---

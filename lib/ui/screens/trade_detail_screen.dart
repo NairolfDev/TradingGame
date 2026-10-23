@@ -34,10 +34,15 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
   double? _cashFraction;
   double? _euroBudget;
   bool _submitting = false;
+  late final TextEditingController _stopLossController;
+  late final TextEditingController _takeProfitController;
+  bool _showProtectionOrders = false;
 
   @override
   void initState() {
     super.initState();
+    _stopLossController = TextEditingController();
+    _takeProfitController = TextEditingController();
     // Intelligenter Initialwert je nach Asset-Preis
     if (widget.asset.currentPrice > 1000) {
       _amount = 0.1;
@@ -49,6 +54,13 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
     _leverage = widget.asset.maxLeverage > 1
         ? 5.clamp(1, widget.asset.maxLeverage)
         : 1;
+  }
+
+  @override
+  void dispose() {
+    _stopLossController.dispose();
+    _takeProfitController.dispose();
+    super.dispose();
   }
 
   void _showSellDialog(
@@ -809,6 +821,90 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
                     }),
                   ),
 
+                  const SizedBox(height: 12),
+                  InkWell(
+                    borderRadius: BorderRadius.circular(8),
+                    onTap: () => setState(
+                      () => _showProtectionOrders = !_showProtectionOrders,
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 4,
+                        horizontal: 2,
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            _showProtectionOrders
+                                ? Icons.expand_less
+                                : Icons.expand_more,
+                            size: 18,
+                            color: AppColors.accent,
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              'Schutz-Orders (Stop-Loss / Take-Profit)',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  if (_showProtectionOrders) ...[
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _stopLossController,
+                            keyboardType:
+                                const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
+                            decoration: InputDecoration(
+                              labelText: 'Stop-Loss (€)',
+                              suffixText: '€',
+                              filled: true,
+                              fillColor: AppColors.surfaceElevated,
+                              isDense: true,
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 10,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextField(
+                            controller: _takeProfitController,
+                            keyboardType:
+                                const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
+                            decoration: InputDecoration(
+                              labelText: 'Take-Profit (€)',
+                              suffixText: '€',
+                              filled: true,
+                              fillColor: AppColors.surfaceElevated,
+                              isDense: true,
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 10,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+
                   const SizedBox(height: 16),
                   Divider(color: AppColors.cardBorder),
                   const SizedBox(height: 10),
@@ -1100,7 +1196,7 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
       return;
     }
 
-    AutomationOrderType selectedType = AutomationOrderType.buyLimit;
+AutomationOrderType selectedType = AutomationOrderType.buyLimit;
     double targetPrice = double.parse(
       (asset.currentPrice * 0.96).toStringAsFixed(
         asset.currentPrice > 500 ? 2 : 4,
@@ -1113,6 +1209,9 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
     );
     final orderAmountController = TextEditingController(
       text: orderAmount.toString(),
+    );
+    final trailingPercentController = TextEditingController(
+      text: '5.0',
     );
 
     showModalBottomSheet(
@@ -1153,52 +1252,108 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
                   ],
                 ),
                 const SizedBox(height: 12),
-                SegmentedButton<AutomationOrderType>(
-                  segments: const [
-                    ButtonSegment(
-                      value: AutomationOrderType.buyLimit,
-                      label: Text('Buy-At', style: TextStyle(fontSize: 12)),
-                    ),
-                    ButtonSegment(
-                      value: AutomationOrderType.takeProfit,
-                      label: Text(
-                        'Take-Profit',
-                        style: TextStyle(fontSize: 12),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: SegmentedButton<AutomationOrderType>(
+                    segments: const [
+                      ButtonSegment(
+                        value: AutomationOrderType.buyLimit,
+                        label: Text('Buy-At', style: TextStyle(fontSize: 12)),
                       ),
-                    ),
-                    ButtonSegment(
-                      value: AutomationOrderType.stopLoss,
-                      label: Text('Stop-Loss', style: TextStyle(fontSize: 12)),
-                    ),
-                  ],
-                  selected: {selectedType},
-                  onSelectionChanged: (val) {
-                    setModalState(() {
-                      selectedType = val.first;
-                      if (selectedType == AutomationOrderType.buyLimit) {
-                        targetPrice = double.parse(
-                          (asset.currentPrice * 0.95).toStringAsFixed(
-                            asset.currentPrice > 500 ? 2 : 4,
-                          ),
-                        );
-                      } else if (selectedType ==
-                          AutomationOrderType.takeProfit) {
-                        targetPrice = double.parse(
-                          (asset.currentPrice * 1.08).toStringAsFixed(
-                            asset.currentPrice > 500 ? 2 : 4,
-                          ),
-                        );
-                      } else {
-                        targetPrice = double.parse(
-                          (asset.currentPrice * 0.92).toStringAsFixed(
-                            asset.currentPrice > 500 ? 2 : 4,
-                          ),
-                        );
-                      }
-                      targetPriceController.text = targetPrice.toString();
-                    });
-                  },
+                      ButtonSegment(
+                        value: AutomationOrderType.takeProfit,
+                        label: Text(
+                          'Take-Profit',
+                          style: TextStyle(fontSize: 12),
+                        ),
+                      ),
+                      ButtonSegment(
+                        value: AutomationOrderType.stopLoss,
+                        label: Text('Stop-Loss', style: TextStyle(fontSize: 12)),
+                      ),
+                      ButtonSegment(
+                        value: AutomationOrderType.trailingStop,
+                        label: Text(
+                          'Trailing-Stop (%)',
+                          style: TextStyle(fontSize: 12),
+                        ),
+                      ),
+                    ],
+                    selected: {selectedType},
+                    onSelectionChanged: (val) {
+                      setModalState(() {
+                        selectedType = val.first;
+                        switch (selectedType) {
+                          case AutomationOrderType.buyLimit:
+                            targetPrice = double.parse(
+                              (asset.currentPrice * 0.95).toStringAsFixed(
+                                asset.currentPrice > 500 ? 2 : 4,
+                              ),
+                            );
+                            break;
+                          case AutomationOrderType.takeProfit:
+                            targetPrice = double.parse(
+                              (asset.currentPrice * 1.08).toStringAsFixed(
+                                asset.currentPrice > 500 ? 2 : 4,
+                              ),
+                            );
+                            break;
+                          case AutomationOrderType.stopLoss:
+                            targetPrice = double.parse(
+                              (asset.currentPrice * 0.92).toStringAsFixed(
+                                asset.currentPrice > 500 ? 2 : 4,
+                              ),
+                            );
+                            break;
+                          case AutomationOrderType.trailingStop:
+                            final pct = double.tryParse(
+                                  trailingPercentController.text.replaceAll(
+                                    ',',
+                                    '.',
+                                  ),
+                                ) ??
+                                5.0;
+                            targetPrice = double.parse(
+                              (asset.currentPrice * (1.0 - pct / 100.0))
+                                  .toStringAsFixed(
+                                asset.currentPrice > 500 ? 2 : 4,
+                              ),
+                            );
+                            break;
+                        }
+                        targetPriceController.text = targetPrice.toString();
+                      });
+                    },
+                  ),
                 ),
+                if (selectedType == AutomationOrderType.trailingStop) ...[
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: trailingPercentController,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    decoration: InputDecoration(
+                      labelText: 'Trailing-Abstand in % (z. B. 5.0)',
+                      suffixText: '%',
+                      helperText:
+                          'Abstand zum Höchstkurs für dynamischen Stop',
+                      filled: true,
+                      fillColor: AppColors.surfaceElevated,
+                    ),
+                    onChanged: (v) {
+                      final pct =
+                          double.tryParse(v.replaceAll(',', '.')) ?? 5.0;
+                      targetPrice = double.parse(
+                        (asset.currentPrice * (1.0 - pct / 100.0))
+                            .toStringAsFixed(
+                          asset.currentPrice > 500 ? 2 : 4,
+                        ),
+                      );
+                      targetPriceController.text = targetPrice.toString();
+                    },
+                  ),
+                ],
                 const SizedBox(height: 16),
                 TextField(
                   controller: targetPriceController,
@@ -1206,7 +1361,9 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
                     decimal: true,
                   ),
                   decoration: InputDecoration(
-                    labelText: 'Zielkurs / Auslösepreis (€)',
+                    labelText: selectedType == AutomationOrderType.trailingStop
+                        ? 'Initialer Stopkurs (€)'
+                        : 'Zielkurs / Auslösepreis (€)',
                     suffixText: '€',
                     helperText:
                         'Aktueller Marktpreis: ${CurrencyFormatter.formatPrice(asset.currentPrice)}',
@@ -1214,7 +1371,8 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
                     fillColor: AppColors.surfaceElevated,
                   ),
                   onChanged: (v) {
-                    targetPrice = double.tryParse(v) ?? targetPrice;
+                    targetPrice =
+                        double.tryParse(v.replaceAll(',', '.')) ?? targetPrice;
                   },
                 ),
                 const SizedBox(height: 12),
@@ -1229,7 +1387,8 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
                     fillColor: AppColors.surfaceElevated,
                   ),
                   onChanged: (v) {
-                    orderAmount = double.tryParse(v) ?? orderAmount;
+                    orderAmount =
+                        double.tryParse(v.replaceAll(',', '.')) ?? orderAmount;
                   },
                 ),
                 const SizedBox(height: 20),
@@ -1246,12 +1405,23 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
                     ),
                     onPressed: () async {
                       if (targetPrice <= 0 || orderAmount <= 0) return;
+                      final trailingPct = selectedType ==
+                              AutomationOrderType.trailingStop
+                          ? (double.tryParse(
+                                trailingPercentController.text.replaceAll(
+                                  ',',
+                                  '.',
+                                ),
+                              ) ??
+                              5.0)
+                          : null;
                       Navigator.pop(ctx);
                       await provider.placeAutomationOrder(
                         asset: asset,
                         orderType: selectedType,
                         targetPrice: targetPrice,
                         amount: orderAmount,
+                        trailingPercent: trailingPct,
                       );
                     },
                     child: const Text(
@@ -1504,6 +1674,12 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
                       cashFraction: cashFraction,
                       leverage: leverage,
                       isShort: isShort,
+                      stopLossPrice: double.tryParse(
+                        _stopLossController.text.replaceAll(',', '.'),
+                      ),
+                      takeProfitPrice: double.tryParse(
+                        _takeProfitController.text.replaceAll(',', '.'),
+                      ),
                     ),
                   );
                   if (!mounted) return;

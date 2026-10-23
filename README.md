@@ -1,12 +1,13 @@
 # 📈 Trading Game – Open-Source Multi-Asset Trading Simulator
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
+[![Version](https://img.shields.io/badge/Version-v1.18.0%2B26-orange.svg)](#)
 [![Flutter](https://img.shields.io/badge/Flutter-3.41.0-02569B?logo=flutter)](https://flutter.dev)
 [![Firebase](https://img.shields.io/badge/Firebase-Hosting%20%7C%20Firestore-FFCA28?logo=firebase)](https://tradinggame-live.web.app)
 [![Platforms](https://img.shields.io/badge/Platforms-Android%20%7C%20Windows%20%7C%20Linux%20%7C%20macOS%20%7C%20Web-brightgreen)](#)
 [![Release Pipeline](https://img.shields.io/badge/CI%2FCD-GitHub%20Actions-2088FF?logo=github-actions)](.github/workflows/ci_cd.yml)
 
-Ein realistisches, persistentes, kompetitives und plattformübergreifendes Finanz- & Börsenspiel entwickelt mit **Flutter**, **Firebase** und **Inno Setup**.
+Ein realistisches, persistentes, kompetitives und plattformübergreifendes Finanz- & Börsenspiel entwickelt mit **Flutter**, **Firebase** und **Inno Setup** (Version **v1.18.0+26**).
 
 Tritt an weltweiten Märkten an, meistere Hebelzertifikate bis 50x, manage Kredite und Bonitätsratings, überlebe drohende Insolvenzen und steige im ewigen **Endlos-Leaderboard** an die Spitze auf!
 
@@ -44,20 +45,31 @@ Wenn du dein eigenes Deployment aufsetzt, nutze **GitHub Secrets** (z. B. `FIREB
 
 ---
 
-## 🌟 Hauptfeatures
+## 🌟 Hauptfeatures (v1.18.0+26)
 
-### 1. 📊 Interaktive Pro Broker-Charts
+### 1. 📊 Interaktive Pro Broker-Charts, Technische Indikatoren & Orderbuch
 Wie in professionellen Trading- und Broker-Apps (TradingView, Bloomberg, Trade Republic):
 - **Zeitachsen-Umschaltung**: `1D` (Intraday), `1W` (1 Woche), `1M` (1 Monat), `1Y` (1 Jahr), `ALL` (Gesamtverlauf).
-- **Chart-Typen**:
-  - 🕯️ **Japanische Candlesticks (Kerzenchart)** mit realen Open, High, Low, Close (OHLC) Kursen und Dochten/Wicks.
-  - 📈 **Glow Line Chart** mit dynamischen Farbverläufen (Emerald-Grün bei Bullenmarkt, Cyber-Rot bei Bärenmarkt).
-- **Indikatoren**: Zu- und abschaltbarer gleitender Durchschnitt (**SMA 5 Trendlinie**).
-- **Live-Scrubber & Crosshair**: Berühre oder fahre mit der Maus über den Chart, um exakte historische Kurse und Zeitstempel abzulesen.
+- **Chart-Typen & Kerzen**:
+  - 🕯️ **Reale japanische Candlesticks (OHLC)**: Echte Open-, High-, Low- und Close-Kurse mit Dochten/Wicks für präzise historische Kursanalysen.
+  - 📈 **Glow Line Chart**: Dynamische Farbverläufe (Emerald-Grün bei Bullenmarkt, Cyber-Rot bei Bärenmarkt).
+- **Technische Indikatoren**:
+  - **EMA & SMA**: Exponential Moving Average und Simple Moving Average Trendlinien zur automatisierten Trenderkennung.
+  - **Bollinger Bands**: Dynamische Volatilitätsbänder (oberes, mittleres und unteres Band) zur Erkennung von Überkauft-/Überverkauft-Phasen.
+- **Binance Level-2 Live Order Book**:
+  - Reales Echtzeit-Orderbuch mit **Bid/Ask-Spreads** und visueller Markttiefe (Order Book Depth) für Kryptowährungsmärkte.
+- **Live-Scrubber & Crosshair**: Interaktives Abtasten mit Finger oder Maus für sekundengenaue historische Notierungen und Zeitstempel.
 
 ---
 
-### 2. 🌍 Gigantisches Multi-Asset-Universum
+### 2. 🎯 Direktes Stop-Loss/Take-Profit & Trailing-Stop Bots
+- **Direktes SL / TP beim Kauf**: Bereits bei der Ordererteilung im Kaufdialog können Stop-Loss- und Take-Profit-Marken direkt gesetzt werden – der Broker wickelt Verkäufe bei Limit-Erreichen vollautomatisch ab.
+- **🤖 Trailing-Stop Bots**: Dynamisch nachziehender Stop-Loss, der mit steigenden Kursen automatisch nach oben wandert und bei Marktumkehr Gewinne absichert.
+- **Limit- und Stop-Orders**: Präzise Einstiegs- und Ausstiegsregeln für diszipliniertes Risikomanagement.
+
+---
+
+### 3. 🌍 Gigantisches Multi-Asset-Universum
 - 🥇 **Edelmetalle & Industrielle Rohstoffe**:
   - **Gold** (`XAU/EUR`) – Krisenwährung Nummer 1.
   - **Silber** (`XAG/EUR`) – Hohe industrielle und monetäre Nachfrage.
@@ -81,20 +93,37 @@ Wie in professionellen Trading- und Broker-Apps (TradingView, Bloomberg, Trade R
 
 ---
 
-### 3. 🏦 Kredite, Bonitätsstufen (Schufa/Rating) & Echte Privatinsolvenz
-- **25.000 € Startkredit**: Verfügbar zu Beginn mit 60 Tagen Tilgungsfrist.
-- **Bonitätssystem (Rating AAA bis D)**: Dein Zinssatz passt sich dynamisch deiner Trading-Performance an.
-- **Anti-Spam Cooldown**: Nach jeder Kreditaufnahme greift eine **24-stündige Abklingzeit**, bevor eine weitere Kreditanfrage gestellt werden kann.
-- 🚨 **Privatinsolvenz-Sperre (120 Stunden / 5 echte Tage)**:
-  - Fällt dein Portfolio ins Minus (`NetWorth < -10.000 €` und `Cash <= 0`), musst du den Insolvenzantrag stellen.
-  - Das Insolvenzgericht verhängt eine **strikte 5-tägige Kreditsperre (Echtzeit-Kalendertage)**.
-  - Ein Live-Countdown zeigt die verbleibende Sperrzeit sekundengenau an.
-  - Erst nach Ablauf der 120 Stunden erhältst du Zugang zu einem Sanierungskredit (Rating D mit Risikoaufschlag).
+### 4. 📰 Datengetriebene Marktnachrichten (Market News)
+- **Echtzeit-Nachrichtenfeed**: Datenbasierte Wirtschaftsnachrichten, Zinsentscheide und geopolitische News.
+- **Marktreaktionen**: Nachrichtenereignisse beeinflussen Marktstimmung und Volatilität für ein dynamisches, lebendiges Marktumfeld.
 
 ---
 
-### 4. 💻 Windows Installer & Auto-Update
-- **Inno Setup Installer Script**: In `windows/installer.iss` definiert.
+### 5. 🇦🇹 Optionale 27,5 % KESt-Steuersimulation & Verlustverrechnung
+- **Österreichische Kapitalertragsteuer (KESt)**: Auf Wunsch zuschaltbare 27,5 % Versteuerung auf realisierte Gewinne und Zinserträge.
+- **Automatischer Verlustverrechnungstopf (Loss Carryforward)**: Realisierte Kursverluste werden fortlaufend gutgeschrieben und mit künftigen Gewinnen steuermindernd verrechnet.
+
+---
+
+### 6. 🏦 Sofortige Planinsolvenz & Progressives Bonitätsrating-System
+- **25.000 € Startkredit**: Verfügbar zu Beginn mit 60 Tagen Tilgungsfrist.
+- **Progressives Bonitätsrating (Rating AAA bis D)**: Dein Zinssatz und Kreditrahmen passen sich dynamisch deiner Trading-Performance, deinem Eigenkapital und deinem Risiko an.
+- **Anti-Spam Cooldown**: Nach jeder Kreditaufnahme greift eine **24-stündige Abklingzeit**, bevor eine weitere Kreditanfrage gestellt werden kann.
+- 🚨 **Sofortige Planinsolvenz & Kreditsperre (120 Stunden / 5 echte Tage)**:
+  - Fällt dein Portfolio ins Minus (`NetWorth < -10.000 €` und `Cash <= 0`), tritt sofort die gerichtliche Planinsolvenz ein.
+  - Das Insolvenzgericht verhängt eine **strikte 5-tägige Kreditsperre (Echtzeit-Kalendertage)** mit sekundengenauem Live-Countdown.
+  - Erst nach Ablauf der 120 Stunden erhältst du Zugang zu einem Sanierungs-Notkredit (Rating D mit Risikoaufschlag).
+
+---
+
+### 7. 🏆 Saisonale Bestenlisten (Leaderboard) & Copy-Trading
+- **Saisonale Bestenlisten**: Ranglisten filtern nach **All-Time**, **Weekly (Wöchentlich)** und **Monthly (Monatlich)** mit Live-Synchronisation.
+- **Öffentliche Portfolios & Copy-Trading**: Verfolge die Portfolios und Erfolgsstrategien führender Trader weltweit.
+
+---
+
+### 8. 💻 Windows Installer & Auto-Update
+- **Inno Setup Installer Script**: In `windows/installer.iss` definiert (Version **1.18.0**).
 - Erstellt eine offizielle `TradingGame-Setup.exe`:
   - Startmenü- und Desktop-Icons.
   - Clean Uninstaller in den Windows-Einstellungen.
@@ -103,11 +132,9 @@ Wie in professionellen Trading- und Broker-Apps (TradingView, Bloomberg, Trade R
 
 ---
 
-### 5. ☁️ Kein eigenes Backend (Firebase Free Tier)
-Es gibt keine Cloud Functions. Die App spricht direkt mit Firestore (abgesichert über `firestore.rules`)
-und holt Kurse direkt bei Binance/CoinGecko (Krypto) und Yahoo Finance (Aktien/ETFs; nur Android/Desktop,
-der Browser blockiert Yahoo per CORS und nutzt dort simulierte Kurse). Kursalarme prüft die App selbst,
-solange sie läuft.
+### 9. 🔒 Version-Gating & Backend-Sicherheit (Build 26+)
+- **Hard Version-Floor**: Clients müssen mindestens Build `26` aufweisen. Firestore Security Rules erzwingen serverseitig Schema-Validierung und schließen veraltete Builds vom Schreibzugriff auf das Leaderboard und die Portfolios aus.
+- **Schlankes Serverless-Backend**: Direkte Kommunikation mit Firestore, gesichert durch strenge Regeln (`firestore.rules`). Kursfeeds über Binance/CoinGecko und Yahoo Finance.
 
 ---
 

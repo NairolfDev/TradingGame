@@ -67,6 +67,83 @@ jobs:
           channelId: live
           projectId: tradinggame-austria-prod
 
+      - name: Update Version Gate & Deploy Firestore Rules
+        if: github.event_name != 'pull_request'
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          if [ -z "$FIREBASE_SERVICE_ACCOUNT" ]; then
+            echo "FIREBASE_SERVICE_ACCOUNT secret not found, skipping."
+            exit 0
+          fi
+          echo "$FIREBASE_SERVICE_ACCOUNT" > /tmp/sa.json
+          export GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa.json
+
+          node -e '
+          const crypto = require("crypto");
+          const fs = require("fs");
+          async function run() {
+            const sa = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+            const pubspec = fs.readFileSync("pubspec.yaml", "utf8");
+            const match = pubspec.match(/^version:\s*([0-9\.]+)\+(\d+)/m);
+            const version = match ? match[1] : "1.18.0";
+            const build = match ? match[2] : "26";
+            console.log(`Updating config/app -> version: ${version}, minBuild: ${build}`);
+
+            const now = Math.floor(Date.now() / 1000);
+            const header = Buffer.from(JSON.stringify({ alg: "RS256", typ: "JWT" })).toString("base64url");
+            const payload = Buffer.from(JSON.stringify({
+              iss: sa.client_email,
+              scope: "https://www.googleapis.com/auth/datastore",
+              aud: "https://oauth2.googleapis.com/token",
+              exp: now + 3600,
+              iat: now
+            })).toString("base64url");
+
+            const signer = crypto.createSign("RSA-SHA256");
+            signer.update(`${header}.${payload}`);
+            const assertion = `${header}.${payload}.${signer.sign(sa.private_key, "base64url")}`;
+
+            const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
+              method: "POST",
+              headers: { "Content-Type": "application/x-www-form-urlencoded" },
+              body: new URLSearchParams({
+                grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+                assertion
+              })
+            });
+            if (!tokenRes.ok) {
+              console.error("Token error:", tokenRes.status, await tokenRes.text());
+              process.exit(1);
+            }
+            const { access_token } = await tokenRes.json();
+
+            const url = "https://firestore.googleapis.com/v1/projects/tradinggame-austria-prod/databases/(default)/documents/config/app?updateMask.fieldPaths=minBuild&updateMask.fieldPaths=version&updateMask.fieldPaths=notes";
+            const updateRes = await fetch(url, {
+              method: "PATCH",
+              headers: {
+                "Authorization": `Bearer ${access_token}`,
+                "Content-Type": "application/json"
+              },
+              body: JSON.stringify({
+                fields: {
+                  minBuild: { integerValue: build },
+                  version: { stringValue: version },
+                  notes: { stringValue: `Release v${version} (Build ${build}) – Pflicht-Update` }
+                }
+              })
+            });
+            if (!updateRes.ok) {
+              console.error("Firestore update error:", updateRes.status, await updateRes.text());
+              process.exit(1);
+            }
+            console.log("Firestore config/app updated successfully.");
+          }
+          run();
+          '
+
+          npx --yes firebase-tools deploy --only firestore:rules --project tradinggame-austria-prod
+
       - name: Upload Web Artifact
         uses: actions/upload-artifact@v4
         with:

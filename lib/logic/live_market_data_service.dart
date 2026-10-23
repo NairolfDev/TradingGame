@@ -29,6 +29,48 @@ class LiveQuoteResult {
   });
 }
 
+class OhlcPoint {
+  final DateTime time;
+  final double open;
+  final double high;
+  final double low;
+  final double close;
+  final double? volume;
+
+  const OhlcPoint({
+    required this.time,
+    required this.open,
+    required this.high,
+    required this.low,
+    required this.close,
+    this.volume,
+  });
+}
+
+class OrderBookEntry {
+  final double price;
+  final double amount;
+  const OrderBookEntry({required this.price, required this.amount});
+}
+
+class OrderBookData {
+  final List<OrderBookEntry> bids;
+  final List<OrderBookEntry> asks;
+  final double spread;
+  final double spreadPercent;
+  final String source;
+  final bool isLiveLevel2;
+
+  const OrderBookData({
+    required this.bids,
+    required this.asks,
+    required this.spread,
+    required this.spreadPercent,
+    required this.source,
+    required this.isLiveLevel2,
+  });
+}
+
 class LiveMarketDataService {
   static final LiveMarketDataService _instance =
       LiveMarketDataService._internal();
@@ -38,6 +80,7 @@ class LiveMarketDataService {
   final Map<String, LiveQuoteResult> _quoteCache = {};
   final Map<String, DateTime> _fetchedAt = {};
   final Map<String, Map<String, List<double>>> _historicalSeriesCache = {};
+  final Map<String, Map<String, List<OhlcPoint>>> _ohlcCache = {};
 
   DateTime? _lastSyncTime;
   DateTime? get lastSyncTime => _lastSyncTime;
@@ -78,6 +121,63 @@ class LiveMarketDataService {
       debugPrint(
         'LiveMarketDataService: Fehler bei Quote für ${asset.symbol}: $e',
       );
+    }
+    return null;
+  }
+
+  /// Holt Orderbuch-Daten (Level-2) für Krypto via Binance, oder null wenn nicht verfügbar
+  Future<OrderBookData?> fetchOrderBook(Asset asset) async {
+    if (!asset.currentPrice.isFinite || asset.currentPrice <= 0) return null;
+    if (asset.type == AssetType.crypto) {
+      try {
+        final binanceSymbol = '${asset.symbol.toUpperCase()}EUR';
+        final uri = Uri.parse(
+          'https://api.binance.com/api/v3/depth?symbol=$binanceSymbol&limit=5',
+        );
+        final resp = await http.get(uri).timeout(const Duration(seconds: 3));
+        if (resp.statusCode == 200) {
+          final data = jsonDecode(resp.body) as Map<String, dynamic>;
+          final rawBids = data['bids'] as List?;
+          final rawAsks = data['asks'] as List?;
+          if (rawBids != null &&
+              rawAsks != null &&
+              rawBids.isNotEmpty &&
+              rawAsks.isNotEmpty) {
+            final bids = <OrderBookEntry>[];
+            for (final b in rawBids) {
+              if (b is List && b.length >= 2) {
+                final p = double.tryParse(b[0].toString());
+                final a = double.tryParse(b[1].toString());
+                if (p != null && a != null && p > 0 && a > 0) {
+                  bids.add(OrderBookEntry(price: p, amount: a));
+                }
+              }
+            }
+            final asks = <OrderBookEntry>[];
+            for (final a in rawAsks) {
+              if (a is List && a.length >= 2) {
+                final p = double.tryParse(a[0].toString());
+                final amt = double.tryParse(a[1].toString());
+                if (p != null && amt != null && p > 0 && amt > 0) {
+                  asks.add(OrderBookEntry(price: p, amount: amt));
+                }
+              }
+            }
+            if (bids.isNotEmpty && asks.isNotEmpty) {
+              final spread = asks.first.price - bids.first.price;
+              final spreadPercent = (spread / asset.currentPrice) * 100;
+              return OrderBookData(
+                bids: bids,
+                asks: asks,
+                spread: spread,
+                spreadPercent: spreadPercent,
+                source: 'Binance Level-2',
+                isLiveLevel2: true,
+              );
+            }
+          }
+        }
+      } catch (_) {}
     }
     return null;
   }
@@ -194,6 +294,40 @@ class LiveMarketDataService {
     } catch (e) {
       debugPrint(
         'LiveMarketDataService: Fehler bei Historie für ${asset.symbol} ($timeframe): $e',
+      );
+    }
+
+    return null;
+  }
+
+  /// Holt historische OHLC-Daten für die verschiedenen Timeframes
+  Future<List<OhlcPoint>?> fetchHistoricalOhlc(
+    Asset asset,
+    String timeframe,
+  ) async {
+    final symbol = euroYahooSymbolFor(asset);
+    if (symbol == null) return null;
+    final assetKey = asset.symbol;
+    if (_ohlcCache.containsKey(assetKey) &&
+        _ohlcCache[assetKey]!.containsKey(timeframe)) {
+      return _ohlcCache[assetKey]![timeframe];
+    }
+
+    try {
+      if (symbol.isNotEmpty) {
+        final points = await _fetchYahooOhlc(symbol, timeframe, assetKey);
+        if (points != null && points.isNotEmpty) {
+          _historyTimes['$assetKey|$timeframe'] = [
+            for (final p in points) p.time,
+          ];
+          _noHistory.remove(assetKey);
+          _ohlcCache.putIfAbsent(assetKey, () => {})[timeframe] = points;
+          return points;
+        }
+      }
+    } catch (e) {
+      debugPrint(
+        'LiveMarketDataService: Fehler bei OHLC für ${asset.symbol} ($timeframe): $e',
       );
     }
 
@@ -464,6 +598,141 @@ class LiveMarketDataService {
         if (stamps[i] is num && _positive(closes[i]))
           (t: (stamps[i] as num).toInt(), v: (closes[i] as num).toDouble()),
     ];
+  }
+
+  Future<List<OhlcPoint>?> _fetchYahooOhlc(
+    String yahooSymbol,
+    String timeframe,
+    String assetKey,
+  ) async {
+    final (range, interval) = switch (timeframe) {
+      '1D' => ('1d', '5m'),
+      '1W' => ('5d', '15m'),
+      '1M' => ('1mo', '1d'),
+      '1Y' => ('1y', '1wk'),
+      '3Y' => ('3y', '1wk'),
+      _ => ('max', '1mo'),
+    };
+    try {
+      final chart = await _chart(
+        yahooSymbol,
+        interval,
+        range,
+        const Duration(seconds: 10),
+      );
+      if (chart == null) return null;
+      final currency = (chart['meta'] as Map?)?['currency'];
+      final rawPoints = _parseOhlc(chart);
+      if (rawPoints.isEmpty) return null;
+
+      if (currency == 'EUR') {
+        return [
+          for (final p in rawPoints)
+            OhlcPoint(
+              time: DateTime.fromMillisecondsSinceEpoch(p.t * 1000),
+              open: p.o,
+              high: p.h,
+              low: p.l,
+              close: p.c,
+              volume: p.v,
+            ),
+        ];
+      }
+
+      final fxSymbol = _fxSymbols[currency];
+      if (fxSymbol == null) {
+        _noHistory.add(assetKey);
+        return null;
+      }
+      final fxChart = await _chart(
+        fxSymbol,
+        interval,
+        range,
+        const Duration(seconds: 10),
+      );
+      final fx = fxChart == null ? <({int t, double v})>[] : _closes(fxChart);
+      if (fx.isEmpty) return null;
+      final converted = <OhlcPoint>[];
+      var j = -1;
+      final scale = _fxScale(currency as String?);
+      for (final p in rawPoints) {
+        while (j + 1 < fx.length && fx[j + 1].t <= p.t) {
+          j++;
+        }
+        final raw = j >= 0
+            ? fx[j].v
+            : (fx.first.t - p.t < 4 * 86400 ? fx.first.v : null);
+        if (raw != null) {
+          final rate = raw * scale;
+          converted.add(
+            OhlcPoint(
+              time: DateTime.fromMillisecondsSinceEpoch(p.t * 1000),
+              open: p.o / rate,
+              high: p.h / rate,
+              low: p.l / rate,
+              close: p.c / rate,
+              volume: p.v,
+            ),
+          );
+        }
+      }
+      return converted.length < 2 ? null : converted;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  List<({int t, double o, double h, double l, double c, double? v})> _parseOhlc(
+    Map<String, dynamic> chart,
+  ) {
+    final stamps = chart['timestamp'] as List?;
+    final quote =
+        (((chart['indicators'] as Map?)?['quote'] as List?)?.firstOrNull
+            as Map?);
+    if (stamps == null || quote == null) return const [];
+
+    final opens = quote['open'] as List?;
+    final highs = quote['high'] as List?;
+    final lows = quote['low'] as List?;
+    final closes = quote['close'] as List?;
+    final volumes = quote['volume'] as List?;
+
+    if (closes == null) return const [];
+    final n = stamps.length < closes.length ? stamps.length : closes.length;
+    final result =
+        <({int t, double o, double h, double l, double c, double? v})>[];
+
+    for (var i = 0; i < n; i++) {
+      final s = stamps[i];
+      final cl = closes[i];
+      if (s is! num || !_positive(cl)) continue;
+
+      final closeVal = (cl as num).toDouble();
+      final op = (opens != null && i < opens.length) ? opens[i] : null;
+      final hi = (highs != null && i < highs.length) ? highs[i] : null;
+      final lo = (lows != null && i < lows.length) ? lows[i] : null;
+      final vol = (volumes != null && i < volumes.length) ? volumes[i] : null;
+
+      var o = _positive(op) ? (op as num).toDouble() : closeVal;
+      var h = _positive(hi) ? (hi as num).toDouble() : closeVal;
+      var l = _positive(lo) ? (lo as num).toDouble() : closeVal;
+      final v = (vol is num && vol.isFinite && vol >= 0) ? vol.toDouble() : null;
+
+      if (h < o) h = o;
+      if (h < closeVal) h = closeVal;
+      if (l > o) l = o;
+      if (l > closeVal) l = closeVal;
+
+      result.add((
+        t: s.toInt(),
+        o: o,
+        h: h,
+        l: l,
+        c: closeVal,
+        v: v,
+      ));
+    }
+    return result;
   }
 
   /// Realtime Live-Quote für Krypto (Binance 24hr API, Fallback auf CoinGecko)

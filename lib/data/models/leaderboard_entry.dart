@@ -8,6 +8,8 @@ class LeaderboardEntry {
   final String strategy;
   double netWorth;
   double roiPercent;
+  double? weeklyRoiPercent;
+  double? monthlyRoiPercent;
   final bool isPlayer;
   int rank;
   int luxuryCount;
@@ -22,6 +24,8 @@ class LeaderboardEntry {
     required this.strategy,
     required this.netWorth,
     required this.roiPercent,
+    this.weeklyRoiPercent,
+    this.monthlyRoiPercent,
     this.isPlayer = false,
     this.rank = 0,
     this.luxuryCount = 0,
@@ -37,6 +41,8 @@ class LeaderboardEntry {
         'strategy': strategy,
         'netWorth': netWorth,
         'roiPercent': roiPercent,
+        if (weeklyRoiPercent != null) 'weeklyRoiPercent': weeklyRoiPercent,
+        if (monthlyRoiPercent != null) 'monthlyRoiPercent': monthlyRoiPercent,
         'isPlayer': isPlayer,
         'rank': rank,
         'luxuryCount': luxuryCount,
@@ -53,6 +59,8 @@ class LeaderboardEntry {
         strategy: json['strategy'] as String,
         netWorth: (json['netWorth'] as num).toDouble(),
         roiPercent: (json['roiPercent'] as num).toDouble(),
+        weeklyRoiPercent: (json['weeklyRoiPercent'] as num?)?.toDouble(),
+        monthlyRoiPercent: (json['monthlyRoiPercent'] as num?)?.toDouble(),
         isPlayer: json['isPlayer'] as bool? ?? false,
         rank: (json['rank'] as num?)?.toInt() ?? 0,
         luxuryCount: (json['luxuryCount'] as num?)?.toInt() ?? 0,

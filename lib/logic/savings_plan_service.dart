@@ -4,7 +4,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../data/models/savings_plan.dart';
 
 class SavingsPlanService {
-  static const String _keySavings = 'tg_savings_plans_v1';
+  static const String _legacyKeySavings = 'tg_savings_plans_v1';
+
+  String _profileId = 'local';
+  String get _keySavings =>
+      (_profileId == 'local' || _profileId.isEmpty)
+          ? _legacyKeySavings
+          : '${_legacyKeySavings}_$_profileId';
 
   final List<SavingsPlan> _plans = [];
 
@@ -12,7 +18,8 @@ class SavingsPlanService {
   List<SavingsPlan> get activePlans =>
       List.unmodifiable(_plans.where((p) => p.isActive));
 
-  Future<void> initialize() async {
+  Future<void> initialize({String profileId = 'local'}) async {
+    _profileId = profileId.trim().isEmpty ? 'local' : profileId;
     _plans.clear();
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_keySavings);
@@ -26,6 +33,19 @@ class SavingsPlanService {
         debugPrint('Fehler beim Laden der Sparpläne: $e');
       }
     }
+  }
+
+  Future<void> applyCloudPlans(List<SavingsPlan> cloudPlans) async {
+    _plans
+      ..clear()
+      ..addAll(cloudPlans);
+    await _save();
+  }
+
+  Future<void> resetForProfile() async {
+    _plans.clear();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_keySavings);
   }
 
   Future<void> _save() async {

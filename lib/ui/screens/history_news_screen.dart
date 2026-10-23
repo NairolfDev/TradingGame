@@ -6,6 +6,7 @@ import '../../core/utils/currency_formatter.dart';
 import '../../data/models/transaction.dart';
 import '../../logic/portfolio_provider.dart';
 import '../widgets/empty_state.dart';
+import 'trade_detail_screen.dart';
 
 class HistoryNewsScreen extends StatelessWidget {
   /// Takes people to the markets from the empty order history.
@@ -26,7 +27,7 @@ class HistoryNewsScreen extends StatelessWidget {
             indicatorColor: AppColors.primary,
             labelColor: AppColors.primary,
             unselectedLabelColor: AppColors.textSecondary,
-            tabs: [
+            tabs: const [
               Tab(icon: Icon(Icons.newspaper), text: 'Marktnachrichten'),
               Tab(icon: Icon(Icons.receipt_long), text: 'Orderbuch-Historie'),
             ],
@@ -35,7 +36,7 @@ class HistoryNewsScreen extends StatelessWidget {
         body: TabBarView(
           children: [
             // Tab 1: Live News
-            _buildNewsTab(provider),
+            _buildNewsTab(context, provider),
             // Tab 2: Transaction History
             _buildHistoryTab(provider),
           ],
@@ -44,88 +45,215 @@ class HistoryNewsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildNewsTab(PortfolioProvider provider) {
+  Widget _buildNewsTab(BuildContext context, PortfolioProvider provider) {
     final newsList = provider.newsEvents;
-
-    if (newsList.isEmpty) {
-      return const EmptyState(
-        icon: Icons.newspaper,
-        title: 'Noch keine Eilmeldungen',
-        message:
-            'Neue Meldungen erscheinen hier, sobald eine Nachrichtenquelle verfügbar ist.',
-      );
-    }
-
     final dateFormat = DateFormat('HH:mm:ss');
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: newsList.length,
-      itemBuilder: (context, index) {
-        final news = newsList[index];
-        final isBull = news.isBullish;
-
-        return Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: isBull
-                  ? AppColors.profit.withValues(alpha: 0.3)
-                  : AppColors.loss.withValues(alpha: 0.3),
-            ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 3,
-                    ),
-                    decoration: BoxDecoration(
-                      color: (isBull ? AppColors.profit : AppColors.loss)
-                          .withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      isBull ? 'BULLISH ↗' : 'BEARISH ↘',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: isBull ? AppColors.profit : AppColors.loss,
-                      ),
-                    ),
-                  ),
+                  Icon(Icons.bolt, size: 18, color: AppColors.accent),
+                  const SizedBox(width: 6),
                   Text(
-                    dateFormat.format(news.timestamp),
-                    style: TextStyle(fontSize: 12, color: AppColors.textMuted),
+                    'Live-Marktbewegung & Berichte',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                    ),
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
-              Text(
-                news.headline,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
+              TextButton.icon(
+                onPressed: () => provider.fetchLiveMarketQuotes(),
+                icon: const Icon(Icons.refresh, size: 16),
+                label: const Text('Aktualisieren'),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.primary,
+                  visualDensity: VisualDensity.compact,
                 ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                news.description,
-                style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
               ),
             ],
           ),
-        );
-      },
+        ),
+        Expanded(
+          child: newsList.isEmpty
+              ? const EmptyState(
+                  icon: Icons.newspaper,
+                  title: 'Noch keine Eilmeldungen',
+                  message:
+                      'Neue Meldungen erscheinen hier, sobald eine Nachrichtenquelle verfügbar ist.',
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                  itemCount: newsList.length,
+                  itemBuilder: (context, index) {
+                    final news = newsList[index];
+                    final isBull = news.isBullish;
+                    final matchingAsset = news.affectedSymbol != null
+                        ? provider.assets
+                            .where((a) => a.symbol == news.affectedSymbol)
+                            .firstOrNull
+                        : null;
+
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: isBull
+                              ? AppColors.profit.withValues(alpha: 0.3)
+                              : AppColors.loss.withValues(alpha: 0.3),
+                        ),
+                      ),
+                      child: Material(
+                        color: Colors.transparent,
+                        borderRadius: BorderRadius.circular(16),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(16),
+                          onTap: matchingAsset != null
+                              ? () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => TradeDetailScreen(
+                                        asset: matchingAsset,
+                                      ),
+                                    ),
+                                  );
+                                }
+                              : null,
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Expanded(
+                                      child: Wrap(
+                                        spacing: 6,
+                                        runSpacing: 4,
+                                        crossAxisAlignment:
+                                            WrapCrossAlignment.center,
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                              vertical: 3,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: (isBull
+                                                      ? AppColors.profit
+                                                      : AppColors.loss)
+                                                  .withValues(alpha: 0.15),
+                                              borderRadius:
+                                                  BorderRadius.circular(6),
+                                            ),
+                                            child: Text(
+                                              isBull
+                                                  ? 'BULLISH ↗'
+                                                  : 'BEARISH ↘',
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.bold,
+                                                color: isBull
+                                                    ? AppColors.profit
+                                                    : AppColors.loss,
+                                              ),
+                                            ),
+                                          ),
+                                          if (news.affectedSymbol != null)
+                                            Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                horizontal: 8,
+                                                vertical: 3,
+                                              ),
+                                              decoration: BoxDecoration(
+                                                color: AppColors.primary
+                                                    .withValues(alpha: 0.15),
+                                                borderRadius:
+                                                    BorderRadius.circular(6),
+                                                border: Border.all(
+                                                  color: AppColors.primary
+                                                      .withValues(alpha: 0.3),
+                                                ),
+                                              ),
+                                              child: Text(
+                                                '${news.affectedSymbol} • ${news.category}',
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: AppColors.primary,
+                                                ),
+                                              ),
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      dateFormat.format(news.timestamp),
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: AppColors.textMuted,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  news.headline,
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.textPrimary,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  news.description,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: AppColors.textSecondary,
+                                  ),
+                                ),
+                                if (matchingAsset != null) ...[
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    children: [
+                                      Text(
+                                        'Zum Instrument ${matchingAsset.symbol} →',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                          color: AppColors.primary,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+        ),
+      ],
     );
   }
 

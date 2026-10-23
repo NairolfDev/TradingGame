@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 import '../widgets/appearance_picker.dart';
 import '../../core/constants/app_colors.dart';
@@ -9,9 +10,14 @@ import '../../logic/portfolio_provider.dart';
 import '../../logic/auth_provider.dart';
 import 'auth_screen.dart';
 
-class SettingsScreen extends StatelessWidget {
+class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
 
+  @override
+  State<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<PortfolioProvider>();
@@ -183,6 +189,104 @@ class SettingsScreen extends StatelessWidget {
               onChanged: provider.isOnLeaderboard
                   ? (v) => provider.setPortfolioPublic(v)
                   : null,
+            ),
+          ),
+
+          const SizedBox(height: 24),
+
+          // 2c. STEUERSIMULATION & PORTFOLIO-ANALYTIK
+          _buildSectionHeader('⚖️ STEUERSIMULATION & PORTFOLIO-ANALYTIK'),
+          const SizedBox(height: 10),
+          _buildCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  activeTrackColor: AppColors.primary,
+                  title: Text(
+                    'Realistische Kapitalertragsteuer (27,5 % KESt)',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  subtitle: Text(
+                    'Rechnet automatisch 27,5 % KESt auf realisierte Gewinne ab und führt einen realistischen Verlustverrechnungstopf zum Ausgleich zukünftiger Gewinne.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  value: provider.isTaxModeEnabled,
+                  onChanged: (v) => provider.setTaxModeEnabled(v),
+                ),
+                Divider(color: AppColors.cardBorder, height: 20),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceElevated,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.cardBorder),
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildMetricItem(
+                              'Verlusttopf',
+                              CurrencyFormatter.format(
+                                provider.taxLossCarryforward,
+                              ),
+                              AppColors.loss,
+                            ),
+                          ),
+                          Container(
+                            width: 1,
+                            height: 36,
+                            color: AppColors.cardBorder,
+                          ),
+                          Expanded(
+                            child: _buildMetricItem(
+                              'Gezahlte KESt',
+                              CurrencyFormatter.format(provider.totalTaxPaid),
+                              AppColors.warning,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Divider(color: AppColors.cardBorder, height: 16),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildMetricItem(
+                              'Trefferquote (Win-Rate)',
+                              '${provider.winRatePercent.toStringAsFixed(1)} %',
+                              provider.winRatePercent >= 50
+                                  ? AppColors.profit
+                                  : AppColors.loss,
+                            ),
+                          ),
+                          Container(
+                            width: 1,
+                            height: 36,
+                            color: AppColors.cardBorder,
+                          ),
+                          Expanded(
+                            child: _buildMetricItem(
+                              'Max. Drawdown',
+                              '${provider.maxDrawdownPercent.toStringAsFixed(1)} %',
+                              AppColors.loss,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
 
@@ -397,13 +501,21 @@ class SettingsScreen extends StatelessWidget {
                         color: AppColors.textSecondary,
                       ),
                     ),
-                    Text(
-                      'v1.5.0 (Build 7)',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.textPrimary,
-                      ),
+                    FutureBuilder<PackageInfo>(
+                      future: PackageInfo.fromPlatform(),
+                      builder: (context, snap) {
+                        final versionText = (snap.hasData && snap.data != null)
+                            ? 'v${snap.data!.version} (Build ${snap.data!.buildNumber})'
+                            : 'v1.18.0 (Build 26)';
+                        return Text(
+                          versionText,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textPrimary,
+                          ),
+                        );
+                      },
                     ),
                   ],
                 ),
@@ -446,6 +558,37 @@ class SettingsScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 40),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMetricItem(String label, String value, Color valueColor) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              color: AppColors.textMuted,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+              color: valueColor,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
         ],
       ),
     );
@@ -512,8 +655,13 @@ class SettingsScreen extends StatelessWidget {
               Switch(
                 value: plan.isActive,
                 activeTrackColor: AppColors.primary,
-                onChanged: (_) =>
-                    provider.savingsPlanService.togglePlan(plan.id),
+                onChanged: (_) async {
+                  await provider.savingsPlanService.togglePlan(plan.id);
+                  await provider.repository.saveCloudSavingsPlans(
+                    provider.savingsPlans,
+                  );
+                  if (mounted) setState(() {});
+                },
               ),
               IconButton(
                 icon: Icon(
@@ -521,8 +669,13 @@ class SettingsScreen extends StatelessWidget {
                   size: 18,
                   color: AppColors.loss,
                 ),
-                onPressed: () =>
-                    provider.savingsPlanService.deletePlan(plan.id),
+                onPressed: () async {
+                  await provider.savingsPlanService.deletePlan(plan.id);
+                  await provider.repository.saveCloudSavingsPlans(
+                    provider.savingsPlans,
+                  );
+                  if (mounted) setState(() {});
+                },
               ),
             ],
           ),
@@ -664,9 +817,13 @@ class SettingsScreen extends StatelessWidget {
                     amountEur: amount,
                     frequency: frequency,
                   );
+                  await provider.repository.saveCloudSavingsPlans(
+                    provider.savingsPlans,
+                  );
                   if (ctx.mounted) {
                     Navigator.pop(ctx);
                   }
+                  if (mounted) setState(() {});
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,

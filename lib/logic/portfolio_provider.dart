@@ -62,9 +62,13 @@ class PortfolioProvider extends ChangeNotifier {
 
   static const String _keySimplisticMode = 'tg_is_simplistic_mode';
   static const String _keyRealisticOrderDelay = 'tg_is_realistic_order_delay';
+  static const double capitalGainsTaxRate = 0.275; // 27.5% KESt
 
   bool _isSimplisticMode = false;
   bool _isRealisticOrderDelay = true;
+  bool _isTaxModeEnabled = false;
+  double _taxLossCarryforward = 0.0;
+  double _totalTaxPaid = 0.0;
 
   double _cash = 50000.0;
   List<Asset> _assets = [];
@@ -89,6 +93,7 @@ class PortfolioProvider extends ChangeNotifier {
       notifyListeners();
     }
   }
+
   bool _refreshingQuotes = false;
   final Map<String, DateTime> _quoteUpdatedAt = {};
   final Map<String, LiveQuoteResult> _quoteDetails = {};
@@ -109,6 +114,10 @@ class PortfolioProvider extends ChangeNotifier {
     _init();
   }
 
+  String get _profileKey => repository is LocalTradingRepository
+      ? (repository as LocalTradingRepository).userId
+      : (_activeUid == 'local_player' ? 'local' : _activeUid);
+
   // Getters
   double get cash => _cash;
   List<Asset> get assets => _assets;
@@ -125,6 +134,10 @@ class PortfolioProvider extends ChangeNotifier {
       _assets.where((a) => a.isWatchlisted).toList();
   bool get isSimplisticMode => _isSimplisticMode;
   bool get isRealisticOrderDelay => _isRealisticOrderDelay;
+  bool get isTaxModeEnabled => _isTaxModeEnabled;
+  double get taxLossCarryforward => _taxLossCarryforward;
+  double get totalTaxPaid => _totalTaxPaid;
+
   DateTime? quoteUpdatedAt(Asset asset) => _quoteUpdatedAt[asset.id];
   String quoteStatus(Asset asset) {
     final updated = quoteUpdatedAt(asset);
@@ -175,6 +188,57 @@ class PortfolioProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> setTaxModeEnabled(bool enabled) async {
+    _isTaxModeEnabled = enabled;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('tg_tax_mode_$_profileKey', enabled);
+    notifyListeners();
+  }
+
+  Future<void> _loadTaxState() async {
+    final prefs = await SharedPreferences.getInstance();
+    _isTaxModeEnabled = prefs.getBool('tg_tax_mode_$_profileKey') ?? false;
+    _taxLossCarryforward =
+        prefs.getDouble('tg_tax_loss_pot_$_profileKey') ?? 0.0;
+    _totalTaxPaid = prefs.getDouble('tg_tax_paid_$_profileKey') ?? 0.0;
+  }
+
+  Future<void> _saveTaxState() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('tg_tax_mode_$_profileKey', _isTaxModeEnabled);
+    await prefs.setDouble(
+      'tg_tax_loss_pot_$_profileKey',
+      _taxLossCarryforward,
+    );
+    await prefs.setDouble('tg_tax_paid_$_profileKey', _totalTaxPaid);
+  }
+
+  /// Applies 27.5% KESt with loss carryforward when `_isTaxModeEnabled` is true.
+  /// Returns the tax amount deducted (>= 0).
+  double _applyCapitalGainsTax(double realizedPnL) {
+    if (!_isTaxModeEnabled || !realizedPnL.isFinite) return 0.0;
+    if (realizedPnL < 0) {
+      _taxLossCarryforward += realizedPnL.abs();
+      unawaited(_saveTaxState());
+      return 0.0;
+    }
+    if (realizedPnL == 0) return 0.0;
+    double taxable = realizedPnL;
+    if (_taxLossCarryforward > 0) {
+      final offset = min(_taxLossCarryforward, taxable);
+      _taxLossCarryforward -= offset;
+      taxable -= offset;
+    }
+    if (taxable <= 0) {
+      unawaited(_saveTaxState());
+      return 0.0;
+    }
+    final tax = double.parse((taxable * capitalGainsTaxRate).toStringAsFixed(2));
+    _totalTaxPaid += tax;
+    unawaited(_saveTaxState());
+    return tax;
+  }
+
   List<LuxuryItem> get luxuryItems => _luxuryItems;
   List<PendingOrder> get pendingOrders => _pendingOrders
       .where((o) => o.status == PendingOrderStatus.pending)
@@ -192,7 +256,7 @@ class PortfolioProvider extends ChangeNotifier {
       _newsEvents.isNotEmpty ? _newsEvents.first : null;
   List<DailyQuest> get dailyQuests => questService.quests;
   int get loginStreakDays => questService.loginStreakDays;
-  // No public portfolio feed is available yet.
+
   // --- Öffentliches Portfolio (Copy-Trading-Feed) ---
   static const _keyPortfolioPublic = 'tg_portfolio_public_';
   bool _portfolioPublic = false;
@@ -295,7 +359,7 @@ class PortfolioProvider extends ChangeNotifier {
     if (!_rewards.isClosed) _rewards.add(e);
   }
 
-  // Insolvenz & Kreditsperre (5 echte Kalendertage = 120h)
+  // Insolvenz & Kreditsperre
   bool get isInsolvent => _isInsolvent || (_cash <= 0 && netWorth <= -10000);
   DateTime? get insolvencyLockoutUntil => _insolvencyLockoutUntil;
   DateTime? get lastLoanTakenAt => _lastLoanTakenAt;
@@ -312,7 +376,6 @@ class PortfolioProvider extends ChangeNotifier {
     return _insolvencyLockoutUntil!.difference(DateTime.now());
   }
 
-  // Kredit-Abkühlphase: Nach jedem Kredit mind. 24h Sperre
   bool get isLoanOnCooldown {
     if (_lastLoanTakenAt == null) return false;
     return DateTime.now().difference(_lastLoanTakenAt!).inHours < 24;
@@ -443,6 +506,34 @@ class PortfolioProvider extends ChangeNotifier {
   double get netProfit => netWorth - 25000.0;
   double get totalRoiPercent => netProfit / 25000.0;
 
+  double get weeklyRoiPercent => netWorthHistory.roiOverWindowPercent(
+        const Duration(days: 7),
+        currentNetWorth: netWorth,
+        fallbackRoiPercent: totalRoiPercent * 100,
+      );
+
+  double get monthlyRoiPercent => netWorthHistory.roiOverWindowPercent(
+        const Duration(days: 30),
+        currentNetWorth: netWorth,
+        fallbackRoiPercent: totalRoiPercent * 100,
+      );
+
+  double get maxDrawdownPercent => netWorthHistory.maxDrawdownPercent;
+
+  double get winRatePercent {
+    final closed = _transactions
+        .where(
+          (t) =>
+              (t.type == TransactionType.sell ||
+                  t.type == TransactionType.liquidation) &&
+              t.realizedPnL != null,
+        )
+        .toList();
+    if (closed.isEmpty) return 0.0;
+    final wins = closed.where((t) => (t.realizedPnL ?? 0) > 0).length;
+    return (wins / closed.length) * 100.0;
+  }
+
   int get totalPrestigePoints {
     int sum = 0;
     for (final item in _luxuryItems) {
@@ -515,8 +606,6 @@ class PortfolioProvider extends ChangeNotifier {
       newsCallback: _onNewsGenerated,
     );
 
-    // Fabricated news must not move prices supplied by market feeds.
-
     // Initialisiere Daily Quests
     await _initializeQuests();
     questService.recordTrade(
@@ -527,12 +616,19 @@ class PortfolioProvider extends ChangeNotifier {
       totalPositionsCount: _positions.length,
     );
 
-    // Initialisiere Automation Service (Limit-Orders & Bot-Trading)
-    await automationService.initialize();
+    // Initialisiere Automation Service (pro Profil + optional Cloud-Sync)
+    await automationService.initialize(profileId: _profileKey);
+    final cloudAuto = await repository.getCloudAutomationState();
+    if (cloudAuto != null) {
+      await automationService.applyCloudState(
+        unlockedSlotsCount: cloudAuto.unlockedSlotsCount,
+        orders: cloudAuto.orders,
+      );
+    }
 
     // Initialisiere Gamification Achievements
     await achievementService.initialize(
-      profileId: _activeUid == 'local_player' ? 'local' : _activeUid,
+      profileId: _profileKey,
       ledger: _ledger,
     );
     await _syncClaimedQuests();
@@ -553,15 +649,21 @@ class PortfolioProvider extends ChangeNotifier {
       notifyListeners();
     };
 
-    // Initialisiere Sparpläne & Benutzereinstellungen
+    // Initialisiere Sparpläne & Benutzereinstellungen (pro Profil)
     final prefs = await SharedPreferences.getInstance();
     _isSimplisticMode = prefs.getBool(_keySimplisticMode) ?? false;
     _isRealisticOrderDelay = prefs.getBool(_keyRealisticOrderDelay) ?? true;
-    await savingsPlanService.initialize();
+    await _loadTaxState();
+    await savingsPlanService.initialize(profileId: _profileKey);
+    final cloudSavings = await repository.getCloudSavingsPlans();
+    if (cloudSavings != null) {
+      await savingsPlanService.applyCloudPlans(cloudSavings);
+    }
     await netWorthHistory.load(_activeUid);
 
     // Initiales Update der Positionspreise, Leaderboard & Achievements
     _updatePositionsWithCurrentAssetPrices();
+    _refreshMarketNewsFromFeed();
     _updateLeaderboard();
     _checkAllAchievements();
 
@@ -576,10 +678,7 @@ class PortfolioProvider extends ChangeNotifier {
   }
 
   Future<void> _initializeQuests() async {
-    final profileId = repository is LocalTradingRepository
-        ? (repository as LocalTradingRepository).userId
-        : (_activeUid == 'local_player' ? 'local' : _activeUid);
-    await questService.initialize(profileId: profileId);
+    await questService.initialize(profileId: _profileKey);
   }
 
   void _listenToAuthChanges() {
@@ -641,8 +740,22 @@ class PortfolioProvider extends ChangeNotifier {
                 latest == null || date.isAfter(latest) ? date : latest,
           );
       await _initializeQuests();
+      await automationService.initialize(profileId: _profileKey);
+      final cloudAuto = await account.getCloudAutomationState();
+      if (cloudAuto != null) {
+        await automationService.applyCloudState(
+          unlockedSlotsCount: cloudAuto.unlockedSlotsCount,
+          orders: cloudAuto.orders,
+        );
+      }
+      await savingsPlanService.initialize(profileId: _profileKey);
+      final cloudSavings = await account.getCloudSavingsPlans();
+      if (cloudSavings != null) {
+        await savingsPlanService.applyCloudPlans(cloudSavings);
+      }
+      await _loadTaxState();
       await achievementService.initialize(
-        profileId: _activeUid == 'local_player' ? 'local' : _activeUid,
+        profileId: _profileKey,
         ledger: _ledger,
       );
       await _syncClaimedQuests();
@@ -670,6 +783,20 @@ class PortfolioProvider extends ChangeNotifier {
     });
   }
 
+  void _refreshMarketNewsFromFeed() {
+    final reports = newsService.buildMarketFeedReports(_assets);
+    if (reports.isEmpty) return;
+    final existingIds = _newsEvents.map((e) => e.id).toSet();
+    for (final r in reports.reversed) {
+      if (!existingIds.contains(r.id)) {
+        _newsEvents.insert(0, r);
+      }
+    }
+    if (_newsEvents.length > 30) {
+      _newsEvents.removeRange(30, _newsEvents.length);
+    }
+  }
+
   /// Holt echte Live-Kurse aus Binance & Yahoo / Cloud Function und aktualisiert Assets & Depot
   Future<void> fetchLiveMarketQuotes() async {
     if (_refreshingQuotes) return;
@@ -681,12 +808,9 @@ class PortfolioProvider extends ChangeNotifier {
         ..._positions.map((p) => p.assetId),
         ...pendingOrders.map((p) => p.assetId),
       };
-      // The ticker shows the first 10 instruments when nothing is watchlisted:
-      // they need quotes too, or it reads "Kein Kurs" next to real prices.
       if (!_assets.any((a) => a.isWatchlisted)) {
         wanted.addAll(_assets.take(10).map((a) => a.id));
       }
-      // Dashboard starts with a small default page; never refresh the whole catalog.
       if (wanted.isEmpty) wanted.addAll(_assets.take(20).map((a) => a.id));
       final quotes = await liveDataService.refreshQuotesForAssets(
         _assets.where((a) => wanted.contains(a.id)).toList(),
@@ -722,6 +846,7 @@ class PortfolioProvider extends ChangeNotifier {
           _assets = updatedAssets;
           marketEngine.updateAssetsReference(_assets);
           _updatePositionsWithCurrentAssetPrices();
+          _refreshMarketNewsFromFeed();
           _checkAndExecutePendingOrders();
           _checkAndExecuteAutomationOrders();
           _updateLeaderboard();
@@ -755,6 +880,7 @@ class PortfolioProvider extends ChangeNotifier {
     _checkAndExecutePendingOrders();
     _checkAndExecuteAutomationOrders();
     _checkBondsCouponPayout();
+    _checkOverdueLoans();
     _updateLeaderboard();
     _checkAllAchievements();
 
@@ -838,6 +964,8 @@ class PortfolioProvider extends ChangeNotifier {
     _lastAlertMessage =
         '⚠️ ZWANGSLIQUIDATION! Deine Position ${pos.symbol} (${pos.leverage}x Hebel) wurde liquidiert. Margin verloren!';
 
+    _applyCapitalGainsTax(-pos.collateral);
+
     final record = TransactionRecord(
       id: _uuid.v4(),
       symbol: pos.symbol,
@@ -867,6 +995,8 @@ class PortfolioProvider extends ChangeNotifier {
     double? cashFraction,
     int leverage = 1,
     bool isShort = false,
+    double? stopLossPrice,
+    double? takeProfitPrice,
   }) async {
     if (_isLoading) return false;
     if (asset.type == AssetType.bond) {
@@ -911,6 +1041,46 @@ class PortfolioProvider extends ChangeNotifier {
       return false;
     }
 
+    Future<void> attachProtectionOrders() async {
+      bool added = false;
+      if (stopLossPrice != null &&
+          stopLossPrice.isFinite &&
+          stopLossPrice > 0) {
+        await automationService.placeOrder(
+          assetId: asset.id,
+          symbol: asset.symbol,
+          name: asset.name,
+          orderType: AutomationOrderType.stopLoss,
+          targetPrice: stopLossPrice,
+          amount: amount,
+          bypassSlotLimit: true,
+        );
+        added = true;
+      }
+      if (takeProfitPrice != null &&
+          takeProfitPrice.isFinite &&
+          takeProfitPrice > 0) {
+        await automationService.placeOrder(
+          assetId: asset.id,
+          symbol: asset.symbol,
+          name: asset.name,
+          orderType: AutomationOrderType.takeProfit,
+          targetPrice: takeProfitPrice,
+          amount: amount,
+          bypassSlotLimit: true,
+        );
+        added = true;
+      }
+      if (added) {
+        unawaited(
+          repository.saveCloudAutomationState(
+            unlockedSlotsCount: automationService.unlockedSlotsCount,
+            orders: automationService.allOrders,
+          ),
+        );
+      }
+    }
+
     if (!isOpen) {
       // BÖRSE GESCHLOSSEN -> VORAB-ORDER ERSTELLEN
       _cash -= totalCost; // Cash für Vorab-Order reservieren
@@ -935,6 +1105,7 @@ class PortfolioProvider extends ChangeNotifier {
 
       _pendingOrders.insert(0, pendingOrder);
       await repository.savePendingOrders(_pendingOrders);
+      await attachProtectionOrders();
 
       _lastAlertMessage =
           '🕒 Börse geschlossen: Vorab-Kauforder für ${asset.symbol} vorgemerkt! Wird automatisch bei Marktöffnung ausgeführt.';
@@ -997,6 +1168,7 @@ class PortfolioProvider extends ChangeNotifier {
 
       _pendingOrders.insert(0, pendingOrder);
       await repository.savePendingOrders(_pendingOrders);
+      await attachProtectionOrders();
 
       _lastAlertMessage =
           '📡 Kauforder an $venue übermittelt! Geschätzte Ausführung: in ~$delayMinutes Min.';
@@ -1063,6 +1235,7 @@ class PortfolioProvider extends ChangeNotifier {
     }
 
     await repository.savePositions(_positions);
+    await attachProtectionOrders();
 
     // Transaktionshistorie eintragen
     final record = TransactionRecord(
@@ -1259,6 +1432,10 @@ class PortfolioProvider extends ChangeNotifier {
       realizedPnL = portionPnL;
     }
 
+    final taxDeducted = _applyCapitalGainsTax(realizedPnL);
+    cashReturn = max(0.0, cashReturn - taxDeducted);
+    final netRealizedPnL = realizedPnL - taxDeducted;
+
     _cash += cashReturn;
 
     if (sellAmount >= position.amount) {
@@ -1281,6 +1458,9 @@ class PortfolioProvider extends ChangeNotifier {
     await repository.saveCashBalance(_cash);
     await repository.savePositions(_positions);
 
+    final taxNote = taxDeducted > 0
+        ? ' (inkl. -${taxDeducted.toStringAsFixed(2)} € KESt)'
+        : '';
     final record = TransactionRecord(
       id: _uuid.v4(),
       symbol: position.symbol,
@@ -1289,10 +1469,10 @@ class PortfolioProvider extends ChangeNotifier {
       amount: sellAmount,
       price: asset.currentPrice,
       totalAmount: cashReturn,
-      realizedPnL: realizedPnL,
+      realizedPnL: netRealizedPnL,
       timestamp: DateTime.now(),
       note:
-          'Verkauf Realisiert: ${realizedPnL >= 0 ? "+" : ""}${realizedPnL.toStringAsFixed(2)} €',
+          'Verkauf Realisiert: ${netRealizedPnL >= 0 ? "+" : ""}${netRealizedPnL.toStringAsFixed(2)} €$taxNote',
     );
 
     _transactions.insert(0, record);
@@ -1302,19 +1482,19 @@ class PortfolioProvider extends ChangeNotifier {
       tradeAmount: cashReturn,
       isCommodity: position.type == AssetType.commodity,
       leverage: position.leverage,
-      profit: realizedPnL,
+      profit: netRealizedPnL,
       totalPositionsCount: _positions.length,
     );
 
     _updateLeaderboard(forceCloud: true);
     _lastAlertMessage =
-        'Verkauft: ${sellAmount.toStringAsFixed(2)}x ${position.symbol} (Rendite: ${realizedPnL >= 0 ? "+" : ""}${realizedPnL.toStringAsFixed(2)} €)';
+        'Verkauft: ${sellAmount.toStringAsFixed(2)}x ${position.symbol} (Rendite: ${netRealizedPnL >= 0 ? "+" : ""}${netRealizedPnL.toStringAsFixed(2)} €$taxNote)';
     _reward(
       RewardEvent(
-        kind: realizedPnL >= 0 ? RewardKind.profit : RewardKind.loss,
-        title: realizedPnL >= 0 ? 'Gewinn realisiert!' : 'Verlust realisiert',
+        kind: netRealizedPnL >= 0 ? RewardKind.profit : RewardKind.loss,
+        title: netRealizedPnL >= 0 ? 'Gewinn realisiert!' : 'Verlust realisiert',
         detail: '${_qty(sellAmount)} × ${position.symbol} verkauft',
-        cash: realizedPnL,
+        cash: netRealizedPnL,
       ),
     );
     notifyListeners();
@@ -1531,6 +1711,10 @@ class PortfolioProvider extends ChangeNotifier {
                 order.amount;
           }
 
+          final taxDeducted = _applyCapitalGainsTax(realizedPnL);
+          cashReturn = max(0.0, cashReturn - taxDeducted);
+          final netRealizedPnL = realizedPnL - taxDeducted;
+
           _cash += cashReturn;
           repository.saveCashBalance(_cash);
 
@@ -1542,7 +1726,7 @@ class PortfolioProvider extends ChangeNotifier {
             amount: order.amount,
             price: matchingAsset.currentPrice,
             totalAmount: cashReturn,
-            realizedPnL: realizedPnL,
+            realizedPnL: netRealizedPnL,
             timestamp: now,
             note:
                 'Börsen-Verkauf ausgeführt (${order.brokerVenue ?? "Orderbuch"})',
@@ -1554,7 +1738,7 @@ class PortfolioProvider extends ChangeNotifier {
             tradeAmount: cashReturn,
             isCommodity: matchingAsset.type == AssetType.commodity,
             leverage: order.leverage,
-            profit: realizedPnL,
+            profit: netRealizedPnL,
             totalPositionsCount: _positions.length,
           );
 
@@ -1566,7 +1750,7 @@ class PortfolioProvider extends ChangeNotifier {
               title: 'Verkaufs-Order ausgeführt',
               detail:
                   '${_qty(order.amount)} × ${matchingAsset.symbol} für ${cashReturn.toStringAsFixed(2)} €',
-              cash: realizedPnL,
+              cash: netRealizedPnL,
             ),
           );
         }
@@ -1586,19 +1770,35 @@ class PortfolioProvider extends ChangeNotifier {
     }
   }
 
-  /// Führt fällige Sparpläne automatisch aus
+  /// Führt fällige Sparpläne automatisch aus (inkl. Handelszeiten, Gebühren & Quests)
   Future<void> _checkSavingsPlans() async {
     final due = savingsPlanService.getDuePlans();
+    if (due.isEmpty) return;
+    bool anyExecuted = false;
     for (final plan in due) {
       final matchingAssets = _assets.where((a) => a.symbol == plan.assetSymbol);
       if (matchingAssets.isEmpty) continue;
       final asset = matchingAssets.first;
+      if (!isAssetMarketOpen(asset)) continue;
       if (asset.type == AssetType.bond) {
         await _checkBondsCouponPayout(force: true);
       }
-      if (_cash >= plan.amountEur && asset.currentPrice > 0) {
-        final shares = plan.amountEur / asset.currentPrice;
-        _cash -= plan.amountEur;
+      if (_cash >= plan.amountEur &&
+          asset.currentPrice.isFinite &&
+          asset.currentPrice > 0) {
+        final shares = TradingFeeService.maximumBuyAmount(
+          asset: asset,
+          cash: plan.amountEur,
+          leverage: 1,
+        );
+        if (!shares.isFinite || shares <= 0) continue;
+        final breakdown = TradingFeeService.calculateBuyFee(
+          asset: asset,
+          amount: shares,
+          leverage: 1,
+        );
+        final cost = min(plan.amountEur, breakdown.totalCashRequired);
+        _cash -= cost;
         await repository.saveCashBalance(_cash);
 
         final existingIndex = _positions.indexWhere(
@@ -1641,17 +1841,31 @@ class PortfolioProvider extends ChangeNotifier {
           type: TransactionType.buy,
           amount: shares,
           price: asset.currentPrice,
-          totalAmount: plan.amountEur,
+          totalAmount: cost,
           timestamp: DateTime.now(),
-          note: 'Automatischer Sparplan (${plan.frequency.displayName})',
+          note:
+              'Automatischer Sparplan (${plan.frequency.displayName}, inkl. ${breakdown.transactionFee.toStringAsFixed(2)} € Gebühr)',
         );
         _transactions.insert(0, record);
         await repository.saveTransaction(record);
-        await savingsPlanService.markExecuted(plan.id, plan.amountEur);
+        await savingsPlanService.markExecuted(plan.id, cost);
+        questService.recordTrade(
+          tradeAmount: cost,
+          isCommodity: asset.type == AssetType.commodity,
+          leverage: 1,
+          profit: 0,
+          totalPositionsCount: _positions.length,
+        );
+        anyExecuted = true;
         _lastAlertMessage =
-            '🏦 Sparplan ausgeführt: ${plan.amountEur.toStringAsFixed(2)} € in ${plan.assetSymbol} investiert!';
-        notifyListeners();
+            '🏦 Sparplan ausgeführt: ${cost.toStringAsFixed(2)} € in ${plan.assetSymbol} investiert!';
       }
+    }
+    if (anyExecuted) {
+      unawaited(repository.saveCloudSavingsPlans(savingsPlanService.plans));
+      _updateLeaderboard(forceCloud: true);
+      _checkAllAchievements();
+      notifyListeners();
     }
   }
 
@@ -1729,6 +1943,11 @@ class PortfolioProvider extends ChangeNotifier {
     buffer.writeln(
       'Realisierte G/V:  ${totalRealizedPnL.toStringAsFixed(2)} €',
     );
+    if (_isTaxModeEnabled || _totalTaxPaid > 0 || _taxLossCarryforward > 0) {
+      buffer.writeln(
+        'Gezahlte KESt:    ${_totalTaxPaid.toStringAsFixed(2)} € (Verlusttopf: ${_taxLossCarryforward.toStringAsFixed(2)} €)',
+      );
+    }
     buffer.writeln('----------------------------------------------------');
     buffer.writeln('DEPOTBESTAND:');
     if (_positions.isEmpty) {
@@ -1813,16 +2032,18 @@ class PortfolioProvider extends ChangeNotifier {
       if (now.isBefore(paidThrough)) continue;
       await prefs.setString(key, now.toIso8601String());
       if (payout <= 0) continue;
-      _cash += payout;
-      totalCouponPaid += payout;
+      final tax = _applyCapitalGainsTax(payout);
+      final netPayout = max(0.0, payout - tax);
+      _cash += netPayout;
+      totalCouponPaid += netPayout;
       final record = TransactionRecord(
         id: _uuid.v4(),
         symbol: pos.symbol,
         name: pos.name,
         type: TransactionType.couponPayout,
         amount: 1,
-        price: payout,
-        totalAmount: payout,
+        price: netPayout,
+        totalAmount: netPayout,
         timestamp: now,
         note: 'Zinskupon ${(rate * 100).toStringAsFixed(1)}% p.a. [${pos.id}]',
       );
@@ -1881,6 +2102,43 @@ class PortfolioProvider extends ChangeNotifier {
   }
 
   // --- KREDIT & SCHULDEN SYSTEM ---
+  bool _checkingOverdueLoans = false;
+  Future<void> _checkOverdueLoans() async {
+    if (_isLoading || _checkingOverdueLoans) return;
+    final overdue = activeLoans.where((l) => l.isOverdue).toList();
+    if (overdue.isEmpty) return;
+    _checkingOverdueLoans = true;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      bool changed = false;
+      for (final loan in overdue) {
+        if (_cash > 1.0 && loan.remainingDebt > 0) {
+          final autoPay = min(_cash, loan.remainingDebt);
+          await repayLoan(loan, autoPay);
+        }
+        if (!loan.isPaid && loan.remainingDebt > 0.01) {
+          final penaltyKey = 'tg_overdue_penalty_${_profileKey}_${loan.id}';
+          if (prefs.getBool(penaltyKey) != true) {
+            final fee = double.parse(
+              (loan.remainingDebt * 0.05).toStringAsFixed(2),
+            );
+            loan.remainingDebt += fee;
+            await prefs.setBool(penaltyKey, true);
+            changed = true;
+            _lastAlertMessage =
+                '⚠️ Kredit "${loan.title}" überfällig! +${fee.toStringAsFixed(2)} € Verzugszuschlag (5 %) berechnet.';
+          }
+        }
+      }
+      if (changed) {
+        await repository.saveLoans(_loans);
+        notifyListeners();
+      }
+    } finally {
+      _checkingOverdueLoans = false;
+    }
+  }
+
   Future<void> declareInsolvency() async {
     _isInsolvent = true;
     _insolvencyLockoutUntil = null; // Keine Kreditsperre: man kann sofort weiterspielen und Kredite aufnehmen!
@@ -1907,6 +2165,12 @@ class PortfolioProvider extends ChangeNotifier {
     for (final botOrder in List.from(automationService.activeOrders)) {
       await automationService.cancelOrder(botOrder.id);
     }
+    unawaited(
+      repository.saveCloudAutomationState(
+        unlockedSlotsCount: automationService.unlockedSlotsCount,
+        orders: automationService.allOrders,
+      ),
+    );
 
     if (_cash < 0) {
       _cash = 0;
@@ -1928,7 +2192,8 @@ class PortfolioProvider extends ChangeNotifier {
       price: 0,
       totalAmount: 0,
       timestamp: DateTime.now(),
-      note: 'Privatinsolvenz angemeldet. Sofortiger Neustart und Kreditaufnahme möglich!',
+      note:
+          'Privatinsolvenz angemeldet. Sofortiger Neustart und Kreditaufnahme möglich!',
     );
     _transactions.insert(0, record);
     await repository.saveTransaction(record);
@@ -2187,6 +2452,8 @@ class PortfolioProvider extends ChangeNotifier {
           : '${positions.first.symbol} & Momentum',
       netWorth: netWorth,
       roiPercent: totalRoiPercent * 100,
+      weeklyRoiPercent: weeklyRoiPercent,
+      monthlyRoiPercent: monthlyRoiPercent,
       isPlayer: true,
       luxuryCount: luxuryCount,
     );
@@ -2286,7 +2553,9 @@ class PortfolioProvider extends ChangeNotifier {
     final priced = <Asset, double>{};
     for (final e in trader.portfolioAllocation.entries) {
       final asset = _assets.where((a) => a.symbol == e.key).firstOrNull;
-      if (asset != null && asset.currentPrice.isFinite && asset.currentPrice > 0) {
+      if (asset != null &&
+          asset.currentPrice.isFinite &&
+          asset.currentPrice > 0) {
         priced[asset] = e.value;
       }
     }
@@ -2301,11 +2570,18 @@ class PortfolioProvider extends ChangeNotifier {
     _cash -= allocatedAmount;
     await repository.saveCashBalance(_cash);
 
+    bool anyCommodity = false;
     for (final entry in priced.entries) {
       final asset = entry.key;
+      if (asset.type == AssetType.commodity) anyCommodity = true;
       final sliceAmount = allocatedAmount * entry.value / weightSum;
 
-      final shares = sliceAmount / asset.currentPrice;
+      final shares = TradingFeeService.maximumBuyAmount(
+        asset: asset,
+        cash: sliceAmount,
+        leverage: 1,
+      );
+      if (!shares.isFinite || shares <= 0) continue;
 
       final existingIndex = _positions.indexWhere(
         (p) => p.symbol == asset.symbol && !p.isLeveraged,
@@ -2313,7 +2589,7 @@ class PortfolioProvider extends ChangeNotifier {
       if (existingIndex != -1) {
         final existing = _positions[existingIndex];
         final totalOld = existing.amount * existing.averageBuyPrice;
-        final totalNew = totalOld + sliceAmount;
+        final totalNew = totalOld + (shares * asset.currentPrice);
         final newShares = existing.amount + shares;
         _positions[existingIndex] = existing.copyWith(
           amount: newShares,
@@ -2350,11 +2626,20 @@ class PortfolioProvider extends ChangeNotifier {
     );
     _transactions.insert(0, record);
 
+    questService.recordTrade(
+      tradeAmount: allocatedAmount,
+      isCommodity: anyCommodity,
+      leverage: 1,
+      profit: 0,
+      totalPositionsCount: _positions.length,
+    );
+
     await repository.savePositions(_positions);
     await repository.saveTransaction(record);
     _lastAlertMessage =
         '🤝 Du kopierst jetzt ${trader.name} mit ${allocatedAmount.toStringAsFixed(0)} €!';
     _updateLeaderboard(forceCloud: true);
+    _checkAllAchievements();
     notifyListeners();
     return true;
   }
@@ -2373,8 +2658,11 @@ class PortfolioProvider extends ChangeNotifier {
 
   void payoutSimulatedDividends() {
     if (!canClaimMonthlyDividends) return;
-    final payout = monthlyPassiveIncome;
-    if (payout <= 0) return;
+    final grossPayout = monthlyPassiveIncome;
+    if (grossPayout <= 0) return;
+
+    final tax = _applyCapitalGainsTax(grossPayout);
+    final payout = max(0.0, grossPayout - tax);
 
     _cash += payout;
     repository.saveCashBalance(_cash);
@@ -2428,6 +2716,12 @@ class PortfolioProvider extends ChangeNotifier {
     });
 
     if (success) {
+      unawaited(
+        repository.saveCloudAutomationState(
+          unlockedSlotsCount: automationService.unlockedSlotsCount,
+          orders: automationService.allOrders,
+        ),
+      );
       _lastAlertMessage =
           '🤖 Neuer Trading-Bot Slot freigeschaltet! Mehr Automatisierung aktiv.';
       _checkAllAchievements();
@@ -2441,6 +2735,7 @@ class PortfolioProvider extends ChangeNotifier {
     required AutomationOrderType orderType,
     required double targetPrice,
     required double amount,
+    double? trailingPercent,
   }) async {
     final order = await automationService.placeOrder(
       assetId: asset.id,
@@ -2449,11 +2744,20 @@ class PortfolioProvider extends ChangeNotifier {
       orderType: orderType,
       targetPrice: targetPrice,
       amount: amount,
+      trailingPercent: trailingPercent,
+      initialObservedPrice: asset.currentPrice,
     );
 
     if (order != null) {
-      _lastAlertMessage =
-          '🤖 Limit-Order vorgemerkt: ${orderType.displayName} für ${asset.symbol} @ ${targetPrice.toStringAsFixed(2)} €';
+      unawaited(
+        repository.saveCloudAutomationState(
+          unlockedSlotsCount: automationService.unlockedSlotsCount,
+          orders: automationService.allOrders,
+        ),
+      );
+      _lastAlertMessage = orderType == AutomationOrderType.trailingStop
+          ? '🤖 Trailing-Stop (${(order.trailingPercent ?? 5).toStringAsFixed(1)} %) für ${asset.symbol} aktiviert (Start-Stop: ${order.targetPrice.toStringAsFixed(2)} €)'
+          : '🤖 Limit-Order vorgemerkt: ${orderType.displayName} für ${asset.symbol} @ ${targetPrice.toStringAsFixed(2)} €';
     } else {
       _lastAlertMessage =
           '⚠️ Kein freier Bot-Slot verfügbar! Schalte weitere Slots frei.';
@@ -2466,6 +2770,12 @@ class PortfolioProvider extends ChangeNotifier {
   Future<bool> cancelAutomationOrder(String orderId) async {
     final success = await automationService.cancelOrder(orderId);
     if (success) {
+      unawaited(
+        repository.saveCloudAutomationState(
+          unlockedSlotsCount: automationService.unlockedSlotsCount,
+          orders: automationService.allOrders,
+        ),
+      );
       _lastAlertMessage = 'Limit-Order storniert.';
       notifyListeners();
     }
@@ -2483,7 +2793,7 @@ class PortfolioProvider extends ChangeNotifier {
                 '🤖 Bot Limit-Kauf ausgeführt: ${order.amount}x ${order.symbol} @ ${asset.currentPrice.toStringAsFixed(2)} €';
           }
         } else {
-          // Take-Profit oder Stop-Loss
+          // Take-Profit, Stop-Loss oder Trailing-Stop
           final matchingPositions = _positions.where(
             (p) => p.assetId == asset.id || p.symbol == asset.symbol,
           );
@@ -2497,11 +2807,22 @@ class PortfolioProvider extends ChangeNotifier {
               sellAmount: sellAmt,
             );
             if (success) {
+              final label = switch (order.orderType) {
+                AutomationOrderType.takeProfit => 'Take-Profit',
+                AutomationOrderType.trailingStop => 'Trailing-Stop',
+                _ => 'Stop-Loss',
+              };
               _lastAlertMessage =
-                  '🤖 Bot Limit-Verkauf (${order.orderType == AutomationOrderType.takeProfit ? "Take-Profit" : "Stop-Loss"}) ausgeführt: ${sellAmt}x ${order.symbol} @ ${asset.currentPrice.toStringAsFixed(2)} €';
+                  '🤖 Bot Limit-Verkauf ($label) ausgeführt: ${sellAmt}x ${order.symbol} @ ${asset.currentPrice.toStringAsFixed(2)} €';
             }
           }
         }
+        unawaited(
+          repository.saveCloudAutomationState(
+            unlockedSlotsCount: automationService.unlockedSlotsCount,
+            orders: automationService.allOrders,
+          ),
+        );
         _checkAllAchievements();
         notifyListeners();
       },
@@ -2588,6 +2909,8 @@ class PortfolioProvider extends ChangeNotifier {
   // Spiel zurücksetzen (falls vom Nutzer gewünscht)
   Future<void> resetGame() async {
     await repository.resetGameToInitial();
+    await automationService.resetForProfile();
+    await savingsPlanService.resetForProfile();
     await _init();
   }
 

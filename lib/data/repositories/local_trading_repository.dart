@@ -1,7 +1,9 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/asset.dart';
+import '../models/automation_order.dart';
 import '../models/position.dart';
+import '../models/savings_plan.dart';
 import '../models/transaction.dart';
 import '../models/luxury_item.dart';
 import '../models/pending_order.dart';
@@ -17,7 +19,8 @@ class LocalTradingRepository implements TradingRepository {
   final String userId;
   LocalTradingRepository([this.userId = 'local']);
 
-  String _k(String base) => (userId == 'local' || userId.isEmpty) ? 'tg_$base' : 'tg_${userId}_$base';
+  String _k(String base) =>
+      (userId == 'local' || userId.isEmpty) ? 'tg_$base' : 'tg_${userId}_$base';
 
   String get _keyCash => _k('cash_balance');
   static const String _keyAssets = 'tg_assets';
@@ -57,8 +60,6 @@ class LocalTradingRepository implements TradingRepository {
       final saved = list
           .map((e) => Asset.fromJson(e as Map<String, dynamic>))
           .toList();
-      // Instruments added to the game after this list was saved (gold, oil,
-      // ...) would otherwise never show up for existing players.
       final defaults = {for (final a in InitialAssets.getAssets()) a.id: a};
       for (var i = 0; i < saved.length; i++) {
         final d = defaults[saved[i].id];
@@ -214,7 +215,10 @@ class LocalTradingRepository implements TradingRepository {
   }
 
   @override
-  Future<void> saveLeaderboard(List<LeaderboardEntry> entries, {bool forceCloud = false}) async {
+  Future<void> saveLeaderboard(
+    List<LeaderboardEntry> entries, {
+    bool forceCloud = false,
+  }) async {
     final prefs = await SharedPreferences.getInstance();
     final raw = jsonEncode(entries.map((e) => e.toJson()).toList());
     await prefs.setString(_keyLeaderboard, raw);
@@ -283,6 +287,22 @@ class LocalTradingRepository implements TradingRepository {
     };
     await prefs.setString(_keyInsolvency, jsonEncode(data));
   }
+
+  @override
+  Future<({int unlockedSlotsCount, List<AutomationOrder> orders})?>
+  getCloudAutomationState() async => null;
+
+  @override
+  Future<void> saveCloudAutomationState({
+    required int unlockedSlotsCount,
+    required List<AutomationOrder> orders,
+  }) async {}
+
+  @override
+  Future<List<SavingsPlan>?> getCloudSavingsPlans() async => null;
+
+  @override
+  Future<void> saveCloudSavingsPlans(List<SavingsPlan> plans) async {}
 
   @override
   Future<void> resetGameToInitial() async {
