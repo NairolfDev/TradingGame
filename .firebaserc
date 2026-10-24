@@ -1,5 +1,14 @@
 {
   "projects": {
     "default": "tradinggame-austria-prod"
+  },
+  "targets": {
+    "tradinggame-austria-prod": {
+      "hosting": {
+        "tradinggame-live": [
+          "tradinggame-live"
+        ]
+      }
+    }
   }
 }

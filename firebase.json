@@ -31,7 +31,6 @@
       ]
     },
     {
-      "site": "tradinggame-live",
       "public": "build/web",
       "ignore": [
         "firebase.json",
@@ -54,7 +53,8 @@
             }
           ]
         }
-      ]
+      ],
+      "target": "tradinggame-live"
     }
   ],
   "flutter": {
