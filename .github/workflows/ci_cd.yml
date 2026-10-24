@@ -6,6 +6,11 @@ on:
   pull_request:
     branches: [ main, dev ]
   workflow_dispatch:
+    inputs:
+      deploy_backend:
+        description: Update the version gate and deploy Firestore rules
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -74,7 +79,7 @@ jobs:
           projectId: tradinggame-austria-prod
 
       - name: Update Version Gate & Deploy Firestore Rules
-        if: github.event_name != 'pull_request'
+        if: github.event_name == 'workflow_dispatch' && inputs.deploy_backend
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
         run: |
